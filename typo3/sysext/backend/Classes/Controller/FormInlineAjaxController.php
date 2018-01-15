@@ -94,6 +94,12 @@ class FormInlineAjaxController
         /** @var FormDataCompiler $formDataCompiler */
         $formDataCompiler = GeneralUtility::makeInstance(FormDataCompiler::class, $formDataGroup);
         $parentData = $formDataCompiler->compile($formDataCompilerInputForParent);
+        if (isset($ajaxArguments['context'])) {
+            $context = json_decode($ajaxArguments['context'], true);
+            if (GeneralUtility::hmac(serialize($context['config'])) === $context['hmac']) {
+                $parentData['processedTca']['columns'][$parentFieldName]['config'] = $context['config'];
+            }
+        }
         $parentConfig = $parentData['processedTca']['columns'][$parentFieldName]['config'];
 
         // Child, a record from this table should be rendered
@@ -261,6 +267,12 @@ class FormInlineAjaxController
         /** @var FormDataCompiler $formDataCompiler */
         $formDataCompiler = GeneralUtility::makeInstance(FormDataCompiler::class, $formDataGroup);
         $parentData = $formDataCompiler->compile($formDataCompilerInputForParent);
+        if (isset($ajaxArguments['context'])) {
+            $context = json_decode($ajaxArguments['context'], true);
+            if (GeneralUtility::hmac(serialize($context['config'])) === $context['hmac']) {
+                $parentData['processedTca']['columns'][$parentFieldName]['config'] = $context['config'];
+            }
+        }
         $parentConfig = $parentData['processedTca']['columns'][$parentFieldName]['config'];
 
         if ($parentConfig['type'] === 'flex') {
@@ -359,6 +371,12 @@ class FormInlineAjaxController
             /** @var FormDataCompiler $formDataCompiler */
             $formDataCompiler = GeneralUtility::makeInstance(FormDataCompiler::class, $formDataGroup);
             $parentData = $formDataCompiler->compile($formDataCompilerInputForParent);
+            if (isset($ajaxArguments['context'])) {
+                $context = json_decode($ajaxArguments['context'], true);
+                if (GeneralUtility::hmac(serialize($context['config'])) === $context['hmac']) {
+                    $parentData['processedTca']['columns'][$parentFieldName]['config'] = $context['config'];
+                }
+            }
             $parentConfig = $parentData['processedTca']['columns'][$parentFieldName]['config'];
             $parentLanguageField = $parentData['processedTca']['ctrl']['languageField'];
             $parentLanguage = $parentData['databaseRow'][$parentLanguageField];
