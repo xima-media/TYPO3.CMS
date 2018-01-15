@@ -29,7 +29,7 @@ class LinkAnalyzer
      *
      * @var array
      */
-    protected $searchFields = array();
+    protected $searchFields = [];
 
     /**
      * List of comma separated page uids (rootline downwards)
@@ -43,35 +43,35 @@ class LinkAnalyzer
      *
      * @var array
      */
-    protected $linkCounts = array();
+    protected $linkCounts = [];
 
     /**
      * Array of tables and the number of broken external links they contain
      *
      * @var array
      */
-    protected $brokenLinkCounts = array();
+    protected $brokenLinkCounts = [];
 
     /**
      * Array of tables and records containing broken links
      *
      * @var array
      */
-    protected $recordsWithBrokenLinks = array();
+    protected $recordsWithBrokenLinks = [];
 
     /**
      * Array for hooks for own checks
      *
      * @var \TYPO3\CMS\Linkvalidator\Linktype\AbstractLinktype[]
      */
-    protected $hookObjectsArr = array();
+    protected $hookObjectsArr = [];
 
     /**
      * Array with information about the current page
      *
      * @var array
      */
-    protected $extPageInTreeInfo = array();
+    protected $extPageInTreeInfo = [];
 
     /**
      * Reference to the current element with table:uid, e.g. pages:85
@@ -92,7 +92,7 @@ class LinkAnalyzer
      *
      * @var array
      */
-    protected $tsConfig = array();
+    protected $tsConfig = [];
 
     /**
      * Fill hookObjectsArr with different link types and possible XClasses.
@@ -130,25 +130,27 @@ class LinkAnalyzer
      * @param bool $considerHidden Defines whether to look into hidden fields
      * @return void
      */
-    public function getLinkStatistics($checkOptions = array(), $considerHidden = false)
+    public function getLinkStatistics($checkOptions = [], $considerHidden = false)
     {
-        $results = array();
-        if (!empty($checkOptions)) {
+        $results = [];
+        $pidList = implode(',', GeneralUtility::intExplode(',', $this->pidList, true));
+        if (!empty($checkOptions) && !empty($pidList)) {
             $checkKeys = array_keys($checkOptions);
             $checkLinkTypeCondition = ' AND link_type IN (\'' . implode('\',\'', $checkKeys) . '\')';
             $this->getDatabaseConnection()->exec_DELETEquery(
                 'tx_linkvalidator_link',
-                '(record_pid IN (' . $this->pidList . ')' .
-                    ' OR ( record_uid IN (' . $this->pidList . ') AND table_name like \'pages\'))' .
+                '(record_pid IN (' . $pidList . ')' .
+                    ' OR ( record_uid IN (' . $pidList . ') AND table_name like \'pages\'))' .
                     $checkLinkTypeCondition
             );
             // Traverse all configured tables
             foreach ($this->searchFields as $table => $fields) {
                 if ($table === 'pages') {
-                    $where = 'deleted = 0 AND uid IN (' . $this->pidList . ')';
+                    $where = 'uid IN (' . $pidList . ')';
                 } else {
-                    $where = 'deleted = 0 AND pid IN (' . $this->pidList . ')';
+                    $where = 'pid IN (' . $pidList . ')';
                 }
+                $where .= BackendUtility::deleteClause($table);
                 if (!$considerHidden) {
                     $where .= BackendUtility::BEenableFields($table);
                 }
@@ -174,7 +176,7 @@ class LinkAnalyzer
                     //  Check them
                     foreach ($results[$key] as $entryKey => $entryValue) {
                         $table = $entryValue['table'];
-                        $record = array();
+                        $record = [];
                         $record['headline'] = BackendUtility::getRecordTitle($table, $entryValue['row']);
                         $record['record_pid'] = $entryValue['row']['pid'];
                         $record['record_uid'] = $entryValue['uid'];
@@ -194,7 +196,7 @@ class LinkAnalyzer
                         $checkUrl = $hookObj->checkLink($url, $entryValue, $this);
                         // Broken link found
                         if (!$checkUrl) {
-                            $response = array();
+                            $response = [];
                             $response['valid'] = false;
                             $response['errorParams'] = $hookObj->getErrorParams();
                             $this->brokenLinkCounts[$table]++;
@@ -203,7 +205,7 @@ class LinkAnalyzer
                             $record['url_response'] = serialize($response);
                             $this->getDatabaseConnection()->exec_INSERTquery('tx_linkvalidator_link', $record);
                         } elseif (GeneralUtility::_GP('showalllinks')) {
-                            $response = array();
+                            $response = [];
                             $response['valid'] = true;
                             $this->brokenLinkCounts[$table]++;
                             $record['url'] = $url;
@@ -328,7 +330,7 @@ class LinkAnalyzer
      */
     protected function analyseTypoLinks(array $resultArray, array &$results, $htmlParser, array $record, $field, $table)
     {
-        $currentR = array();
+        $currentR = [];
         $linkTags = $htmlParser->splitIntoBlock('link', $resultArray['content']);
         $idRecord = $record['uid'];
         $type = '';
@@ -384,7 +386,7 @@ class LinkAnalyzer
      */
     public function getLinkCounts($curPage)
     {
-        $markerArray = array();
+        $markerArray = [];
         if (empty($this->pidList)) {
             $this->pidList = $curPage;
         }
@@ -436,7 +438,7 @@ class LinkAnalyzer
                 foreach ($rows as $row) {
                     if ($begin <= 0 && ($row['hidden'] == 0 || $considerHidden)) {
                         $theList .= $row['uid'] . ',';
-                        $this->extPageInTreeInfo[] = array($row['uid'], htmlspecialchars($row['title'], $depth));
+                        $this->extPageInTreeInfo[] = [$row['uid'], htmlspecialchars($row['title'], $depth)];
                     }
                     if ($depth > 1 && (!($row['hidden'] == 1 && $row['extendToSubpages'] == 1) || $considerHidden)) {
                         $theList .= $this->extGetTreeList($row['uid'], $depth - 1, $begin - 1, $permsClause, $considerHidden);
@@ -489,7 +491,7 @@ class LinkAnalyzer
         return $this->getSignalSlotDispatcher()->dispatch(
             self::class,
             'beforeAnalyzeRecord',
-            array($results, $record, $table, $fields, $this)
+            [$results, $record, $table, $fields, $this]
         );
     }
 

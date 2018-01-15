@@ -62,8 +62,8 @@ class FormProtectionFactoryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function getForTypeBackEndWithExistingBackEndReturnsBackEndFormProtection()
     {
-        $userMock = $this->getMock(\TYPO3\CMS\Core\Authentication\BackendUserAuthentication::class, array(), array(), '', false);
-        $userMock->user = array('uid' => $this->getUniqueId());
+        $userMock = $this->getMock(\TYPO3\CMS\Core\Authentication\BackendUserAuthentication::class, [], [], '', false);
+        $userMock->user = ['uid' => $this->getUniqueId()];
         $this->assertInstanceOf(
             \TYPO3\CMS\Core\FormProtection\BackendFormProtection::class,
             FormProtectionFactory::get(
@@ -79,8 +79,8 @@ class FormProtectionFactoryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function getForTypeBackEndCalledTwoTimesReturnsTheSameInstance()
     {
-        $userMock = $this->getMock(\TYPO3\CMS\Core\Authentication\BackendUserAuthentication::class, array(), array(), '', false);
-        $userMock->user = array('uid' => $this->getUniqueId());
+        $userMock = $this->getMock(\TYPO3\CMS\Core\Authentication\BackendUserAuthentication::class, [], [], '', false);
+        $userMock->user = ['uid' => $this->getUniqueId()];
         $arguments = [
             \TYPO3\CMS\Core\FormProtection\BackendFormProtection::class,
             $userMock,
@@ -146,8 +146,8 @@ class FormProtectionFactoryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     {
         $flashMessageQueueMock = $this->getMock(
             \TYPO3\CMS\Core\Messaging\FlashMessageQueue::class,
-            array(),
-            array(),
+            [],
+            [],
             '',
             false
         );
@@ -155,8 +155,8 @@ class FormProtectionFactoryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
             ->expects($this->once())
             ->method('enqueue')
             ->with($this->isInstanceOf(\TYPO3\CMS\Core\Messaging\FlashMessage::class))
-            ->will($this->returnCallback(array($this, 'enqueueAjaxFlashMessageCallback')));
-        $languageServiceMock = $this->getMock(\TYPO3\CMS\Lang\LanguageService::class, array(), array(), '', false);
+            ->will($this->returnCallback([$this, 'enqueueAjaxFlashMessageCallback']));
+        $languageServiceMock = $this->getMock(\TYPO3\CMS\Lang\LanguageService::class, [], [], '', false);
         $languageServiceMock->expects($this->once())->method('sL')->will($this->returnValue('foo'));
 
         FormProtectionFactory::getMessageClosure($languageServiceMock, $flashMessageQueueMock, true)->__invoke();

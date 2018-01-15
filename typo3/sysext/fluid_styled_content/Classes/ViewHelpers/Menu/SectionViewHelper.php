@@ -15,6 +15,7 @@ namespace TYPO3\CMS\FluidStyledContent\ViewHelpers\Menu;
  */
 
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Fluid\Core\ViewHelper\AbstractViewHelper;
 
 /**
  * A view helper which returns content elements with 'Show in Section Menus' enabled
@@ -44,14 +45,9 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  * Content element 3 in page with uid = 1 and "Show in section menu's" enabled
  * </output>
  */
-class SectionViewHelper extends AbstractMenuViewHelper
+class SectionViewHelper extends AbstractViewHelper
 {
-    /**
-     * Output escaping is disabled as child content contains HTML by default
-     *
-     * @var bool
-     */
-    protected $escapeOutput = false;
+    use MenuViewHelperTrait;
 
     /**
      * Initialize ViewHelper arguments
@@ -81,13 +77,13 @@ class SectionViewHelper extends AbstractMenuViewHelper
             $pageUid = $this->getTypoScriptFrontendController()->id;
         }
 
-        if (!empty($type) && !in_array($type, array('all', 'header'), true)) {
+        if (!empty($type) && !in_array($type, ['all', 'header'], true)) {
             return '';
         }
 
-        return $this->renderChildrenWithVariables(array(
+        return $this->renderChildrenWithVariables([
             $as => $this->findBySection($pageUid, $type, $this->arguments['column'])
-        ));
+        ]);
     }
 
     /**
@@ -132,7 +128,7 @@ class SectionViewHelper extends AbstractMenuViewHelper
         $contentElements = $this->getTypoScriptFrontendController()->cObj->getRecords('tt_content', [
             'where' => $whereStatement,
             'orderBy' => 'sorting',
-            'languageField = sys_language_uid',
+            'languageField' => 'sys_language_uid',
             'pidInList' => (int)$pageUid
         ]);
 

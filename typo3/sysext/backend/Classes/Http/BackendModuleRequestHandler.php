@@ -24,6 +24,7 @@ use TYPO3\CMS\Core\FormProtection\FormProtectionFactory;
 use TYPO3\CMS\Core\Http\Dispatcher;
 use TYPO3\CMS\Core\Http\RequestHandlerInterface;
 use TYPO3\CMS\Core\Http\Response;
+use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 
@@ -41,7 +42,7 @@ class BackendModuleRequestHandler implements RequestHandlerInterface
     /**
      * @var array
      */
-    protected $moduleRegistry = array();
+    protected $moduleRegistry = [];
 
     /**
      * @var BackendUserAuthentication
@@ -82,10 +83,22 @@ class BackendModuleRequestHandler implements RequestHandlerInterface
             throw new Exception('The CSRF protection token for the requested module is missing or invalid', 1417988921);
         }
 
+        // Set to empty as it is not needed / always coming from typo3/index.php
+        $GLOBALS['BACK_PATH'] = '';
+
         $this->backendUserAuthentication = $GLOBALS['BE_USER'];
 
         $moduleName = (string)$this->request->getQueryParams()['M'];
-        return $this->dispatchModule($moduleName);
+        if ($this->isDispatchedModule($moduleName)) {
+            return $this->dispatchModule($moduleName);
+        } else {
+            // @deprecated: This else path is deprecated and throws deprecations logs at registration time. Can be removed with TYPO3 CMS 8.
+            $isDispatched = $this->callTraditionalModule($moduleName);
+            if (!$isDispatched) {
+                throw new Exception('No module "' . $moduleName . '" could be found.', 1294585070);
+            }
+        }
+        return null;
     }
 
     /**
@@ -95,13 +108,21 @@ class BackendModuleRequestHandler implements RequestHandlerInterface
      */
     protected function boot()
     {
+        // Evaluate the constant for skipping the BE user check for the bootstrap, will be done without the constant at a later point
+        if (defined('TYPO3_PROCEED_IF_NO_USER') && TYPO3_PROCEED_IF_NO_USER) {
+            $proceedIfNoUserIsLoggedIn = true;
+        } else {
+            $proceedIfNoUserIsLoggedIn = false;
+        }
+
         $this->bootstrap->checkLockedBackendAndRedirectOrDie()
             ->checkBackendIpOrDie()
             ->checkSslBackendAndRedirectIfNeeded()
             ->initializeBackendRouter()
-            ->loadExtensionTables()
+            ->loadExtensionTables(true)
+            ->initializeSpriteManager()
             ->initializeBackendUser()
-            ->initializeBackendAuthentication()
+            ->initializeBackendAuthentication($proceedIfNoUserIsLoggedIn)
             ->initializeLanguageObject()
             ->initializeBackendTemplate()
             ->endOutputBufferingAndCleanPreviousOutput()
@@ -132,6 +153,18 @@ class BackendModuleRequestHandler implements RequestHandlerInterface
     }
 
     /**
+     * A dispatched module is used, when no PATH is given.
+     * Traditional modules have a module path set.
+     *
+     * @param string $moduleName
+     * @return bool
+     */
+    protected function isDispatchedModule($moduleName)
+    {
+        return empty($this->moduleRegistry['_PATHS'][$moduleName]);
+    }
+
+    /**
      * Executes the modules configured via Extbase
      *
      * @param string $moduleName
@@ -149,7 +182,7 @@ class BackendModuleRequestHandler implements RequestHandlerInterface
         $this->backendUserAuthentication->modAccess($moduleConfiguration, true);
         $id = isset($this->request->getQueryParams()['id']) ? $this->request->getQueryParams()['id'] : $this->request->getParsedBody()['id'];
         if ($id && MathUtility::canBeInterpretedAsInteger($id)) {
-            $permClause = $this->backendUserAuthentication->getPagePermsClause(true);
+            $permClause = $this->backendUserAuthentication->getPagePermsClause(Permission::PAGE_SHOW);
             // Check page access
             $access = is_array(BackendUtility::readPageAccess((int)$id, $permClause));
             if (!$access) {
@@ -169,10 +202,10 @@ class BackendModuleRequestHandler implements RequestHandlerInterface
             $response = $dispatcher->dispatch($this->request, $response);
         } else {
             // extbase module
-            $configuration = array(
+            $configuration = [
                 'extensionName' => $moduleConfiguration['extensionName'],
                 'pluginName' => $moduleName
-            );
+            ];
             if (isset($moduleConfiguration['vendorName'])) {
                 $configuration['vendorName'] = $moduleConfiguration['vendorName'];
             }
@@ -185,6 +218,36 @@ class BackendModuleRequestHandler implements RequestHandlerInterface
         }
 
         return $response;
+    }
+
+    /**
+     * Calls traditional modules which are identified by having an index.php in their directory
+     * and were previously located within the global scope.
+     *
+     * @param string $moduleName
+     * @return bool Returns TRUE if the module was executed
+     */
+    protected function callTraditionalModule($moduleName)
+    {
+        $moduleBasePath = $this->moduleRegistry['_PATHS'][$moduleName];
+        // Some modules still rely on this global configuration array in a conf.php file
+        // load configuration from an existing conf.php file inside the same directory
+        if (file_exists($moduleBasePath . 'conf.php')) {
+            require $moduleBasePath . 'conf.php';
+            $moduleConfiguration = $MCONF;
+        } else {
+            $moduleConfiguration = $this->getModuleConfiguration($moduleName);
+        }
+        $GLOBALS['MCONF'] = $moduleConfiguration;
+        if (!empty($moduleConfiguration['access'])) {
+            $this->backendUserAuthentication->modAccess($moduleConfiguration, true);
+        }
+        if (file_exists($moduleBasePath . 'index.php')) {
+            global $SOBE;
+            require $moduleBasePath . 'index.php';
+            return true;
+        }
+        return false;
     }
 
     /**

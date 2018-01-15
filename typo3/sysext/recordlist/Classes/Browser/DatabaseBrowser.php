@@ -69,7 +69,7 @@ class DatabaseBrowser extends AbstractElementBrowser implements ElementBrowserIn
             $this->expandPage = (int)$data['expandPage'];
             $store = false;
         }
-        return array($data, $store);
+        return [$data, $store];
     }
 
     /**
@@ -89,6 +89,7 @@ class DatabaseBrowser extends AbstractElementBrowser implements ElementBrowserIn
         $pageTree->ext_pArrPages = $allowedTables === 'pages';
         $pageTree->ext_showNavTitle = (bool)$backendUser->getTSConfigVal('options.pageTree.showNavTitle');
         $pageTree->ext_showPageId = (bool)$backendUser->getTSConfigVal('options.pageTree.showPageIdWithTitle');
+        $pageTree->ext_showPathAboveMounts = (bool)$backendUser->getTSConfigVal('options.pageTree.showPathAboveMounts');
         $pageTree->addField('nav_title');
         $tree = $pageTree->getBrowsableTree();
 
@@ -125,7 +126,7 @@ class DatabaseBrowser extends AbstractElementBrowser implements ElementBrowserIn
 				<tr>';
         if ($withTree) {
             $content .= '<td class="c-wCell" valign="top">'
-                . '<h3>' . htmlspecialchars($this->getLanguageService()->getLL('pageTree')) . ':</h3>'
+                . '<h3>' . $this->getLanguageService()->getLL('pageTree', true) . ':</h3>'
                 . $this->getTemporaryTreeMountCancelNotice() . $tree . '</td>';
         }
         $content .= '<td class="c-wCell" valign="top">' . $renderedRecordList . '</td>
@@ -150,8 +151,8 @@ class DatabaseBrowser extends AbstractElementBrowser implements ElementBrowserIn
         if ((int)$this->getBackendUser()->getSessionData('pageTree_temporaryMountPoint') === 0) {
             return '';
         }
-        $link = '<p><a href="' . htmlspecialchars(GeneralUtility::linkThisScript(array('setTempDBmount' => 0))) . '" class="btn btn-primary">'
-            . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.temporaryDBmount')) . '</a></p>';
+        $link = '<p><a href="' . htmlspecialchars(GeneralUtility::linkThisScript(['setTempDBmount' => 0])) . '" class="btn btn-primary">'
+            . $this->getLanguageService()->sl('LLL:EXT:lang/locallang_core.xlf:labels.temporaryDBmount', true) . '</a></p>';
 
         return $link;
     }
@@ -203,7 +204,7 @@ class DatabaseBrowser extends AbstractElementBrowser implements ElementBrowserIn
             $tablesArr = GeneralUtility::trimExplode(',', $tables, true);
         }
 
-        $out = '<h3>' . htmlspecialchars($this->getLanguageService()->getLL('selectRecords')) . ':</h3>';
+        $out = '<h3>' . $this->getLanguageService()->getLL('selectRecords', true) . ':</h3>';
         // Create the header, showing the current page for which the listing is.
         // Includes link to the page itself, if pages are amount allowed tables.
         $titleLen = (int)$backendUser->uc['titleLen'];

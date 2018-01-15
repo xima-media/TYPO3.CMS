@@ -16,7 +16,9 @@ namespace TYPO3\CMS\Backend\Module;
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Lang\LanguageService;
 
 /**
@@ -36,21 +38,28 @@ class ModuleLoader
      *
      * @var array
      */
-    public $modules = array();
+    public $modules = [];
+
+    /**
+     * Array with paths pointing to the location of modules from extensions
+     *
+     * @var array
+     */
+    public $absPathArray = [];
 
     /**
      * This array will hold the elements that should go into the select-list of modules for groups...
      *
      * @var array
      */
-    public $modListGroup = array();
+    public $modListGroup = [];
 
     /**
      * This array will hold the elements that should go into the select-list of modules for users...
      *
      * @var array
      */
-    public $modListUser = array();
+    public $modListUser = [];
 
     /**
      * The backend user for use internally
@@ -71,13 +80,7 @@ class ModuleLoader
      *
      * @var array
      */
-    protected $navigationComponents = array();
-
-    /**
-     * Labels for the modules
-     * @var array
-     */
-    protected $moduleLabels = [];
+    protected $navigationComponents = [];
 
     /**
      * Init.
@@ -93,37 +96,121 @@ class ModuleLoader
         // Setting the backend user for use internally
         $this->BE_USER = $beUser ?: $GLOBALS['BE_USER'];
 
+        /*$modulesArray might look like this when entering this function.
+        Notice the two modules added by extensions - they have a path attachedArray
+        (
+        [web] => list,info,perm,func
+        [file] => list
+        [user] =>
+        [tools] => em,install,txphpmyadmin
+        [help] => about
+        [_PATHS] => Array
+        (
+        [system_install] => /www/htdocs/typo3/32/coreinstall/typo3/ext/install/mod/
+        [tools_txphpmyadmin] => /www/htdocs/typo3/32/coreinstall/typo3/ext/phpmyadmin/modsub/
+        ))
+         */
+        $this->absPathArray = $modulesArray['_PATHS'];
+        unset($modulesArray['_PATHS']);
+        // Unset the array for calling external backend module dispatchers in typo3/index.php
+        // (unused in Core, but in case some extension still sets this, we unset that)
+        unset($modulesArray['_dispatcher']);
         // Unset the array for calling backend modules based on external backend module dispatchers in typo3/index.php
         unset($modulesArray['_configuration']);
         $this->navigationComponents = $modulesArray['_navigationComponents'];
         unset($modulesArray['_navigationComponents']);
-        $mainModules = $this->parseModulesArray($modulesArray);
-
+        $theMods = $this->parseModulesArray($modulesArray);
+        // Originally modules were found in typo3/mod/
+        // User defined modules were found in ../typo3conf/
+        // Today almost all modules reside in extensions and they are found by the _PATHS array of the incoming $TBE_MODULES array
+        // Setting paths for 1) core modules (old concept from mod/) and 2) user-defined modules (from ../typo3conf)
+        $paths = [];
+        // Path of static modules
+        $paths['defMods'] = PATH_typo3 . 'mod/';
+        // Local modules (maybe frontend specific)
+        $paths['userMods'] = PATH_typo3 . '../typo3conf/';
         // Traverses the module setup and creates the internal array $this->modules
-        foreach ($mainModules as $mainModuleName => $subModules) {
-            $mainModuleConfiguration = $this->checkMod($mainModuleName);
-            // If $mainModuleConfiguration is not set (FALSE) there is no access to the module !(?)
-            if (is_array($mainModuleConfiguration)) {
-                $this->modules[$mainModuleName] = $mainModuleConfiguration;
-                // Load the submodules
-                if (is_array($subModules)) {
-                    foreach ($subModules as $subModuleName) {
-                        $subModuleConfiguration = $this->checkMod($mainModuleName . '_' . $subModuleName);
-                        if (is_array($subModuleConfiguration)) {
-                            $this->modules[$mainModuleName]['sub'][$subModuleName] = $subModuleConfiguration;
+        foreach ($theMods as $mods => $subMod) {
+            $path = null;
+            $extModRelPath = $this->checkExtensionModule($mods);
+            // EXTENSION module:
+            if ($extModRelPath) {
+                $theMainMod = $this->checkMod($mods, PATH_site . $extModRelPath);
+                if (is_array($theMainMod) || $theMainMod != 'notFound') {
+                    // ... just so it goes on... submodules cannot be within this path!
+                    $path = 1;
+                }
+            } else {
+                // 'CLASSIC' module
+                // Checking for typo3/mod/ module existence...
+                $theMainMod = $this->checkMod($mods, $paths['defMods'] . $mods);
+                if (is_array($theMainMod) || $theMainMod != 'notFound') {
+                    $path = $paths['defMods'];
+                } else {
+                    // If not typo3/mod/ then it could be user-defined in typo3conf/ ...?
+                    $theMainMod = $this->checkMod($mods, $paths['userMods'] . $mods);
+                    if (is_array($theMainMod) || $theMainMod != 'notFound') {
+                        $path = $paths['userMods'];
+                    }
+                }
+            }
+            // If $theMainMod is not set (FALSE) there is no access to the module !(?)
+            if ($theMainMod && !is_null($path)) {
+                $this->modules[$mods] = $theMainMod;
+                // SUBMODULES - if any - are loaded
+                if (is_array($subMod)) {
+                    foreach ($subMod as $valsub) {
+                        $extModRelPath = $this->checkExtensionModule($mods . '_' . $valsub);
+                        if ($extModRelPath) {
+                            // EXTENSION submodule:
+                            $theTempSubMod = $this->checkMod($mods . '_' . $valsub, PATH_site . $extModRelPath);
+                            // Default sub-module in either main-module-path, be it the default or the userdefined.
+                            if (is_array($theTempSubMod)) {
+                                $this->modules[$mods]['sub'][$valsub] = $theTempSubMod;
+                            }
+                        } else {
+                            // 'CLASSIC' submodule
+                            // Checking for typo3/mod/xxx/ module existence...
+                            // @todo what about $path = 1; from above and using $path as string here?
+                            $theTempSubMod = $this->checkMod($mods . '_' . $valsub, $path . $mods . '/' . $valsub);
+                            // Default sub-module in either main-module-path, be it the default or the userdefined.
+                            if (is_array($theTempSubMod)) {
+                                $this->modules[$mods]['sub'][$valsub] = $theTempSubMod;
+                            } elseif ($path == $paths['defMods']) {
+                                // If the submodule did not exist in the default module path, then check if there is a submodule in the submodule path!
+                                $theTempSubMod = $this->checkMod($mods . '_' . $valsub, $paths['userMods'] . $mods . '/' . $valsub);
+                                if (is_array($theTempSubMod)) {
+                                    $this->modules[$mods]['sub'][$valsub] = $theTempSubMod;
+                                }
+                            }
                         }
                     }
                 }
-            } elseif ($mainModuleConfiguration !== false) {
-                // Although the configuration was not found, still check if there are submodules
+            } else {
                 // This must be done in order to fill out the select-lists for modules correctly!!
-                if (is_array($subModules)) {
-                    foreach ($subModules as $subModuleName) {
-                        $this->checkMod($mainModuleName . '_' . $subModuleName);
+                if (is_array($subMod)) {
+                    foreach ($subMod as $valsub) {
+                        // @todo path can only be NULL here, or not?
+                        $this->checkMod($mods . '_' . $valsub, $path . $mods . '/' . $valsub);
                     }
                 }
             }
         }
+    }
+
+    /**
+     * If the module name ($name) is a module from an extension (has path in $this->absPathArray)
+     * then that path is returned relative to PATH_site
+     *
+     * @param string $name Module name
+     * @return string If found, the relative path from PATH_site
+     */
+    public function checkExtensionModule($name)
+    {
+        if (isset($this->absPathArray[$name])) {
+            return rtrim(PathUtility::stripPathSitePrefix($this->absPathArray[$name]), '/');
+        }
+        return '';
     }
 
     /**
@@ -135,26 +222,30 @@ class ModuleLoader
      * array():	    Configuration array, in case a valid module where access IS granted exists.
      *
      * @param string $name Module name
+     * @param string $fullPath Absolute path to module
      * @return string|bool|array See description of function
      */
-    public function checkMod($name)
+    public function checkMod($name, $fullPath)
     {
+        if ($name === 'user_ws' && !ExtensionManagementUtility::isLoaded('version')) {
+            return false;
+        }
         // Check for own way of configuring module
         if (is_array($GLOBALS['TBE_MODULES']['_configuration'][$name]['configureModuleFunction'])) {
             $obj = $GLOBALS['TBE_MODULES']['_configuration'][$name]['configureModuleFunction'];
             if (is_callable($obj)) {
-                $MCONF = call_user_func($obj, $name);
+                $MCONF = call_user_func($obj, $name, $fullPath);
                 if ($this->checkModAccess($name, $MCONF) !== true) {
                     return false;
                 }
-                $this->addLabelsForModule($name, $MCONF['labels']);
                 return $MCONF;
             }
         }
 
-        // merge configuration and labels into one array
-        $setupInformation = $this->getModuleSetupInformation($name);
+        // merges $MCONF and $MLANG from conf.php and the additional configuration of the module
+        $setupInformation = $this->getModuleSetupInformation($name, $fullPath);
 
+        // Because 'path/../path' does not work
         // clean up the configuration part
         if (empty($setupInformation['configuration'])) {
             return 'notFound';
@@ -169,7 +260,53 @@ class ModuleLoader
         $finalModuleConfiguration = $setupInformation['configuration'];
         $finalModuleConfiguration['name'] = $name;
         // Language processing. This will add module labels and image reference to the internal ->moduleLabels array of the LANG object.
-        $this->addLabelsForModule($name, ($finalModuleConfiguration['labels'] ?? $setupInformation['labels']));
+        $lang = $this->getLanguageService();
+        if (is_object($lang)) {
+            // $setupInformation['labels']['default']['tabs_images']['tab'] is for modules the reference
+            // to the module icon.
+            $defaultLabels = $setupInformation['labels']['default'];
+
+            // Here the path is transformed to an absolute reference.
+            if ($defaultLabels['tabs_images']['tab']) {
+                // Initializing search for alternative icon:
+                // Alternative icon key (might have an alternative set in $TBE_STYLES['skinImg']
+                $altIconKey = 'MOD:' . $name . '/' . $defaultLabels['tabs_images']['tab'];
+                $altIconAbsPath = is_array($GLOBALS['TBE_STYLES']['skinImg'][$altIconKey]) ? GeneralUtility::resolveBackPath(PATH_typo3 . $GLOBALS['TBE_STYLES']['skinImg'][$altIconKey][0]) : '';
+                // Setting icon, either default or alternative:
+                if ($altIconAbsPath && @is_file($altIconAbsPath)) {
+                    $defaultLabels['tabs_images']['tab'] = $altIconAbsPath;
+                } else {
+                    if (\TYPO3\CMS\Core\Utility\StringUtility::beginsWith($defaultLabels['tabs_images']['tab'], 'EXT:')) {
+                        list($extensionKey, $relativePath) = explode('/', substr($defaultLabels['tabs_images']['tab'], 4), 2);
+                        $defaultLabels['tabs_images']['tab'] = ExtensionManagementUtility::extPath($extensionKey) . $relativePath;
+                    } else {
+                        $defaultLabels['tabs_images']['tab'] = $fullPath . '/' . $defaultLabels['tabs_images']['tab'];
+                    }
+                }
+
+                $defaultLabels['tabs_images']['tab'] = $this->getRelativePath(PATH_typo3, $defaultLabels['tabs_images']['tab']);
+
+                // Finally, setting the icon with correct path:
+                if (substr($defaultLabels['tabs_images']['tab'], 0, 3) === '../') {
+                    $defaultLabels['tabs_images']['tab'] = PATH_site . substr($defaultLabels['tabs_images']['tab'], 3);
+                } else {
+                    $defaultLabels['tabs_images']['tab'] = PATH_typo3 . $defaultLabels['tabs_images']['tab'];
+                }
+            }
+
+            // If LOCAL_LANG references are used for labels of the module:
+            if ($defaultLabels['ll_ref']) {
+                // Now the 'default' key is loaded with the CURRENT language - not the english translation...
+                $defaultLabels['labels']['tablabel'] = $lang->sL($defaultLabels['ll_ref'] . ':mlang_labels_tablabel');
+                $defaultLabels['labels']['tabdescr'] = $lang->sL($defaultLabels['ll_ref'] . ':mlang_labels_tabdescr');
+                $defaultLabels['tabs']['tab'] = $lang->sL($defaultLabels['ll_ref'] . ':mlang_tabs_tab');
+                $lang->addModuleLabels($defaultLabels, $name . '_');
+            } else {
+                // ... otherwise use the old way:
+                $lang->addModuleLabels($defaultLabels, $name . '_');
+                $lang->addModuleLabels($setupInformation['labels'][$lang->lang], $name . '_');
+            }
+        }
 
         // Default script setup
         if ($setupInformation['configuration']['script'] === '_DISPATCH' || isset($setupInformation['configuration']['routeTarget'])) {
@@ -179,6 +316,9 @@ class ModuleLoader
                 // just go through BackendModuleRequestHandler where the routeTarget is resolved
                 $finalModuleConfiguration['script'] = BackendUtility::getModuleUrl($name);
             }
+        } elseif ($setupInformation['configuration']['script'] && file_exists($setupInformation['path'] . '/' . $setupInformation['configuration']['script'])) {
+            GeneralUtility::deprecationLog('Loading module "' . $name . '" as a standalone script. Script-based modules are deprecated since TYPO3 CMS 7. Support will be removed with TYPO3 CMS 8, use the "routeTarget" option or dispatched modules instead.');
+            $finalModuleConfiguration['script'] = $this->getRelativePath(PATH_typo3, $fullPath . '/' . $setupInformation['configuration']['script']);
         } else {
             $finalModuleConfiguration['script'] = BackendUtility::getModuleUrl('dummy');
         }
@@ -188,8 +328,20 @@ class ModuleLoader
                 $setupInformation['configuration']['navigationFrameModule'],
                 !empty($setupInformation['configuration']['navigationFrameModuleParameters'])
                     ? $setupInformation['configuration']['navigationFrameModuleParameters']
-                    : array()
+                    : []
             );
+        } elseif (!empty($setupInformation['configuration']['navFrameScript'])) {
+            GeneralUtility::deprecationLog('Loading navFrameScript "' . $setupInformation['configuration']['navFrameScript'] . '" as a standalone script. Script-based navigation frames are deprecated since TYPO3 CMS 7. Support will be removed with TYPO3 CMS 8, use "navigationFrameModule" option or the "navigationComponentId" option instead.');
+            // Navigation Frame Script (GET params could be added)
+            $navFrameScript = explode('?', $setupInformation['configuration']['navFrameScript']);
+            $navFrameScript = $navFrameScript[0];
+            if (file_exists($setupInformation['path'] . '/' . $navFrameScript)) {
+                $finalModuleConfiguration['navFrameScript'] = $this->getRelativePath(PATH_typo3, $fullPath . '/' . $setupInformation['configuration']['navFrameScript']);
+            }
+            // Additional params for Navigation Frame Script: "&anyParam=value&moreParam=1"
+            if ($setupInformation['configuration']['navFrameScriptParam']) {
+                $finalModuleConfiguration['navFrameScriptParam'] = $setupInformation['configuration']['navFrameScriptParam'];
+            }
         }
 
         // Check if this is a submodule
@@ -213,14 +365,36 @@ class ModuleLoader
      * some additional configuration
      *
      * @param \string $moduleName the combined name of the module, can be "web", "web_info", or "tools_log"
+     * @param \string $pathToModuleDirectory the path where the module data is put, used for the conf.php or the modScript
      * @return array an array with subarrays, named "configuration" (aka $MCONF), "labels" (previously known as $MLANG) and the stripped path
      */
-    protected function getModuleSetupInformation($moduleName)
+    protected function getModuleSetupInformation($moduleName, $pathToModuleDirectory)
     {
-        $moduleSetupInformation = array(
-            'configuration' => array(),
-            'labels' => array()
-        );
+
+        // Because 'path/../path' does not work
+        $path = preg_replace('/\\/[^\\/.]+\\/\\.\\.\\//', '/', $pathToModuleDirectory);
+
+        $moduleSetupInformation = [
+            'configuration' => [],
+            'labels' => [],
+            'path' => $path
+        ];
+
+        if (@is_dir($path) && file_exists($path . '/conf.php')) {
+            $MCONF = [];
+            $MLANG = [];
+
+            // The conf-file is included. This must be valid PHP.
+            include $path . '/conf.php';
+
+            // Move the global variables defined in conf.php into the local method
+            if (is_array($MCONF)) {
+                $moduleSetupInformation['configuration'] = $MCONF;
+            } else {
+                $moduleSetupInformation['configuration'] = [];
+            }
+            $moduleSetupInformation['labels'] = $MLANG;
+        }
 
         $moduleConfiguration = !empty($GLOBALS['TBE_MODULES']['_configuration'][$moduleName])
             ? $GLOBALS['TBE_MODULES']['_configuration'][$moduleName]
@@ -314,7 +488,7 @@ class ModuleLoader
      */
     public function parseModulesArray($arr)
     {
-        $theMods = array();
+        $theMods = [];
         if (is_array($arr)) {
             foreach ($arr as $mod => $subs) {
                 // Clean module name to alphanum
@@ -350,65 +524,36 @@ class ModuleLoader
     }
 
     /**
-     * Registers labels for a module in a unified way.
+     * Get relative path for $destDir compared to $baseDir
      *
-     * Legacy info: This was previously named
-     * - labels->tablabel (now called "shortdescription")
-     * - labels->tabdescr (now called "description")
-     * - tabs->tab (now called "title")
-     *
-     * The LLL information is stored, not the actual translated string.
-     *
-     * @param string $moduleName the name of the module
-     * @param string|array $labels the information about the three labels
+     * @param string $baseDir Base directory
+     * @param string $destDir Destination directory
+     * @return string The relative path of destination compared to base.
      */
-    public function addLabelsForModule($moduleName, $labels)
+    public function getRelativePath($baseDir, $destDir)
     {
-        // If LOCAL_LANG references are used for labels of the module:
-        if (is_string($labels)) {
-            // Extbase-based modules
-            $this->moduleLabels[$moduleName] = [
-                'shortdescription' => $labels . ':mlang_labels_tablabel',
-                'description' => $labels . ':mlang_labels_tabdescr',
-                'title' => $labels . ':mlang_tabs_tab',
-            ];
-        } elseif (isset($labels['title'])) {
-            // New way, where all labels can be LLL references
-            $this->moduleLabels[$moduleName] = $labels;
-        } elseif (isset($labels['ll_ref'])) {
-            // Classic, non-extbase module labels
-            $this->addLabelsForModule($moduleName, $labels['ll_ref']);
-        } else {
-            // Very old obsolete approach, don't use anymore, use one of the ways above.
-            if (is_object($this->getLanguageService())) {
-                $language = $this->getLanguageService()->lang;
-            } else {
-                $language = 'default';
-            }
-
-            if (isset($labels[$language]['ll_ref'])) {
-                $this->addLabelsForModule($moduleName, $labels[$language]['ll_ref']);
-            } elseif (isset($labels['default']['ll_ref'])) {
-                $this->addLabelsForModule($moduleName, $labels['default']['ll_ref']);
-            } else {
-                $this->moduleLabels[$moduleName] = [
-                    'shortdescription' => isset($labels[$language]['labels']['tablabel']) ? $labels[$language]['labels']['tablabel'] : $labels['default']['labels']['tablabel'],
-                    'description' => isset($labels[$language]['labels']['tabdescr']) ? $labels[$language]['labels']['tabdescr'] : $labels['default']['labels']['tabdescr'],
-                    'title' => isset($labels[$language]['tabs']['tab']) ? $labels[$language]['tabs']['tab'] : $labels['default']['tabs']['tab'],
-                ];
-            }
+        // A special case, the dirs are equal
+        if ($baseDir === $destDir) {
+            return './';
         }
-    }
-
-    /**
-     * Returns the labels for the given module
-     *
-     * @param string $moduleName
-     * @return array
-     */
-    public function getLabelsForModule($moduleName)
-    {
-        return isset($this->moduleLabels[$moduleName]) ? $this->moduleLabels[$moduleName] : array();
+        // Remove beginning
+        $baseDir = ltrim($baseDir, '/');
+        $destDir = ltrim($destDir, '/');
+        $found = true;
+        do {
+            $slash_pos = strpos($destDir, '/');
+            if ($slash_pos !== false && substr($destDir, 0, $slash_pos) == substr($baseDir, 0, $slash_pos)) {
+                $baseDir = substr($baseDir, $slash_pos + 1);
+                $destDir = substr($destDir, $slash_pos + 1);
+            } else {
+                $found = false;
+            }
+        } while ($found);
+        $slashes = strlen($baseDir) - strlen(str_replace('/', '', $baseDir));
+        for ($i = 0; $i < $slashes; $i++) {
+            $destDir = '../' . $destDir;
+        }
+        return GeneralUtility::resolveBackPath($destDir);
     }
 
     /**

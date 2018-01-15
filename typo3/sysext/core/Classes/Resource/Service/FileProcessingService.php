@@ -14,11 +14,8 @@ namespace TYPO3\CMS\Core\Resource\Service;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Resource;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extbase\Object\ObjectManager;
-use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
 
 /**
  * File processing service
@@ -36,7 +33,7 @@ class FileProcessingService
     protected $driver;
 
     /**
-     * @var Dispatcher
+     * @var \TYPO3\CMS\Extbase\SignalSlot\Dispatcher
      */
     protected $signalSlotDispatcher;
 
@@ -59,8 +56,8 @@ class FileProcessingService
         $this->storage = $storage;
         $this->driver = $driver;
 
-        /** @var $logManager LogManager */
-        $logManager = GeneralUtility::makeInstance(LogManager::class);
+        /** @var $logManager \TYPO3\CMS\Core\Log\LogManager */
+        $logManager = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Log\LogManager::class);
         $this->logger = $logManager->getLogger(__CLASS__);
     }
 
@@ -78,7 +75,7 @@ class FileProcessingService
     public function processFile(Resource\FileInterface $fileObject, Resource\ResourceStorage $targetStorage, $taskType, $configuration)
     {
         /** @var $processedFileRepository Resource\ProcessedFileRepository */
-        $processedFileRepository = GeneralUtility::makeInstance(Resource\ProcessedFileRepository::class);
+        $processedFileRepository = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Resource\ProcessedFileRepository::class);
 
         $processedFile = $processedFileRepository->findOneByOriginalFileAndTaskTypeAndConfiguration($fileObject, $taskType, $configuration);
 
@@ -107,6 +104,7 @@ class FileProcessingService
      */
     protected function process(Resource\ProcessedFile $processedFile, Resource\ResourceStorage $targetStorage)
     {
+
         // We only have to trigger the file processing if the file either is new, does not exist or the
         // original file has changed since the last processing run (the last case has to trigger a reprocessing
         // even if the original file was used until now)
@@ -114,12 +112,12 @@ class FileProcessingService
             $processedFile->isOutdated()) {
             $task = $processedFile->getTask();
             /** @var $processor Resource\Processing\LocalImageProcessor */
-            $processor = GeneralUtility::makeInstance(Resource\Processing\LocalImageProcessor::class);
+            $processor = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Resource\Processing\LocalImageProcessor::class);
             $processor->processTask($task);
 
             if ($task->isExecuted() && $task->isSuccessful() && $processedFile->isProcessed()) {
                 /** @var $processedFileRepository Resource\ProcessedFileRepository */
-                $processedFileRepository = GeneralUtility::makeInstance(Resource\ProcessedFileRepository::class);
+                $processedFileRepository = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Resource\ProcessedFileRepository::class);
                 $processedFileRepository->add($processedFile);
             }
         }
@@ -128,12 +126,13 @@ class FileProcessingService
     /**
      * Get the SignalSlot dispatcher
      *
-     * @return Dispatcher
+     * @return \TYPO3\CMS\Extbase\SignalSlot\Dispatcher
      */
     protected function getSignalSlotDispatcher()
     {
         if (!isset($this->signalSlotDispatcher)) {
-            $this->signalSlotDispatcher = GeneralUtility::makeInstance(ObjectManager::class)->get(Dispatcher::class);
+            $this->signalSlotDispatcher = GeneralUtility::makeInstance(\TYPO3\CMS\Extbase\Object\ObjectManager::class)
+                ->get(\TYPO3\CMS\Extbase\SignalSlot\Dispatcher::class);
         }
         return $this->signalSlotDispatcher;
     }
@@ -146,13 +145,9 @@ class FileProcessingService
      * @param string $context
      * @param array $configuration
      */
-    protected function emitPreFileProcessSignal(Resource\ProcessedFile $processedFile, Resource\FileInterface $file, $context, array $configuration = array())
+    protected function emitPreFileProcessSignal(Resource\ProcessedFile $processedFile, Resource\FileInterface $file, $context, array $configuration = [])
     {
-        $this->getSignalSlotDispatcher()->dispatch(
-            Resource\ResourceStorage::class,
-            self::SIGNAL_PreFileProcess,
-            array($this, $this->driver, $processedFile, $file, $context, $configuration)
-        );
+        $this->getSignalSlotDispatcher()->dispatch(\TYPO3\CMS\Core\Resource\ResourceStorage::class, self::SIGNAL_PreFileProcess, [$this, $this->driver, $processedFile, $file, $context, $configuration]);
     }
 
     /**
@@ -163,12 +158,8 @@ class FileProcessingService
      * @param $context
      * @param array $configuration
      */
-    protected function emitPostFileProcessSignal(Resource\ProcessedFile $processedFile, Resource\FileInterface $file, $context, array $configuration = array())
+    protected function emitPostFileProcessSignal(Resource\ProcessedFile $processedFile, Resource\FileInterface $file, $context, array $configuration = [])
     {
-        $this->getSignalSlotDispatcher()->dispatch(
-            Resource\ResourceStorage::class,
-            self::SIGNAL_PostFileProcess,
-            array($this, $this->driver, $processedFile, $file, $context, $configuration)
-        );
+        $this->getSignalSlotDispatcher()->dispatch(\TYPO3\CMS\Core\Resource\ResourceStorage::class, self::SIGNAL_PostFileProcess, [$this, $this->driver, $processedFile, $file, $context, $configuration]);
     }
 }

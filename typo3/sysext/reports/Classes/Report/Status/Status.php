@@ -14,12 +14,8 @@ namespace TYPO3\CMS\Reports\Report\Status;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Registry;
-use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Lang\LanguageService;
 use TYPO3\CMS\Reports\ExtendedStatusProviderInterface;
 use TYPO3\CMS\Reports\ReportInterface;
-use TYPO3\CMS\Reports\Status as ReportStatus;
 use TYPO3\CMS\Reports\StatusProviderInterface;
 
 /**
@@ -30,7 +26,7 @@ class Status implements ReportInterface
     /**
      * @var StatusProviderInterface[][]
      */
-    protected $statusProviders = array();
+    protected $statusProviders = [];
 
     /**
      * Constructor for class tx_reports_report_Status
@@ -38,7 +34,7 @@ class Status implements ReportInterface
     public function __construct()
     {
         $this->getStatusProviders();
-        $this->getLanguageService()->includeLLFile('EXT:reports/Resources/Private/Language/locallang_reports.xlf');
+        $GLOBALS['LANG']->includeLLFile('EXT:reports/Resources/Private/Language/locallang_reports.xlf');
     }
 
     /**
@@ -52,9 +48,9 @@ class Status implements ReportInterface
         $status = $this->getSystemStatus();
         $highestSeverity = $this->getHighestSeverity($status);
         // Updating the registry
-        $registry = GeneralUtility::makeInstance(Registry::class);
+        $registry = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Registry::class);
         $registry->set('tx_reports', 'status.highestSeverity', $highestSeverity);
-        $content .= '<p class="lead">' . $this->getLanguageService()->getLL('status_report_explanation') . '</p>';
+        $content .= '<p class="lead">' . $GLOBALS['LANG']->getLL('status_report_explanation') . '</p>';
         return $content . $this->renderStatus($status);
     }
 
@@ -66,9 +62,9 @@ class Status implements ReportInterface
     protected function getStatusProviders()
     {
         foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['reports']['tx_reports']['status']['providers'] as $key => $statusProvidersList) {
-            $this->statusProviders[$key] = array();
+            $this->statusProviders[$key] = [];
             foreach ($statusProvidersList as $statusProvider) {
-                $statusProviderInstance = GeneralUtility::makeInstance($statusProvider);
+                $statusProviderInstance = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance($statusProvider);
                 if ($statusProviderInstance instanceof StatusProviderInterface) {
                     $this->statusProviders[$key][] = $statusProviderInstance;
                 }
@@ -83,9 +79,9 @@ class Status implements ReportInterface
      */
     public function getSystemStatus()
     {
-        $status = array();
+        $status = [];
         foreach ($this->statusProviders as $statusProviderId => $statusProviderList) {
-            $status[$statusProviderId] = array();
+            $status[$statusProviderId] = [];
             foreach ($statusProviderList as $statusProvider) {
                 $statuses = $statusProvider->getStatus();
                 $status[$statusProviderId] = array_merge($status[$statusProviderId], $statuses);
@@ -101,9 +97,9 @@ class Status implements ReportInterface
      */
     public function getDetailedSystemStatus()
     {
-        $status = array();
+        $status = [];
         foreach ($this->statusProviders as $statusProviderId => $statusProviderList) {
-            $status[$statusProviderId] = array();
+            $status[$statusProviderId] = [];
             foreach ($statusProviderList as $statusProvider) {
                 if ($statusProvider instanceof ExtendedStatusProviderInterface) {
                     $statuses = $statusProvider->getDetailedStatus();
@@ -122,15 +118,15 @@ class Status implements ReportInterface
      */
     public function getHighestSeverity(array $statusCollection)
     {
-        $highestSeverity = ReportStatus::NOTICE;
+        $highestSeverity = \TYPO3\CMS\Reports\Status::NOTICE;
         foreach ($statusCollection as $statusProvider => $providerStatuses) {
-            /** @var ReportStatus $status */
+            /** @var $status \TYPO3\CMS\Reports\Status */
             foreach ($providerStatuses as $status) {
                 if ($status->getSeverity() > $highestSeverity) {
                     $highestSeverity = $status->getSeverity();
                 }
                 // Reached the highest severity level, no need to go on
-                if ($highestSeverity == ReportStatus::ERROR) {
+                if ($highestSeverity == \TYPO3\CMS\Reports\Status::ERROR) {
                     break;
                 }
             }
@@ -158,23 +154,23 @@ class Status implements ReportInterface
         foreach ($statuses as $provider => $providerStatus) {
             $providerState = $this->sortStatuses($providerStatus);
             $id++;
-            $classes = array(
-                ReportStatus::NOTICE => 'notice',
-                ReportStatus::INFO => 'info',
-                ReportStatus::OK => 'success',
-                ReportStatus::WARNING => 'warning',
-                ReportStatus::ERROR => 'danger'
-            );
+            $classes = [
+                \TYPO3\CMS\Reports\Status::NOTICE => 'notice',
+                \TYPO3\CMS\Reports\Status::INFO => 'info',
+                \TYPO3\CMS\Reports\Status::OK => 'success',
+                \TYPO3\CMS\Reports\Status::WARNING => 'warning',
+                \TYPO3\CMS\Reports\Status::ERROR => 'danger'
+            ];
             $messages = '';
-            /** @var ReportStatus $status */
+            /** @var $status \TYPO3\CMS\Reports\Status */
             foreach ($providerState as $status) {
                 $severity = $status->getSeverity();
-                $messages .= strtr($template, array(
+                $messages .= strtr($template, [
                     '###CLASS###' => $classes[$severity],
                     '###HEADER###' => $status->getTitle(),
                     '###STATUS###' => $status->getValue(),
                     '###CONTENT###' => $status->getMessage()
-                ));
+                ]);
             }
             $header = '<h2>' . $provider . '</h2>';
             $table = '<table class="table table-striped table-hover">';
@@ -197,25 +193,25 @@ class Status implements ReportInterface
         // Extract the primary status collections, i.e. the status groups
         // that must appear on top of the status report
         // Change their keys to localized collection titles
-        $primaryStatuses = array(
-            $this->getLanguageService()->getLL('status_typo3') => $statusCollection['typo3'],
-            $this->getLanguageService()->getLL('status_system') => $statusCollection['system'],
-            $this->getLanguageService()->getLL('status_security') => $statusCollection['security'],
-            $this->getLanguageService()->getLL('status_configuration') => $statusCollection['configuration']
-        );
+        $primaryStatuses = [
+            $GLOBALS['LANG']->getLL('status_typo3') => $statusCollection['typo3'],
+            $GLOBALS['LANG']->getLL('status_system') => $statusCollection['system'],
+            $GLOBALS['LANG']->getLL('status_security') => $statusCollection['security'],
+            $GLOBALS['LANG']->getLL('status_configuration') => $statusCollection['configuration']
+        ];
         unset($statusCollection['typo3'], $statusCollection['system'], $statusCollection['security'], $statusCollection['configuration']);
         // Assemble list of secondary status collections with left-over collections
         // Change their keys using localized labels if available
         // @todo extract into getLabel() method
-        $secondaryStatuses = array();
+        $secondaryStatuses = [];
         foreach ($statusCollection as $statusProviderId => $collection) {
             $label = '';
             if (strpos($statusProviderId, 'LLL:') === 0) {
                 // Label provided by extension
-                $label = $this->getLanguageService()->sL($statusProviderId);
+                $label = $GLOBALS['LANG']->sL($statusProviderId);
             } else {
                 // Generic label
-                $label = $this->getLanguageService()->getLL('status_' . $statusProviderId);
+                $label = $GLOBALS['LANG']->getLL('status_' . $statusProviderId);
             }
             $providerLabel = empty($label) ? $statusProviderId : $label;
             $secondaryStatuses[$providerLabel] = $collection;
@@ -234,10 +230,10 @@ class Status implements ReportInterface
      */
     protected function sortStatuses(array $statusCollection)
     {
-        $statuses = array();
-        $sortTitle = array();
+        $statuses = [];
+        $sortTitle = [];
         $header = null;
-        /** @var ReportStatus $status */
+        /** @var $status \TYPO3\CMS\Reports\Status */
         foreach ($statusCollection as $status) {
             if ($status->getTitle() === 'TYPO3') {
                 $header = $status;
@@ -252,13 +248,5 @@ class Status implements ReportInterface
             array_unshift($statuses, $header);
         }
         return $statuses;
-    }
-
-    /**
-     * @return LanguageService
-     */
-    protected function getLanguageService()
-    {
-        return $GLOBALS['LANG'];
     }
 }

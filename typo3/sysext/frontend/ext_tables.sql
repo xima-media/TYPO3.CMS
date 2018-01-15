@@ -61,7 +61,7 @@ CREATE TABLE fe_session_data (
 #
 CREATE TABLE fe_sessions (
 	ses_id varchar(32) DEFAULT '' NOT NULL,
-	ses_name varchar(32) DEFAULT '' NOT NULL,
+	ses_name varchar(100) DEFAULT '' NOT NULL,
 	ses_iplock varchar(39) DEFAULT '' NOT NULL,
 	ses_hashlock int(11) DEFAULT '0' NOT NULL,
 	ses_userid int(11) unsigned DEFAULT '0' NOT NULL,
@@ -172,7 +172,7 @@ CREATE TABLE sys_domain (
 	crdate int(11) unsigned DEFAULT '0' NOT NULL,
 	cruser_id int(11) unsigned DEFAULT '0' NOT NULL,
 	hidden tinyint(4) unsigned DEFAULT '0' NOT NULL,
-	domainName varchar(80) DEFAULT '' NOT NULL,
+	domainName varchar(255) DEFAULT '' NOT NULL,
 	redirectTo varchar(255) DEFAULT '' NOT NULL,
 	redirectHttpStatusCode int(4) unsigned DEFAULT '301' NOT NULL,
 	sorting int(10) unsigned DEFAULT '0' NOT NULL,

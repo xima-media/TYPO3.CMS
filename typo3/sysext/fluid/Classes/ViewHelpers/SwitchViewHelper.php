@@ -11,12 +11,10 @@ namespace TYPO3\CMS\Fluid\ViewHelpers;
  * The TYPO3 project - inspiring people to share!                         *
  *                                                                        */
 
-use TYPO3Fluid\Fluid\Core\Compiler\StopCompilingException;
-use TYPO3Fluid\Fluid\Core\Compiler\TemplateCompiler;
-use TYPO3Fluid\Fluid\Core\Parser\SyntaxTree\NodeInterface;
-use TYPO3Fluid\Fluid\Core\Parser\SyntaxTree\ViewHelperNode;
-use TYPO3Fluid\Fluid\ViewHelpers\CaseViewHelper as OriginalCaseViewHelper;
-use TYPO3Fluid\Fluid\ViewHelpers\DefaultCaseViewHelper;
+use TYPO3\CMS\Fluid\Core\Rendering\RenderingContextInterface;
+use TYPO3\CMS\Fluid\Core\ViewHelper\AbstractViewHelper;
+use TYPO3\CMS\Fluid\Core\ViewHelper\Facets\ChildNodeAccessInterface;
+use TYPO3\CMS\Fluid\Core\ViewHelper\Facets\CompilableInterface;
 
 /**
  * Switch view helper which can be used to render content depending on a value or expression.
@@ -28,11 +26,11 @@ use TYPO3Fluid\Fluid\ViewHelpers\DefaultCaseViewHelper;
  * <f:switch expression="{person.gender}">
  *   <f:case value="male">Mr.</f:case>
  *   <f:case value="female">Mrs.</f:case>
- *   <f:defaultCase>Mrs. or Mr.</f:defaultCase>
+ *   <f:case default="TRUE">Mrs. or Mr.</f:case>
  * </f:switch>
  * </code>
  * <output>
- * Mr. / Mrs. (depending on the value of {person.gender}) or if no value evaluates to TRUE, defaultCase
+ * Mr. / Mrs. (depending on the value of {person.gender}) or if no value evaluates to TRUE, default case
  * </output>
  *
  * Note: Using this view helper can be a sign of weak architecture. If you end up using it extensively
@@ -43,51 +41,84 @@ use TYPO3Fluid\Fluid\ViewHelpers\DefaultCaseViewHelper;
  *
  * @api
  */
-class SwitchViewHelper extends \TYPO3Fluid\Fluid\ViewHelpers\SwitchViewHelper
+class SwitchViewHelper extends AbstractViewHelper implements ChildNodeAccessInterface, CompilableInterface
 {
     /**
-     * @param NodeInterface $node
-     * @return bool
+     * An array of \TYPO3\CMS\Fluid\Core\Parser\SyntaxTree\AbstractNode
+     * @var array
      */
-    protected function isDefaultCaseNode(NodeInterface $node)
+    private $childNodes = [];
+
+    /**
+     * @var mixed
+     */
+    protected $backupSwitchExpression = null;
+
+    /**
+     * @var bool
+     */
+    protected $backupBreakState = false;
+
+    /**
+     * Setter for ChildNodes - as defined in ChildNodeAccessInterface
+     *
+     * @param array $childNodes Child nodes of this syntax tree node
+     * @return void
+     */
+    public function setChildNodes(array $childNodes)
     {
-        if ($node instanceof ViewHelperNode) {
-            $viewHelperClassName = $node->getViewHelperClassName();
-            $arguments = $node->getArguments();
-            return (
-                $viewHelperClassName === DefaultCaseViewHelper::class ||
-                (
-                    $viewHelperClassName === CaseViewHelper::class && isset($arguments['default']) && $arguments['default']
-                )
-            );
-        }
-        return false;
+        $this->childNodes = $childNodes;
     }
 
     /**
-     * @param NodeInterface $node
-     * @return bool
+     * @param mixed $expression
+     * @return string the rendered string
+     * @api
      */
-    protected function isCaseNode(NodeInterface $node)
+    public function render($expression)
     {
-        if ($node instanceof ViewHelperNode) {
-            $viewHelperClassName = $node->getViewHelperClassName();
-            return ($viewHelperClassName === CaseViewHelper::class || $viewHelperClassName === OriginalCaseViewHelper::class);
-        }
-        return false;
+        return static::renderStatic(
+            [
+                'expression' => $expression
+            ],
+            $this->buildRenderChildrenClosure(),
+            $this->renderingContext
+        );
     }
 
     /**
-     * @param string $argumentsName
-     * @param string $closureName
-     * @param string $initializationPhpCode
-     * @param ViewHelperNode $node
-     * @param TemplateCompiler $compiler
+     * Default implementation for CompilableInterface. See CompilableInterface
+     * for a detailed description of this method.
+     *
+     * @param array $arguments
+     * @param \Closure $renderChildrenClosure
+     * @param RenderingContextInterface $renderingContext
+     * @return mixed
+     * @see \TYPO3\CMS\Fluid\Core\ViewHelper\Facets\CompilableInterface
      */
-    public function compile($argumentsName, $closureName, &$initializationPhpCode, ViewHelperNode $node, TemplateCompiler $compiler)
+    public static function renderStatic(array $arguments, \Closure $renderChildrenClosure, RenderingContextInterface $renderingContext)
     {
-        if (count($node->getChildNodes())) {
-            throw new StopCompilingException();
+        $viewHelperVariableContainer = $renderingContext->getViewHelperVariableContainer();
+
+        $stackValue = [
+            'expression' => $arguments['expression'],
+            'break' => false
+        ];
+
+        if ($viewHelperVariableContainer->exists(self::class, 'stateStack')) {
+            $stateStack = $viewHelperVariableContainer->get(self::class, 'stateStack');
+        } else {
+            $stateStack = [];
         }
+        $stateStack[] = $stackValue;
+        $viewHelperVariableContainer->addOrUpdate(self::class, 'stateStack', $stateStack);
+
+        $result = $renderChildrenClosure();
+
+        $stateStack = $viewHelperVariableContainer->get(self::class, 'stateStack');
+        array_pop($stateStack);
+        $viewHelperVariableContainer->addOrUpdate(self::class, 'stateStack', $stateStack);
+
+        return $result;
     }
 }

@@ -59,7 +59,7 @@ class DatabaseUserPermissionCheckTest extends UnitTestCase
     {
         $this->beUserProphecy->isAdmin()->willReturn(true);
 
-        $result = $this->subject->addData(array());
+        $result = $this->subject->addData([]);
 
         $this->assertSame(Permission::ALL, $result['userPermissionOnPage']);
     }
@@ -75,8 +75,7 @@ class DatabaseUserPermissionCheckTest extends UnitTestCase
         $this->beUserProphecy->isAdmin()->willReturn(false);
         $this->beUserProphecy->check('tables_modify', $input['tableName'])->willReturn(false);
 
-        $this->expectException(AccessDeniedTableModifyException::class);
-        $this->expectExceptionCode(1437683248);
+        $this->setExpectedException(AccessDeniedTableModifyException::class, $this->anything(), 1437683248);
 
         $this->subject->addData($input);
     }
@@ -98,8 +97,7 @@ class DatabaseUserPermissionCheckTest extends UnitTestCase
         $this->beUserProphecy->check('tables_modify', $input['tableName'])->willReturn(true);
         $this->beUserProphecy->calcPerms(['pid' => 321])->willReturn(Permission::NOTHING);
 
-        $this->expectException(AccessDeniedContentEditException::class);
-        $this->expectExceptionCode(1437679657);
+        $this->setExpectedException(AccessDeniedContentEditException::class, 1437679657);
 
         $this->subject->addData($input);
     }
@@ -145,8 +143,33 @@ class DatabaseUserPermissionCheckTest extends UnitTestCase
         $this->beUserProphecy->check('tables_modify', $input['tableName'])->willReturn(true);
         $this->beUserProphecy->calcPerms($input['databaseRow'])->willReturn(Permission::NOTHING);
 
-        $this->expectException(AccessDeniedPageEditException::class);
-        $this->expectExceptionCode(1437679336);
+        $this->setExpectedException(AccessDeniedPageEditException::class, 1437679336);
+
+        $this->subject->addData($input);
+    }
+
+    /**
+     * @test
+     */
+    public function addDataThrowsExceptionIfCommandIsEditTableIsPagesAndUserHasNoDoktypePermissions()
+    {
+        $input = [
+            'tableName' => 'pages',
+            'command' => 'edit',
+            'vanillaUid' => 123,
+            'databaseRow' => [
+                'uid' => 123,
+                'pid' => 321,
+                'doktype' => 1,
+            ],
+        ];
+        $this->beUserProphecy->isAdmin()->willReturn(false);
+        $this->beUserProphecy->check('tables_modify', $input['tableName'])->willReturn(true);
+        $this->beUserProphecy->check('pagetypes_select', $input['databaseRow']['doktype'])->willReturn(false);
+        $this->beUserProphecy->recordEditAccessInternals($input['tableName'], Argument::cetera())->willReturn(true);
+        $this->beUserProphecy->calcPerms($input['databaseRow'])->willReturn(Permission::ALL);
+
+        $this->setExpectedException(AccessDeniedPageEditException::class, 1437679336);
 
         $this->subject->addData($input);
     }
@@ -162,11 +185,13 @@ class DatabaseUserPermissionCheckTest extends UnitTestCase
             'vanillaUid' => 123,
             'databaseRow' => [
                 'uid' => 123,
-                'pid' => 321
+                'pid' => 321,
+                'doktype' => 1,
             ],
         ];
         $this->beUserProphecy->isAdmin()->willReturn(false);
         $this->beUserProphecy->check('tables_modify', $input['tableName'])->willReturn(true);
+        $this->beUserProphecy->check('pagetypes_select', $input['databaseRow']['doktype'])->willReturn(true);
         $this->beUserProphecy->calcPerms($input['databaseRow'])->willReturn(Permission::PAGE_EDIT);
         $this->beUserProphecy->recordEditAccessInternals($input['tableName'], Argument::cetera())->willReturn(true);
 
@@ -217,8 +242,7 @@ class DatabaseUserPermissionCheckTest extends UnitTestCase
         $this->beUserProphecy->check('tables_modify', $input['tableName'])->willReturn(true);
         $this->beUserProphecy->recordEditAccessInternals($input['tableName'], Argument::cetera())->willReturn(true);
 
-        $this->expectException(AccessDeniedRootNodeException::class);
-        $this->expectExceptionCode(1437679856);
+        $this->setExpectedException(AccessDeniedRootNodeException::class, $this->anything(), 1437679856);
 
         $this->subject->addData($input);
     }
@@ -242,8 +266,7 @@ class DatabaseUserPermissionCheckTest extends UnitTestCase
         $this->beUserProphecy->calcPerms($input['parentPageRow'])->willReturn(Permission::ALL);
         $this->beUserProphecy->recordEditAccessInternals($input['tableName'], Argument::cetera())->willReturn(false);
 
-        $this->expectException(AccessDeniedEditInternalsException::class);
-        $this->expectExceptionCode(1437687404);
+        $this->setExpectedException(AccessDeniedEditInternalsException::class, $this->anything(), 1437687404);
 
         $this->subject->addData($input);
     }
@@ -266,8 +289,7 @@ class DatabaseUserPermissionCheckTest extends UnitTestCase
         $this->beUserProphecy->check('tables_modify', $input['tableName'])->willReturn(true);
         $this->beUserProphecy->calcPerms($input['parentPageRow'])->willReturn(Permission::NOTHING);
 
-        $this->expectException(AccessDeniedContentEditException::class);
-        $this->expectExceptionCode(1437745759);
+        $this->setExpectedException(AccessDeniedContentEditException::class, $this->anything(), 1437745759);
 
         $this->subject->addData($input);
     }
@@ -290,8 +312,7 @@ class DatabaseUserPermissionCheckTest extends UnitTestCase
         $this->beUserProphecy->check('tables_modify', $input['tableName'])->willReturn(true);
         $this->beUserProphecy->calcPerms($input['parentPageRow'])->willReturn(Permission::NOTHING);
 
-        $this->expectException(AccessDeniedPageNewException::class);
-        $this->expectExceptionCode(1437745640);
+        $this->setExpectedException(AccessDeniedPageNewException::class, $this->anything(), 1437745640);
 
         $this->subject->addData($input);
     }
@@ -315,14 +336,13 @@ class DatabaseUserPermissionCheckTest extends UnitTestCase
         $this->beUserProphecy->calcPerms($input['parentPageRow'])->willReturn(Permission::ALL);
         $this->beUserProphecy->recordEditAccessInternals($input['tableName'], Argument::cetera())->willReturn(true);
 
-        $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['typo3/alt_doc.php']['makeEditForm_accessCheck'] = array(
+        $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['typo3/alt_doc.php']['makeEditForm_accessCheck'] = [
             'unitTest' => function () {
                 return false;
             }
-        );
+        ];
 
-        $this->expectException(AccessDeniedHookException::class);
-        $this->expectExceptionCode(1437689705);
+        $this->setExpectedException(AccessDeniedHookException::class, $this->anything(), 1437689705);
 
         $this->subject->addData($input);
     }
@@ -346,11 +366,11 @@ class DatabaseUserPermissionCheckTest extends UnitTestCase
         $this->beUserProphecy->calcPerms($input['parentPageRow'])->willReturn(Permission::CONTENT_EDIT);
         $this->beUserProphecy->recordEditAccessInternals($input['tableName'], Argument::cetera())->willReturn(true);
 
-        $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['typo3/alt_doc.php']['makeEditForm_accessCheck'] = array(
+        $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['typo3/alt_doc.php']['makeEditForm_accessCheck'] = [
             'unitTest' => function () {
                 return true;
             }
-        );
+        ];
 
         $result = $this->subject->addData($input);
 
@@ -441,8 +461,7 @@ class DatabaseUserPermissionCheckTest extends UnitTestCase
         $this->beUserProphecy->isAdmin()->willReturn(false);
         $this->beUserProphecy->check('tables_modify', $input['tableName'])->willReturn(true);
 
-        $this->expectException(AccessDeniedRootNodeException::class);
-        $this->expectExceptionCode(1437745221);
+        $this->setExpectedException(AccessDeniedRootNodeException::class, $this->anything(), 1437745221);
 
         $this->subject->addData($input);
     }

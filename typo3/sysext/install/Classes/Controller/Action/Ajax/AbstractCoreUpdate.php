@@ -14,12 +14,6 @@ namespace TYPO3\CMS\Install\Controller\Action\Ajax;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Install\Service\CoreUpdateService;
-use TYPO3\CMS\Install\Service\CoreVersionService;
-use TYPO3\CMS\Install\Status\StatusUtility;
-use TYPO3\CMS\Install\View\JsonView;
-
 /**
  * Abstract core update class contains general core update
  * related methods
@@ -29,7 +23,7 @@ abstract class AbstractCoreUpdate extends AbstractAjaxAction
     /**
      * @var \TYPO3\CMS\Install\View\JsonView
      */
-    protected $view;
+    protected $view = null;
 
     /**
      * @var \TYPO3\CMS\Install\Service\CoreUpdateService
@@ -47,21 +41,46 @@ abstract class AbstractCoreUpdate extends AbstractAjaxAction
     protected $coreVersionService;
 
     /**
-     * @param JsonView $view
-     * @param CoreUpdateService $coreUpdateService
+     * @param \TYPO3\CMS\Install\View\FailsafeView $view
+     */
+    public function injectView(\TYPO3\CMS\Install\View\FailsafeView $view)
+    {
+        // dummy method to stop setting view to failsafeView while keeping
+        // compatibility with parent declaration (and thus errors on PHP7)
+        // while allowing dependency injection to inject correct view by
+        // using method below.
+    }
+
+    /**
+     * @param \TYPO3\CMS\Install\View\JsonView $view
+     */
+    public function injectJsonView(\TYPO3\CMS\Install\View\JsonView $view)
+    {
+        $this->view = $view;
+    }
+
+    /**
+     * @param \TYPO3\CMS\Install\Service\CoreUpdateService $coreUpdateService
+     */
+    public function injectCoreUpdateService(\TYPO3\CMS\Install\Service\CoreUpdateService $coreUpdateService)
+    {
+        $this->coreUpdateService = $coreUpdateService;
+    }
+
+    /**
      * @param \TYPO3\CMS\Install\Status\StatusUtility $statusUtility
+     */
+    public function injectStatusUtility(\TYPO3\CMS\Install\Status\StatusUtility $statusUtility)
+    {
+        $this->statusUtility = $statusUtility;
+    }
+
+    /**
      * @param \TYPO3\CMS\Install\Service\CoreVersionService $coreVersionService
      */
-    public function __construct(
-        JsonView $view = null,
-        CoreUpdateService $coreUpdateService = null,
-        StatusUtility $statusUtility = null,
-        CoreVersionService $coreVersionService = null)
+    public function injectCoreVersionService(\TYPO3\CMS\Install\Service\CoreVersionService $coreVersionService)
     {
-        $this->view = $view ?: GeneralUtility::makeInstance(JsonView::class);
-        $this->coreUpdateService = $coreUpdateService ?: GeneralUtility::makeInstance(CoreUpdateService::class);
-        $this->statusUtility = $statusUtility ?: GeneralUtility::makeInstance(StatusUtility::class);
-        $this->coreVersionService = $coreVersionService ?: GeneralUtility::makeInstance(CoreVersionService::class);
+        $this->coreVersionService = $coreVersionService;
     }
 
     /**

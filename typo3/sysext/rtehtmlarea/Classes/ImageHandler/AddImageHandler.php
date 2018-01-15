@@ -85,7 +85,7 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
      *
      * @var mixed[][]
      */
-    protected $elements = array();
+    protected $elements = [];
 
     /**
      * @var string
@@ -182,7 +182,7 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
             $storages = $backendUser->getFileStorages();
             /** @var $storage \TYPO3\CMS\Core\Resource\ResourceStorage */
             foreach ($storages as $storage) {
-                $storage->addFileAndFolderNameFilter(array($filterObject, 'filterFileList'));
+                $storage->addFileAndFolderNameFilter([$filterObject, 'filterFileList']);
             }
         }
         if ($this->expandFolder) {
@@ -225,10 +225,10 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
 
         // Getting flag for showing/not showing thumbnails:
         $noThumbs = $backendUser->getTSConfigVal('options.noThumbsInRTEimageSelect');
-        $_MOD_SETTINGS = array();
+        $_MOD_SETTINGS = [];
         if (!$noThumbs) {
             // MENU-ITEMS, fetching the setting for thumbnails from File>List module:
-            $_MOD_MENU = array('displayThumbs' => '');
+            $_MOD_MENU = ['displayThumbs' => ''];
             $_MCONF['name'] = 'file_list';
             $_MOD_SETTINGS = BackendUtility::getModuleData($_MOD_MENU, GeneralUtility::_GP('SET'), $_MCONF['name']);
         }
@@ -258,7 +258,7 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
 			<div class="element-browser-section element-browser-filetree">
 			<table border="0" cellpadding="0" cellspacing="0" id="typo3-EBfiles">
 				<tr>
-					<td class="c-wCell" valign="top"><h3>' . htmlspecialchars($this->getLanguageService()->getLL('folderTree')) . ':</h3>' . $tree . '</td>
+					<td class="c-wCell" valign="top"><h3>' . $this->getLanguageService()->getLL('folderTree', true) . ':</h3>' . $tree . '</td>
 					<td class="c-wCell" valign="top">' . $files . '</td>
 				</tr>
 			</table>
@@ -308,18 +308,18 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
         }
         $filesCount = count($files);
 
-        $lines = array();
+        $lines = [];
 
         // Create the header of current folder:
         $folderIcon = $this->iconFactory->getIconForResource($folder, Icon::SIZE_SMALL);
 
         $lines[] = '
-			<tr>
+			<tr class="t3-row-header">
 				<th class="col-title" nowrap="nowrap">' . $folderIcon . ' ' . htmlspecialchars(GeneralUtility::fixed_lgd_cs($folder->getIdentifier(), $titleLen)) . '</th>
 				<th class="col-control" nowrap="nowrap"></th>
 				<th class="col-clipboard" nowrap="nowrap">
-					<a href="#" class="btn btn-default" id="t3js-importSelection" title="' . htmlspecialchars($lang->getLL('importSelection')) . '">' . $this->iconFactory->getIcon('actions-document-import-t3d', Icon::SIZE_SMALL) . '</a>
-					<a href="#" class="btn btn-default" id="t3js-toggleSelection" title="' . htmlspecialchars($lang->getLL('toggleSelection')) . '">' . $this->iconFactory->getIcon('actions-document-select', Icon::SIZE_SMALL) . '</a>
+					<a href="#" class="btn btn-default" id="t3js-importSelection" title="' . $lang->getLL('importSelection', true) . '">' . $this->iconFactory->getIcon('actions-document-import-t3d', Icon::SIZE_SMALL) . '</a>
+					<a href="#" class="btn btn-default" id="t3js-toggleSelection" title="' . $lang->getLL('toggleSelection', true) . '">' . $this->iconFactory->getIcon('actions-document-select', Icon::SIZE_SMALL) . '</a>
 				</th>
 				<th nowrap="nowrap">&nbsp;</th>
 			</tr>';
@@ -334,17 +334,17 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
         foreach ($files as $fileObject) {
             $fileExtension = $fileObject->getExtension();
             // Thumbnail/size generation:
-            $imgInfo = array();
+            $imgInfo = [];
             if (!$noThumbs && GeneralUtility::inList(strtolower($GLOBALS['TYPO3_CONF_VARS']['GFX']['imagefile_ext'] . ',' . $GLOBALS['TYPO3_CONF_VARS']['SYS']['mediafile_ext']), strtolower($fileExtension))) {
                 $processedFile = $fileObject->process(
                     ProcessedFile::CONTEXT_IMAGEPREVIEW,
-                    array('width' => 64, 'height' => 64)
+                    ['width' => 64, 'height' => 64]
                 );
                 $imageUrl = $processedFile->getPublicUrl(true);
-                $imgInfo = array(
+                $imgInfo = [
                     $fileObject->getProperty('width'),
                     $fileObject->getProperty('height')
-                );
+                ];
                 $pDim = $imgInfo[0] . 'x' . $imgInfo[1] . ' pixels';
                 $clickIcon = '<img src="' . $imageUrl . '"'
                              . ' width="' . $processedFile->getProperty('width') . '"'
@@ -359,7 +359,7 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
             $icon = '<span title="' . htmlspecialchars($fileObject->getName() . $size) . '">' . $this->iconFactory->getIconForResource($fileObject, Icon::SIZE_SMALL) . '</span>';
             // Create links for adding the file:
             $filesIndex = count($this->elements);
-            $this->elements['file_' . $filesIndex] = array(
+            $this->elements['file_' . $filesIndex] = [
                 'type' => 'file',
                 'table' => 'sys_file',
                 'uid' => $fileObject->getUid(),
@@ -367,7 +367,7 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
                 'filePath' => $fileObject->getUid(),
                 'fileExt' => $fileExtension,
                 'fileIcon' => $icon
-            );
+            ];
             if ($this->fileIsSelectableInFileList($fileObject, $imgInfo)) {
                 $ATag = '<a href="#" class="btn btn-default" title="' . htmlspecialchars($fileObject->getName()) . '" data-file-index="' . htmlspecialchars($filesIndex) . '" data-close="0">';
                 $ATag_alt = '<a href="#" title="' . htmlspecialchars($fileObject->getName()) . '" data-file-index="' . htmlspecialchars($filesIndex) . '" data-close="1">';
@@ -380,12 +380,12 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
                 $bulkCheckBox = '';
             }
             // Create link to showing details about the file in a window:
-            $Ahref = BackendUtility::getModuleUrl('show_item', array(
+            $Ahref = BackendUtility::getModuleUrl('show_item', [
                 'type' => 'file',
                 'table' => '_FILE',
                 'uid' => $fileObject->getCombinedIdentifier(),
                 'returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')
-            ));
+            ]);
 
             // Combine the stuff:
             $filenameAndIcon = $ATag_alt . $icon . htmlspecialchars(GeneralUtility::fixed_lgd_cs($fileObject->getName(), $titleLen)) . $ATag_e;
@@ -394,8 +394,8 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
 					<tr class="file_list_normal">
 						<td class="col-title" nowrap="nowrap">' . $filenameAndIcon . '&nbsp;</td>
 						<td class="col-control">
-							<div class="btn-group">' . $ATag . '<span title="' .  htmlspecialchars($lang->getLL('addToList')) . '">' . $this->iconFactory->getIcon('actions-edit-add', Icon::SIZE_SMALL)->render() . '</span>' . $ATag_e . '
-							<a href="' . htmlspecialchars($Ahref) . '" class="btn btn-default" title="' . htmlspecialchars($lang->getLL('info')) . '">' . $this->iconFactory->getIcon('actions-document-info', Icon::SIZE_SMALL) . '</a>
+							<div class="btn-group">' . $ATag . '<span title="' . $lang->getLL('addToList', true) . '">' . $this->iconFactory->getIcon('actions-edit-add', Icon::SIZE_SMALL)->render() . '</span>' . $ATag_e . '
+							<a href="' . htmlspecialchars($Ahref) . '" class="btn btn-default" title="' . $lang->getLL('info', true) . '">' . $this->iconFactory->getIcon('actions-document-info', Icon::SIZE_SMALL) . '</a>
 						</td>
 						<td class="col-clipboard" valign="top">' . $bulkCheckBox . '</td>
 						<td nowrap="nowrap">&nbsp;' . $pDim . '</td>
@@ -408,7 +408,7 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
             }
         }
 
-        $out = '<h3>' . htmlspecialchars($lang->getLL('files')) . ' ' . $filesCount . ':</h3>';
+        $out = '<h3>' . $lang->getLL('files', true) . ' ' . $filesCount . ':</h3>';
         $out .= GeneralUtility::makeInstance(FolderUtilityRenderer::class, $this)->getFileSearchField($this->searchWord);
         $out .= '<div id="filelist">';
         $out .= $this->getBulkSelector($filesCount);
@@ -440,7 +440,7 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
             /** @var FileExtensionFilter $filter */
             $filter = GeneralUtility::makeInstance(FileExtensionFilter::class);
             $filter->setAllowedFileExtensions($extensionList);
-            $folder->setFileAndFolderNameFilters(array(array($filter, 'filterFileList')));
+            $folder->setFileAndFolderNameFilters([[$filter, 'filterFileList']]);
         }
         return $folder->getFiles();
     }
@@ -464,7 +464,7 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
         $noThumbsInEB = $this->getBackendUser()->getTSConfigVal('options.noThumbsInEB');
         if (!$noThumbsInEB && $this->selectedFolder) {
             // MENU-ITEMS, fetching the setting for thumbnails from File>List module:
-            $_MOD_MENU = array('displayThumbs' => '');
+            $_MOD_MENU = ['displayThumbs' => ''];
             $_MCONF['name'] = 'file_list';
             $_MOD_SETTINGS = BackendUtility::getModuleData($_MOD_MENU, GeneralUtility::_GP('SET'), $_MCONF['name']);
             $addParams = GeneralUtility::implodeArrayForUrl('', $this->getUrlParameters(['identifier' => $this->selectedFolder->getCombinedIdentifier()]));
@@ -477,7 +477,7 @@ class AddImageHandler implements LinkParameterProviderInterface, LinkHandlerInte
                     $addParams,
                     'id="checkDisplayThumbs"'
                 )
-                              . htmlspecialchars($lang->sL('LLL:EXT:lang/locallang_mod_file_list.xlf:displayThumbs')) . '</label></div>';
+                              . $lang->sL('LLL:EXT:lang/locallang_mod_file_list.xlf:displayThumbs', true) . '</label></div>';
             $out .= $thumbNailCheck;
         } else {
             $out .= '<div style="padding-top: 15px;"></div>';

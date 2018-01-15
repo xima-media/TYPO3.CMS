@@ -18,10 +18,7 @@ use TYPO3\CMS\Backend\Configuration\TranslationConfigurationProvider;
 use TYPO3\CMS\Backend\Routing\Router;
 use TYPO3\CMS\Backend\Routing\UriBuilder;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\DatabaseConnection;
-use TYPO3\CMS\Core\Database\Query\Restriction\BackendWorkspaceRestriction;
-use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -33,6 +30,8 @@ use TYPO3\CMS\Lang\LanguageService;
  *
  * Base for class listing of database records and files in the
  * modules Web>List and File>Filelist
+ * @see typo3/db_list.php
+ * @see typo3/sysext/filelist/mod1/index.php
  */
 abstract class AbstractRecordList
 {
@@ -77,21 +76,21 @@ abstract class AbstractRecordList
      *
      * @var array
      */
-    public $fieldArray = array();
+    public $fieldArray = [];
 
     /**
      * Keys are fieldnames and values are td-parameters to add in addElement(), please use $addElement_tdCSSClass for CSS-classes;
      *
      * @var array
      */
-    public $addElement_tdParams = array();
+    public $addElement_tdParams = [];
 
     /**
      * Keys are fieldnames and values are td-css-classes to add in addElement();
      *
      * @var array
      */
-    public $addElement_tdCssClass = array();
+    public $addElement_tdCssClass = [];
 
     /**
      * Not used in this class - but maybe extension classes...
@@ -153,14 +152,14 @@ abstract class AbstractRecordList
      *
      * @var array
      */
-    public $pageOverlays = array();
+    public $pageOverlays = [];
 
     /**
      * Contains sys language icons and titles
      *
      * @var array
      */
-    public $languageIconTitles = array();
+    public $languageIconTitles = [];
 
     /**
      * @var TranslationConfigurationProvider
@@ -228,10 +227,10 @@ abstract class AbstractRecordList
         $colType = ($colType === 'th') ? 'th' : 'td';
         $noWrap = $this->no_noWrap ? '' : ' nowrap="nowrap"';
         // Start up:
-        $parent = isset($data['parent']) ? (int)$data['parent'] : 0;
+        $l10nParent = isset($data['_l10nparent_']) ? (int)$data['_l10nparent_'] : 0;
         $out = '
 		<!-- Element, begin: -->
-		<tr ' . $rowParams . ' data-uid="' . (int)$data['uid'] . '" data-l10nparent="' . $parent . '">';
+		<tr ' . $rowParams . ' data-uid="' . (int)$data['uid'] . '" data-l10nparent="' . $l10nParent . '">';
         // Show icon and lines
         if ($this->showIcon) {
             $out .= '
@@ -268,7 +267,7 @@ abstract class AbstractRecordList
                 if ($lastKey) {
                     $cssClass = $this->addElement_tdCssClass[$lastKey];
                     if ($this->oddColumnsCssClass && $ccount % 2 == 0) {
-                        $cssClass = implode(' ', array($this->addElement_tdCssClass[$lastKey], $this->oddColumnsCssClass));
+                        $cssClass = implode(' ', [$this->addElement_tdCssClass[$lastKey], $this->oddColumnsCssClass]);
                     }
                     $out .= '
 						<' . $colType . $noWrap . ' class="' . $cssClass . '"' . $colsp . $this->addElement_tdParams[$lastKey] . '>' . $data[$lastKey] . '</' . $colType . '>';
@@ -291,7 +290,7 @@ abstract class AbstractRecordList
         if ($lastKey) {
             $cssClass = $this->addElement_tdCssClass[$lastKey];
             if ($this->oddColumnsCssClass) {
-                $cssClass = implode(' ', array($this->addElement_tdCssClass[$lastKey], $this->oddColumnsCssClass));
+                $cssClass = implode(' ', [$this->addElement_tdCssClass[$lastKey], $this->oddColumnsCssClass]);
             }
             $out .= '
 				<' . $colType . $noWrap . ' class="' . $cssClass . '"' . $colsp . $this->addElement_tdParams[$lastKey] . '>' . $data[$lastKey] . '</' . $colType . '>';
@@ -324,21 +323,21 @@ abstract class AbstractRecordList
         if ($this->eCounter >= $this->firstElementNumber && $this->eCounter < $this->firstElementNumber + $this->iLimit) {
             if ($this->firstElementNumber && $this->eCounter == $this->firstElementNumber) {
                 // 	Reverse
-                $theData = array();
+                $theData = [];
                 $titleCol = $this->fieldArray[0];
                 $theData[$titleCol] = $this->fwd_rwd_HTML('fwd', $this->eCounter, $table);
                 $code = $this->addElement(1, '', $theData, 'class="fwd_rwd_nav"');
             }
-            return array(1, $code);
+            return [1, $code];
         } else {
             if ($this->eCounter == $this->firstElementNumber + $this->iLimit) {
                 // 	Forward
-                $theData = array();
+                $theData = [];
                 $titleCol = $this->fieldArray[0];
                 $theData[$titleCol] = $this->fwd_rwd_HTML('rwd', $this->eCounter, $table);
                 $code = $this->addElement(1, '', $theData, 'class="fwd_rwd_nav"');
             }
-            return array(0, $code);
+            return [0, $code];
         }
     }
 
@@ -428,23 +427,7 @@ abstract class AbstractRecordList
     public function initializeLanguages()
     {
         // Look up page overlays:
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable('pages_language_overlay');
-        $queryBuilder->getRestrictions()
-            ->removeAll()
-            ->add(GeneralUtility::makeInstance(DeletedRestriction::class))
-            ->add(GeneralUtility::makeInstance(BackendWorkspaceRestriction::class));
-        $result = $queryBuilder
-            ->select('*')
-            ->from('pages_language_overlay')
-            ->where($queryBuilder->expr()->eq('pid', (int)$this->id))
-            ->execute();
-
-        $this->pageOverlays = [];
-        while ($row = $result->fetch()) {
-            $this->pageOverlays[$row['sys_language_uid']] = $row;
-        };
-
+        $this->pageOverlays = $this->getDatabaseConnection()->exec_SELECTgetRows('*', 'pages_language_overlay', 'pid=' . (int)$this->id . BackendUtility::deleteClause('pages_language_overlay') . BackendUtility::versioningPlaceholderClause('pages_language_overlay'), '', '', '', 'sys_language_uid');
         $this->languageIconTitles = $this->getTranslateTools()->getSystemLanguages($this->id);
     }
 
@@ -500,7 +483,7 @@ abstract class AbstractRecordList
             if ($launchViewParameter !== '') {
                 $htmlCode .= ' onclick="' . htmlspecialchars(('top.launchView(' . $launchViewParameter . '); return false;')) . '"';
             }
-            $htmlCode .= ' title="' . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:backend/Resources/Private/Language/locallang.xlf:show_references') . ' (' .  $references . ')') . '">';
+            $htmlCode .= ' title="' . htmlspecialchars($this->getLanguageService()->sl('LLL:EXT:backend/Resources/Private/Language/locallang.xlf:show_references') . ' (' . $references . ')') . '">';
             $htmlCode .= $references;
             $htmlCode .= '</a>';
         }

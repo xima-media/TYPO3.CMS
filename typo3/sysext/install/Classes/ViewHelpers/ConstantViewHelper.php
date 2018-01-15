@@ -33,9 +33,9 @@ class ConstantViewHelper extends AbstractViewHelper
     public function render($name)
     {
         return static::renderStatic(
-            array(
+            [
                 'name' => $name,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

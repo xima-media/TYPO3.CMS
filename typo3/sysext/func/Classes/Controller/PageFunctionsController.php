@@ -63,11 +63,6 @@ class PageFunctionsController extends \TYPO3\CMS\Backend\Module\BaseScriptClass
     protected $iconFactory;
 
     /**
-     * @var StandaloneView
-     */
-    protected $view;
-
-    /**
      * Constructor
      */
     public function __construct()
@@ -75,9 +70,9 @@ class PageFunctionsController extends \TYPO3\CMS\Backend\Module\BaseScriptClass
         $this->iconFactory = GeneralUtility::makeInstance(IconFactory::class);
         $this->moduleTemplate = GeneralUtility::makeInstance(ModuleTemplate::class);
         $this->getLanguageService()->includeLLFile('EXT:lang/locallang_mod_web_func.xlf');
-        $this->MCONF = array(
+        $this->MCONF = [
             'name' => $this->moduleName,
-        );
+        ];
     }
 
     /**
@@ -130,27 +125,28 @@ class PageFunctionsController extends \TYPO3\CMS\Backend\Module\BaseScriptClass
                 'if (top.fsMod) top.fsMod.recentIds["web"] = ' . (int)$this->id . ';');
             // Setting up the context sensitive menu:
             $this->moduleTemplate->getPageRenderer()->loadRequireJsModule('TYPO3/CMS/Backend/ClickMenu');
-
-            $this->view = $this->getFluidTemplateObject('func', 'func');
-            $this->view->assign('moduleName', BackendUtility::getModuleUrl('web_func'));
-            $this->view->assign('id', $this->id);
-            $this->view->assign('versionSelector', $this->moduleTemplate->getVersionSelector($this->id, true));
-            $this->view->assign('functionMenuModuleContent', $this->getExtObjContent());
+            $this->content .= '<form action="' . htmlspecialchars(BackendUtility::getModuleUrl('web_func')) . '" id="PageFunctionsController" method="post"><input type="hidden" name="id" value="' . htmlspecialchars($this->id) . '" />';
+            $vContent = $this->moduleTemplate->getVersionSelector($this->id, true);
+            if ($vContent) {
+                $this->content .= '<div>' . $vContent . '</div>';
+            }
+            $this->extObjContent();
             // Setting up the buttons and markers for docheader
             $this->getButtons();
             $this->generateMenu();
-            $this->content .= $this->view->render();
+            $this->content .= '</form>';
         } else {
             // If no access or if ID == zero
             $title = $this->getLanguageService()->getLL('title');
             $message = $this->getLanguageService()->getLL('clickAPage_content');
-            $this->view = $this->getFluidTemplateObject('func', 'func', 'InfoBox');
-            $this->view->assignMultiple(array(
+            $view = GeneralUtility::makeInstance(StandaloneView::class);
+            $view->setTemplatePathAndFilename(GeneralUtility::getFileAbsFileName('EXT:func/Resources/Private/Templates/InfoBox.html'));
+            $view->assignMultiple([
                 'title' => $title,
                 'message' => $message,
                 'state' => InfoboxViewHelper::STATE_INFO
-            ));
-            $this->content = $this->view->render();
+            ]);
+            $this->content = $view->render();
             // Setting up the buttons and markers for docheader
             $this->getButtons();
         }
@@ -186,6 +182,18 @@ class PageFunctionsController extends \TYPO3\CMS\Backend\Module\BaseScriptClass
             $menu->addMenuItem($item);
         }
         $this->moduleTemplate->getDocHeaderComponent()->getMenuRegistry()->addMenu($menu);
+    }
+
+    /**
+     * Print module content (from $this->content)
+     *
+     * @return void
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function printContent()
+    {
+        GeneralUtility::logDeprecatedFunction();
+        echo $this->content;
     }
 
     /**
@@ -234,27 +242,5 @@ class PageFunctionsController extends \TYPO3\CMS\Backend\Module\BaseScriptClass
     protected function getBackendUser()
     {
         return $GLOBALS['BE_USER'];
-    }
-
-    /**
-     * returns a new standalone view, shorthand function
-     *
-     * @param string $extensionName
-     * @param string $controllerExtensionname
-     * @param string $templateName
-     * @return StandaloneView
-     */
-    protected function getFluidTemplateObject($extensionName, $controllerExtensionName, $templateName = 'Main')
-    {
-        /** @var StandaloneView $view */
-        $view = GeneralUtility::makeInstance(StandaloneView::class);
-        $view->setLayoutRootPaths(array(GeneralUtility::getFileAbsFileName('EXT:' . $extensionName . '/Resources/Private/Layouts')));
-        $view->setPartialRootPaths(array(GeneralUtility::getFileAbsFileName('EXT:' . $extensionName . '/Resources/Private/Partials')));
-        $view->setTemplateRootPaths(array(GeneralUtility::getFileAbsFileName('EXT:' . $extensionName . '/Resources/Private/Templates')));
-
-        $view->setTemplatePathAndFilename(GeneralUtility::getFileAbsFileName('EXT:' . $extensionName . '/Resources/Private/Templates/' . $templateName . '.html'));
-
-        $view->getRequest()->setControllerExtensionName($controllerExtensionName);
-        return $view;
     }
 }

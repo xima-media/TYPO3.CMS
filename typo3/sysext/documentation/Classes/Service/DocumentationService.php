@@ -14,7 +14,6 @@ namespace TYPO3\CMS\Documentation\Service;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Http\RequestFactory;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -29,7 +28,7 @@ class DocumentationService
      */
     public function getOfficialDocuments()
     {
-        $documents = array();
+        $documents = [];
 
         $json = GeneralUtility::getUrl('https://docs.typo3.org/typo3cms/documents.json');
         if ($json) {
@@ -39,7 +38,7 @@ class DocumentationService
             }
 
             // Cache file locally to be able to create a composer.json file when fetching a document
-            $absoluteCacheFilename = GeneralUtility::getFileAbsFileName('typo3temp/var/transient/documents.json');
+            $absoluteCacheFilename = GeneralUtility::getFileAbsFileName('typo3temp/Documentation/documents.json');
             GeneralUtility::writeFileToTypo3tempDir($absoluteCacheFilename, $json);
         }
         return $documents;
@@ -52,7 +51,7 @@ class DocumentationService
      */
     public function getLocalExtensions()
     {
-        $documents = array();
+        $documents = [];
 
         foreach ($GLOBALS['TYPO3_LOADED_EXT'] as $extensionKey => $extensionData) {
             $absoluteExtensionPath = GeneralUtility::getFileAbsFileName($extensionData['siteRelPath']);
@@ -65,7 +64,7 @@ class DocumentationService
                 }
 
                 $documentKey = 'typo3cms.extensions.' . $extensionKey;
-                $documents[] = array(
+                $documents[] = [
                     'title'   => $metadata['title'],
                     'icon'    => \TYPO3\CMS\Documentation\Utility\MiscUtility::getIcon($documentKey),
                     'type'    => 'Extension',
@@ -73,7 +72,7 @@ class DocumentationService
                     'shortcut' => $extensionKey,
                     'url'     => 'https://docs.typo3.org/typo3cms/extensions/' . $extensionKey . '/',
                     'version' => $version,
-                );
+                ];
             }
         }
 
@@ -106,7 +105,7 @@ class DocumentationService
             return $success;
         }
 
-        $languages = array($language);
+        $languages = [$language];
         if ($language !== 'default') {
             $languages[] = 'default';
         }
@@ -166,7 +165,7 @@ class DocumentationService
         $languageSegment = str_replace('_', '-', strtolower($language));
         $packageName = sprintf('%s-%s-%s.zip', $packagePrefix, $version, $languageSegment);
         $packageUrl = $url . 'packages/' . $packageName;
-        $absolutePathToZipFile = GeneralUtility::getFileAbsFileName('typo3temp/var/transient/' . $packageName);
+        $absolutePathToZipFile = GeneralUtility::getFileAbsFileName('typo3temp/Documentation/' . $packageName);
 
         $packages = $this->getAvailablePackages($url);
         if (empty($packages) || !isset($packages[$version][$language])) {
@@ -182,11 +181,9 @@ class DocumentationService
         }
 
         if (!$hasArchive) {
-            /** @var RequestFactory $requestFactory */
-            $requestFactory = GeneralUtility::makeInstance(RequestFactory::class);
-            $response = $requestFactory->request($packageUrl, 'GET');
-            if ($response->getStatusCode() === 200) {
-                GeneralUtility::writeFileToTypo3tempDir($absolutePathToZipFile, $response->getBody()->getContents());
+            $content = GeneralUtility::getUrl($packageUrl);
+            if ($content) {
+                GeneralUtility::writeFileToTypo3tempDir($absolutePathToZipFile, $content);
             }
         }
 
@@ -196,15 +193,15 @@ class DocumentationService
             $result = $this->unzipDocumentPackage($absolutePathToZipFile, $absoluteDocumentPath);
 
             // Create a composer.json file
-            $absoluteCacheFilename = GeneralUtility::getFileAbsFileName('typo3temp/var/transient/documents.json');
+            $absoluteCacheFilename = GeneralUtility::getFileAbsFileName('typo3temp/Documentation/documents.json');
             $documents = json_decode(file_get_contents($absoluteCacheFilename), true);
             foreach ($documents as $document) {
                 if ($document['key'] === $key) {
-                    $composerData = array(
+                    $composerData = [
                         'name' => $document['title'],
                         'type' => 'documentation',
                         'description' => 'TYPO3 ' . $document['type'],
-                    );
+                    ];
                     $relativeComposerFilename = $key . '/' . $language . '/composer.json';
                     $absoluteComposerFilename = GeneralUtility::getFileAbsFileName('typo3conf/Documentation/' . $relativeComposerFilename);
                     GeneralUtility::writeFile($absoluteComposerFilename, json_encode($composerData));
@@ -225,7 +222,7 @@ class DocumentationService
      */
     protected function getAvailablePackages($url)
     {
-        $packages = array();
+        $packages = [];
         $url = rtrim($url, '/') . '/';
         $indexUrl = $url . 'packages/packages.xml';
 
@@ -256,10 +253,10 @@ class DocumentationService
 
         // SimpleXML does not properly handle arrays with only 1 item
         if ($data['languagePackIndex']['languagepack'][0] === null) {
-            $data['languagePackIndex']['languagepack'] = array($data['languagePackIndex']['languagepack']);
+            $data['languagePackIndex']['languagepack'] = [$data['languagePackIndex']['languagepack']];
         }
 
-        $packages = array();
+        $packages = [];
         foreach ($data['languagePackIndex']['languagepack'] as $languagePack) {
             $language = $languagePack['@attributes']['language'];
             $version = $languagePack['@attributes']['version'];

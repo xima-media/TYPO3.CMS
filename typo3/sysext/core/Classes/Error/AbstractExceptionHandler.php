@@ -29,30 +29,36 @@ abstract class AbstractExceptionHandler implements ExceptionHandlerInterface, \T
     /**
      * Displays the given exception
      *
-     * @param \Throwable $exception The throwable object.
+     * @param \Exception|\Throwable $exception The exception(PHP 5.x) or throwable(PHP >= 7.0) object.
+     * @TODO #72293 This will change to \Throwable only if we are >= PHP7.0 only
      *
      * @throws \Exception
      */
-    public function handleException(\Throwable $exception)
+    public function handleException($exception)
     {
-        switch (PHP_SAPI) {
-            case 'cli':
-                $this->echoExceptionCLI($exception);
-                break;
-            default:
-                $this->echoExceptionWeb($exception);
+        if ($exception instanceof \Throwable || $exception instanceof \Exception) {
+            switch (PHP_SAPI) {
+                case 'cli':
+                    $this->echoExceptionCLI($exception);
+                    break;
+                default:
+                    $this->echoExceptionWeb($exception);
+            }
+        } else {
+            throw new \Exception('handleException was called the wrong way.', 1450714322);
         }
     }
 
     /**
      * Writes exception to different logs
      *
-     * @param \Throwable $exception The throwable object.
+     * @param \Exception|\Throwable $exception The exception(PHP 5.x) or throwable(PHP >= 7.0) object.
      * @param string $context The context where the exception was thrown, WEB or CLI
      * @return void
      * @see \TYPO3\CMS\Core\Utility\GeneralUtility::sysLog(), \TYPO3\CMS\Core\Utility\GeneralUtility::devLog()
+     * @TODO #72293 This will change to \Throwable only if we are >= PHP7.0 only
      */
-    protected function writeLogEntries(\Throwable $exception, $context)
+    protected function writeLogEntries($exception, $context)
     {
         // Do not write any logs for this message to avoid filling up tables or files with illegal requests
         if ($exception->getCode() === 1396795884) {
@@ -76,10 +82,10 @@ abstract class AbstractExceptionHandler implements ExceptionHandlerInterface, \T
             // Write error message to devlog
             // see: $TYPO3_CONF_VARS['SYS']['enable_exceptionDLOG']
             if (TYPO3_EXCEPTION_DLOG) {
-                GeneralUtility::devLog($logMessage, $logTitle, 3, array(
+                GeneralUtility::devLog($logMessage, $logTitle, 3, [
                     'TYPO3_MODE' => TYPO3_MODE,
                     'backtrace' => $backtrace
-                ));
+                ]);
             }
             // Write error message to sys_log table
             $this->writeLog($logTitle . ': ' . $logMessage);
@@ -101,7 +107,7 @@ abstract class AbstractExceptionHandler implements ExceptionHandlerInterface, \T
         }
         $userId = 0;
         $workspace = 0;
-        $data = array();
+        $data = [];
         $backendUser = $this->getBackendUser();
         if (is_object($backendUser)) {
             if (isset($backendUser->user['uid'])) {
@@ -114,7 +120,7 @@ abstract class AbstractExceptionHandler implements ExceptionHandlerInterface, \T
                 $data['originalUser'] = $backendUser->user['ses_backuserid'];
             }
         }
-        $fields_values = array(
+        $fields_values = [
             'userid' => $userId,
             'type' => 5,
             'action' => 0,
@@ -125,7 +131,7 @@ abstract class AbstractExceptionHandler implements ExceptionHandlerInterface, \T
             'IP' => (string)GeneralUtility::getIndpEnv('REMOTE_ADDR'),
             'tstamp' => $GLOBALS['EXEC_TIME'],
             'workspace' => $workspace
-        );
+        ];
         $databaseConnection->exec_INSERTquery('sys_log', $fields_values);
     }
 
@@ -133,15 +139,16 @@ abstract class AbstractExceptionHandler implements ExceptionHandlerInterface, \T
      * Sends the HTTP Status 500 code, if $exception is *not* a
      * TYPO3\CMS\Core\Error\Http\StatusException and headers are not sent, yet.
      *
-     * @param \Throwable $exception The throwable object.
+     * @param \Exception|\Throwable $exception The exception(PHP 5.x) or throwable(PHP >= 7.0) object.
      * @return void
+     * @TODO #72293 This will change to \Throwable only if we are >= PHP7.0 only
      */
-    protected function sendStatusHeaders(\Throwable $exception)
+    protected function sendStatusHeaders($exception)
     {
         if (method_exists($exception, 'getStatusHeaders')) {
             $headers = $exception->getStatusHeaders();
         } else {
-            $headers = array(\TYPO3\CMS\Core\Utility\HttpUtility::HTTP_STATUS_500);
+            $headers = [\TYPO3\CMS\Core\Utility\HttpUtility::HTTP_STATUS_500];
         }
         if (!headers_sent()) {
             foreach ($headers as $header) {

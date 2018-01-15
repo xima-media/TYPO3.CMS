@@ -25,7 +25,7 @@ abstract class AbstractExportTestCase extends \TYPO3\CMS\Core\Tests\FunctionalTe
     /**
      * @var array
      */
-    protected $coreExtensionsToLoad = array('impexp');
+    protected $coreExtensionsToLoad = ['impexp'];
 
     /**
      * @var \TYPO3\CMS\Impexp\Export
@@ -43,6 +43,8 @@ abstract class AbstractExportTestCase extends \TYPO3\CMS\Core\Tests\FunctionalTe
         parent::setUp();
 
         $this->setUpBackendUserFromFixture(1);
+        // Needed to avoid PHP Warnings
+        $GLOBALS['TBE_STYLES']['spriteIconApi']['iconsAvailable'] = [];
 
         \TYPO3\CMS\Core\Core\Bootstrap::getInstance()->initializeLanguageObject();
 
@@ -65,8 +67,8 @@ abstract class AbstractExportTestCase extends \TYPO3\CMS\Core\Tests\FunctionalTe
         /** @var $tree \TYPO3\CMS\Backend\Tree\View\PageTreeView */
         $tree = GeneralUtility::makeInstance(\TYPO3\CMS\Backend\Tree\View\PageTreeView::class);
         $tree->init('AND ' . $permsClause);
-        $tree->tree[] = array('row' => $pidToStart);
-        $tree->buffer_idH = array();
+        $tree->tree[] = ['row' => $pidToStart];
+        $tree->buffer_idH = [];
         if ($depth > 0) {
             $tree->getTree($pidToStart, $depth, '');
         }

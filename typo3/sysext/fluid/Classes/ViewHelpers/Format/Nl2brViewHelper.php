@@ -56,9 +56,9 @@ class Nl2brViewHelper extends AbstractViewHelper
     public function render($value = null)
     {
         return static::renderStatic(
-            array(
+            [
                 'value' => $value
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

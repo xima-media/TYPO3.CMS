@@ -365,11 +365,14 @@ filters
 
     **Filtered:** John Doe
 
+    **Note:**: By default, all submitted data will be filtered by a Cross
+    Site Scripting (XSS) filter to prevent security issues.
+
 :aspect:`Default:`
     .. code-block:: typoscript
 
       filters {
-        0 = trim
+        0 = removexss
       }
 
 

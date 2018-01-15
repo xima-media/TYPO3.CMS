@@ -42,19 +42,14 @@ class PermissionController extends ActionController
     protected $id;
 
     /**
-     * @var int
+     * @var string
      */
-    protected $returnId;
+    protected $returnUrl = '';
 
     /**
      * @var int
      */
     protected $depth;
-
-    /**
-     * @var int
-     */
-    protected $lastEdited;
 
     /**
      * Number of levels to enable recursive settings for
@@ -66,7 +61,7 @@ class PermissionController extends ActionController
     /**
      * @var array
      */
-    protected $pageInfo = array();
+    protected $pageInfo = [];
 
     /**
      * Backend Template Container
@@ -89,22 +84,26 @@ class PermissionController extends ActionController
      */
     protected function initializeAction()
     {
+        // determine depth parameter
+        $this->depth = (int)GeneralUtility::_GP('depth') > 0
+            ? (int)GeneralUtility::_GP('depth')
+            : (int)$this->getBackendUser()->getSessionData(self::SESSION_PREFIX . 'depth');
+        if ($this->request->hasArgument('depth')) {
+            $this->depth = (int)$this->request->getArgument('depth');
+        }
+        $this->getBackendUser()->setAndSaveSessionData(self::SESSION_PREFIX . 'depth', $this->depth);
+
         // determine id parameter
         $this->id = (int)GeneralUtility::_GP('id');
         if ($this->request->hasArgument('id')) {
             $this->id = (int)$this->request->getArgument('id');
         }
 
-        // determine depth parameter
-        $this->depth = ((int)GeneralUtility::_GP('depth') > 0)
-            ? (int) GeneralUtility::_GP('depth')
-            : $this->getBackendUser()->getSessionData(self::SESSION_PREFIX . 'depth');
-        if ($this->request->hasArgument('depth')) {
-            $this->depth = (int)$this->request->getArgument('depth');
+        $this->returnUrl = GeneralUtility::_GP('returnUrl');
+        if ($this->request->hasArgument('returnUrl')) {
+            $this->returnUrl = $this->request->getArgument('returnUrl');
         }
-        $this->getBackendUser()->setAndSaveSessionData(self::SESSION_PREFIX . 'depth', $this->depth);
-        $this->lastEdited = GeneralUtility::_GP('lastEdited');
-        $this->returnId = GeneralUtility::_GP('returnId');
+
         $this->pageInfo = BackendUtility::readPageAccess($this->id, ' 1=1');
     }
 
@@ -119,7 +118,7 @@ class PermissionController extends ActionController
         parent::initializeView($view);
         $view->assign(
             'previewUrl',
-            BackendUtility::viewOnClick(
+            BackendUtility::viewonclick(
                 $this->pageInfo['uid'], '',
                 BackendUtility::BEgetRootLine($this->pageInfo['uid'])
             )
@@ -139,6 +138,7 @@ class PermissionController extends ActionController
                 '
             );
             $this->registerDocHeaderButtons();
+            $this->view->getModuleTemplate()->getDocHeaderComponent()->setMetaInformation($this->pageInfo);
             $this->view->getModuleTemplate()->setFlashMessageQueue($this->controllerContext->getFlashMessageQueue());
         }
     }
@@ -161,17 +161,13 @@ class PermissionController extends ActionController
         $extensionName = $currentRequest->getControllerExtensionName();
         if (empty($getVars)) {
             $modulePrefix = strtolower('tx_' . $extensionName . '_' . $moduleName);
-            $getVars = array('id', 'M', $modulePrefix);
+            $getVars = ['id', 'M', $modulePrefix];
         }
 
         if ($currentRequest->getControllerActionName() === 'edit') {
             // CLOSE button:
-            $closeUrl = $this->uriBuilder->reset()->setArguments(array(
-                'action' => 'index',
-                'id' => $this->id
-            ))->buildBackendUri();
             $closeButton = $buttonBar->makeLinkButton()
-                ->setHref($closeUrl)
+                ->setHref($this->returnUrl)
                 ->setTitle($lang->sL('LLL:EXT:lang/locallang_core.xlf:rm.closeDoc'))
                 ->setIcon($this->view->getModuleTemplate()->getIconFactory()->getIcon(
                     'actions-document-close',
@@ -199,6 +195,18 @@ class PermissionController extends ActionController
             ->setModuleName($moduleName)
             ->setGetVariables($getVars);
         $buttonBar->addButton($shortcutButton);
+
+        if ($this->id > 0) {
+            $iconFactory = $this->view->getModuleTemplate()->getIconFactory();
+            $viewButton = $buttonBar->makeLinkButton()
+                ->setOnClick(BackendUtility::viewOnClick($this->pageInfo['uid'], '',
+                    BackendUtility::BEgetRootLine($this->pageInfo['uid'])))
+                ->setTitle($this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.showPage'))
+                ->setIcon($iconFactory->getIcon('actions-document-view', Icon::SIZE_SMALL))
+                ->setHref('#');
+
+            $buttonBar->addButton($viewButton, ButtonBar::BUTTON_POSITION_LEFT, 3);
+        }
     }
 
     /**
@@ -209,7 +217,7 @@ class PermissionController extends ActionController
     public function indexAction()
     {
         if (!$this->id) {
-            $this->pageInfo = array('title' => '[root-level]', 'uid' => 0, 'pid' => 0);
+            $this->pageInfo = ['title' => '[root-level]', 'uid' => 0, 'pid' => 0];
         }
 
         if ($this->getBackendUser()->workspace != 0) {
@@ -222,16 +230,16 @@ class PermissionController extends ActionController
         }
 
         // depth options
-        $depthOptions = array();
-        $url = $this->uriBuilder->reset()->setArguments(array(
+        $depthOptions = [];
+        $url = $this->uriBuilder->reset()->setArguments([
             'action' => 'index',
             'depth' => '__DEPTH__',
             'id' => $this->id
-        ))->buildBackendUri();
-        foreach (array(1, 2, 3, 4, 10) as $depthLevel) {
-            $levelLabel = $depthLevel === 1 ? 'level' : 'levels';
-            $depthOptions[$depthLevel] = $depthLevel . ' ' . LocalizationUtility::translate('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:' . $levelLabel, 'beuser');
+        ])->buildBackendUri();
+        foreach ([1, 2, 3, 4, 10] as $depthLevel) {
+            $depthOptions[$depthLevel] = $depthLevel . ' ' . LocalizationUtility::translate('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:levels', 'beuser');
         }
+        $this->view->assign('currentId', $this->id);
         $this->view->assign('depthBaseUrl', $url);
         $this->view->assign('depth', $this->depth);
         $this->view->assign('depthOptions', $depthOptions);
@@ -257,9 +265,9 @@ class PermissionController extends ActionController
 
         // Create the tree from $this->id
         if ($this->id) {
-            $tree->tree[] = array('row' => $this->pageInfo, 'HTML' => $tree->getIcon($this->id));
+            $tree->tree[] = ['row' => $this->pageInfo, 'HTML' => $tree->getIcon($this->id)];
         } else {
-            $tree->tree[] = array('row' => $this->pageInfo, 'HTML' => $tree->getRootIcon($this->pageInfo));
+            $tree->tree[] = ['row' => $this->pageInfo, 'HTML' => $tree->getRootIcon($this->pageInfo)];
         }
         $tree->getTree($this->id, $this->depth);
         $this->view->assign('viewTree', $tree->tree);
@@ -279,7 +287,7 @@ class PermissionController extends ActionController
         $this->view->assign('depth', $this->depth);
 
         if (!$this->id) {
-            $this->pageInfo = array('title' => '[root-level]', 'uid' => 0, 'pid' => 0);
+            $this->pageInfo = ['title' => '[root-level]', 'uid' => 0, 'pid' => 0];
         }
         if ($this->getBackendUser()->workspace != 0) {
             // Adding FlashMessage with the permission setting matrix:
@@ -294,7 +302,7 @@ class PermissionController extends ActionController
         $beUserArray  = BackendUtility::getUserNames();
 
         // Owner selector
-        $beUserDataArray = array(0 => LocalizationUtility::translate('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:selectNone', 'beuser'));
+        $beUserDataArray = [0 => LocalizationUtility::translate('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:selectNone', 'beuser')];
         foreach ($beUserArray as $uid => &$row) {
             $beUserDataArray[$uid] = $row['username'];
         }
@@ -303,7 +311,7 @@ class PermissionController extends ActionController
         $this->view->assign('beUserData', $beUserDataArray);
 
         // Group selector
-        $beGroupDataArray = array(0 => LocalizationUtility::translate('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:selectNone', 'beuser'));
+        $beGroupDataArray = [0 => LocalizationUtility::translate('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:selectNone', 'beuser')];
         foreach ($beGroupArray as $uid => $row) {
             $beGroupDataArray[$uid] = $row['title'];
         }
@@ -311,7 +319,7 @@ class PermissionController extends ActionController
         $this->view->assign('currentBeGroup', $this->pageInfo['perms_groupid']);
         $this->view->assign('beGroupData', $beGroupDataArray);
         $this->view->assign('pageInfo', $this->pageInfo);
-        $this->view->assign('returnId', $this->returnId);
+        $this->view->assign('returnUrl', $this->returnUrl);
         $this->view->assign('recursiveSelectOptions', $this->getRecursiveSelectOptions());
     }
 
@@ -350,7 +358,7 @@ class PermissionController extends ActionController
                 }
             }
         }
-        $this->redirect('index', null, null, array('id' => $this->returnId, 'depth' => $this->depth));
+        $this->redirectToUri($this->returnUrl);
     }
 
     /**
@@ -384,17 +392,15 @@ class PermissionController extends ActionController
         $tree->setRecs = 1;
         // Make tree:
         $tree->getTree($this->id, $this->getLevels, '');
-        $options = array();
+        $options = [];
         $options[''] = '';
         // If there are a hierarchy of page ids, then...
         if ($this->getBackendUser()->user['uid'] && !empty($tree->orig_ids_hierarchy)) {
             // Init:
             $labelRecursive = LocalizationUtility::translate('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:recursive', 'beuser');
-            $labelLevel = LocalizationUtility::translate('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:level', 'beuser');
             $labelLevels = LocalizationUtility::translate('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:levels', 'beuser');
-            $labelPageAffected = LocalizationUtility::translate('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:page_affected', 'beuser');
             $labelPagesAffected = LocalizationUtility::translate('LLL:EXT:beuser/Resources/Private/Language/locallang_mod_permission.xlf:pages_affected', 'beuser');
-            $theIdListArr = array();
+            $theIdListArr = [];
             // Traverse the number of levels we want to allow recursive
             // setting of permissions for:
             for ($a = $this->getLevels; $a > 0; $a--) {
@@ -403,9 +409,8 @@ class PermissionController extends ActionController
                         $theIdListArr[] = $theId;
                     }
                     $lKey = $this->getLevels - $a + 1;
-                    $pagesCount = count($theIdListArr);
-                    $options[implode(',', $theIdListArr)] = $labelRecursive . ' ' . $lKey . ' ' . ($lKey === 1 ? $labelLevel : $labelLevels) .
-                        ' (' . $pagesCount . ' ' . ($pagesCount === 1 ? $labelPageAffected : $labelPagesAffected) . ')';
+                    $options[implode(',', $theIdListArr)] = $labelRecursive . ' ' . $lKey . ' ' . $labelLevels .
+                        ' (' . count($theIdListArr) . ' ' . $labelPagesAffected . ')';
                 }
             }
         }

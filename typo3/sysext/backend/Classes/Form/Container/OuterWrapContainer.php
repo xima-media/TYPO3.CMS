@@ -19,7 +19,6 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Fluid\View\StandaloneView;
 use TYPO3\CMS\Lang\LanguageService;
 
 /**
@@ -69,18 +68,18 @@ class OuterWrapContainer extends AbstractContainer
         $tableTitle = $languageService->sL($this->data['processedTca']['ctrl']['title']);
 
         if ($this->data['command'] === 'new') {
-            $newOrUid = ' <span class="typo3-TCEforms-newToken">' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.new')) . '</span>';
+            $newOrUid = ' <span class="typo3-TCEforms-newToken">' . $languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.new', true) . '</span>';
 
             // @todo: There is quite some stuff do to for WS overlays ...
             $workspacedPageRecord = BackendUtility::getRecordWSOL('pages', $this->data['effectivePid'], 'title');
             $pageTitle = BackendUtility::getRecordTitle('pages', $workspacedPageRecord, true, false);
             if ($table === 'pages') {
-                $label = htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.createNewPage'));
+                $label = $languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.createNewPage', true);
                 $pageTitle = sprintf($label, $tableTitle);
             } else {
-                $label = htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.createNewRecord'));
+                $label = $languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.createNewRecord', true);
                 if ($this->data['effectivePid'] === 0) {
-                    $label = htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.createNewRecordRootLevel'));
+                    $label = $languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.createNewRecordRootLevel', true);
                 }
                 $pageTitle = sprintf($label, $tableTitle, $pageTitle);
             }
@@ -91,17 +90,17 @@ class OuterWrapContainer extends AbstractContainer
             // @todo: getRecordTitlePrep applies an htmlspecialchars here
             $recordLabel = BackendUtility::getRecordTitlePrep($this->data['recordTitle']);
             if ($table === 'pages') {
-                $label = htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.editPage'));
+                $label = $languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.editPage', true);
                 $pageTitle = sprintf($label, $tableTitle, $recordLabel);
             } else {
-                $label = htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.editRecord'));
+                $label = $languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.editRecord', true);
                 $workspacedPageRecord = BackendUtility::getRecordWSOL('pages', $row['pid'], 'uid,title');
                 $pageTitle = BackendUtility::getRecordTitle('pages', $workspacedPageRecord, true, false);
                 if (empty($recordLabel)) {
-                    $label = htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.editRecordNoTitle'));
+                    $label = $languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.editRecordNoTitle', true);
                 }
                 if ($this->data['effectivePid'] === 0) {
-                    $label = htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.editRecordRootLevel'));
+                    $label = $languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.editRecordRootLevel', true);
                 }
                 if (!empty($recordLabel)) {
                     // Use record title and prepend an edit label.
@@ -113,30 +112,16 @@ class OuterWrapContainer extends AbstractContainer
             }
         }
 
-        $view = GeneralUtility::makeInstance(StandaloneView::class);
-        $view->setTemplatePathAndFilename(GeneralUtility::getFileAbsFileName(
-            'EXT:backend/Resources/Private/Templates/OuterWrapContainer.html'
-        ));
+        $html = [];
+        $html[] = '<h1>' . $pageTitle . '</h1>';
+        $html[] = '<div class="typo3-TCEforms">';
+        $html[] =    $childHtml;
+        $html[] =    '<div class="help-block text-right">';
+        $html[] =        $icon . ' <strong>' . htmlspecialchars($tableTitle) . '</strong>' . ' ' . $newOrUid;
+        $html[] =    '</div>';
+        $html[] = '</div>';
 
-        $descriptionColumn = !empty($this->data['processedTca']['ctrl']['descriptionColumn'])
-            ? $this->data['processedTca']['ctrl']['descriptionColumn'] : null;
-        if ($descriptionColumn !== null) {
-            $title = $this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.recordInformation');
-            $content = $this->data['databaseRow'][$descriptionColumn];
-            $view->assignMultiple([
-                'infoBoxMessageTitle' => $title,
-                'infoBoxMessage' => $content
-            ]);
-        }
-
-        $view->assignMultiple(array(
-            'pageTitle' => $pageTitle,
-            'childHtml' => $childHtml,
-            'icon' => $icon,
-            'tableTitle' => $tableTitle,
-            'newOrUid' => $newOrUid
-        ));
-        $result['html'] = $view->render();
+        $result['html'] = implode(LF, $html);
         return $result;
     }
 

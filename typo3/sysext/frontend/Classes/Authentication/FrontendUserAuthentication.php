@@ -38,14 +38,6 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
     protected $sessionDataLifetime = 86400;
 
     /**
-     * if > 0 : session-timeout in seconds.
-     * if FALSE/<0 : no timeout.
-     * if string: The string is field name from the user table where the timeout can be found.
-     * @var string|int
-     */
-    public $sessionTimeout = 6000;
-
-    /**
      * @var string
      */
     public $usergroup_column = 'usergroup';
@@ -58,22 +50,22 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
     /**
      * @var array
      */
-    public $groupData = array(
-        'title' => array(),
-        'uid' => array(),
-        'pid' => array()
-    );
+    public $groupData = [
+        'title' => [],
+        'uid' => [],
+        'pid' => []
+    ];
 
     /**
      * Used to accumulate the TSconfig data of the user
      * @var array
      */
-    public $TSdataArray = array();
+    public $TSdataArray = [];
 
     /**
      * @var array
      */
-    public $userTS = array();
+    public $userTS = [];
 
     /**
      * @var bool
@@ -92,7 +84,7 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
      *
      * @var array
      */
-    public $sesData = array();
+    public $sesData = [];
 
     /**
      * @var bool
@@ -107,7 +99,7 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
     /**
      * @var bool
      */
-    public $is_permanent = false;
+    public $is_permanent;
 
     /**
      * @var int|NULL
@@ -139,15 +131,16 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
         $this->userident_column = 'password';
         $this->userid_column = 'uid';
         $this->lastLogin_column = 'lastlogin';
-        $this->enablecolumns = array(
+        $this->enablecolumns = [
             'deleted' => 'deleted',
             'disabled' => 'disable',
             'starttime' => 'starttime',
             'endtime' => 'endtime'
-        );
+        ];
         $this->formfield_uname = 'user';
         $this->formfield_uident = 'pass';
         $this->formfield_status = 'logintype';
+        $this->auth_timeout_field = 6000;
         $this->sendNoCacheHeaders = false;
         $this->getFallBack = true;
         $this->getMethodEnabled = true;
@@ -175,9 +168,9 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
      */
     public function start()
     {
-        if ((int)$this->sessionTimeout > 0 && $this->sessionTimeout < $this->lifetime) {
+        if ((int)$this->auth_timeout_field > 0 && (int)$this->auth_timeout_field < $this->lifetime) {
             // If server session timeout is non-zero but less than client session timeout: Copy this value instead.
-            $this->sessionTimeout = $this->lifetime;
+            $this->auth_timeout_field = $this->lifetime;
         }
         $this->sessionDataLifetime = (int)$GLOBALS['TYPO3_CONF_VARS']['FE']['sessionDataLifetime'];
         if ($this->sessionDataLifetime <= 0) {
@@ -195,7 +188,7 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
     public function getNewSessionRecord($tempuser)
     {
         $insertFields = parent::getNewSessionRecord($tempuser);
-        $insertFields['ses_permanent'] = $this->is_permanent ? 1 : 0;
+        $insertFields['ses_permanent'] = $this->is_permanent;
         return $insertFields;
     }
 
@@ -244,11 +237,11 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
                 // we need to force setting the session cookie here
                 $this->forceSetCookie = true;
             }
-            $isPermanent = (bool)$isPermanent;
+            $isPermanent = $isPermanent ? 1 : 0;
         } elseif ($GLOBALS['TYPO3_CONF_VARS']['FE']['permalogin'] == 2) {
-            $isPermanent = true;
+            $isPermanent = 1;
         } else {
-            $isPermanent = false;
+            $isPermanent = 0;
         }
         $loginData['permanent'] = $isPermanent;
         $this->is_permanent = $isPermanent;
@@ -281,32 +274,32 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
      */
     public function fetchGroupData()
     {
-        $this->TSdataArray = array();
-        $this->userTS = array();
+        $this->TSdataArray = [];
+        $this->userTS = [];
         $this->userTSUpdated = false;
-        $this->groupData = array(
-            'title' => array(),
-            'uid' => array(),
-            'pid' => array()
-        );
+        $this->groupData = [
+            'title' => [],
+            'uid' => [],
+            'pid' => []
+        ];
         // Setting default configuration:
         $this->TSdataArray[] = $GLOBALS['TYPO3_CONF_VARS']['FE']['defaultUserTSconfig'];
         // Get the info data for auth services
         $authInfo = $this->getAuthInfoArray();
         if ($this->writeDevLog) {
             if (is_array($this->user)) {
-                GeneralUtility::devLog('Get usergroups for user: ' . GeneralUtility::arrayToLogString($this->user, array($this->userid_column, $this->username_column)), __CLASS__);
+                GeneralUtility::devLog('Get usergroups for user: ' . GeneralUtility::arrayToLogString($this->user, [$this->userid_column, $this->username_column]), __CLASS__);
             } else {
                 GeneralUtility::devLog('Get usergroups for "anonymous" user', __CLASS__);
             }
         }
-        $groupDataArr = array();
+        $groupDataArr = [];
         // Use 'auth' service to find the groups for the user
         $serviceChain = '';
         $subType = 'getGroups' . $this->loginType;
         while (is_object($serviceObj = GeneralUtility::makeInstanceService('auth', $subType, $serviceChain))) {
             $serviceChain .= ',' . $serviceObj->getServiceKey();
-            $serviceObj->initAuth($subType, array(), $authInfo, $this);
+            $serviceObj->initAuth($subType, [], $authInfo, $this);
             $groupData = $serviceObj->getGroups($this->user, $groupDataArr);
             if (is_array($groupData) && !empty($groupData)) {
                 // Keys in $groupData should be unique ids of the groups (like "uid") so this function will override groups.
@@ -331,7 +324,7 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
             $subType = 'authGroups' . $this->loginType;
             while (is_object($serviceObj = GeneralUtility::makeInstanceService('auth', $subType, $serviceChain))) {
                 $serviceChain .= ',' . $serviceObj->getServiceKey();
-                $serviceObj->initAuth($subType, array(), $authInfo, $this);
+                $serviceObj->initAuth($subType, [], $authInfo, $this);
                 if (!$serviceObj->authGroup($this->user, $groupData)) {
                     $validGroup = false;
                     if ($this->writeDevLog) {
@@ -399,11 +392,10 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
      */
     public function fetchSessionData()
     {
-        $db = $this->getDatabaseConnection();
         // Gets SesData if any AND if not already selected by session fixation check in ->isExistingSessionRecord()
         if ($this->id && empty($this->sesData)) {
-            $statement = $db->prepare_SELECTquery('*', 'fe_session_data', 'hash = :hash');
-            $statement->execute(array(':hash' => $this->id));
+            $statement = $this->db->prepare_SELECTquery('*', 'fe_session_data', 'hash = :hash');
+            $statement->execute([':hash' => $this->id]);
             if (($sesDataRow = $statement->fetch()) !== false) {
                 $this->sesData = unserialize($sesDataRow['content']);
                 $this->sessionDataTimestamp = $sesDataRow['tstamp'];
@@ -427,7 +419,6 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
         if ($this->userData_change) {
             $this->writeUC('');
         }
-        $db = $this->getDatabaseConnection();
         if ($this->sesData_change && $this->id) {
             if (empty($this->sesData)) {
                 // Remove session-data
@@ -438,23 +429,23 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
                 }
             } elseif ($this->sessionDataTimestamp === null) {
                 // Write new session-data
-                $insertFields = array(
+                $insertFields = [
                     'hash' => $this->id,
                     'content' => serialize($this->sesData),
                     'tstamp' => $GLOBALS['EXEC_TIME']
-                );
+                ];
                 $this->sessionDataTimestamp = $GLOBALS['EXEC_TIME'];
-                $db->exec_INSERTquery('fe_session_data', $insertFields);
+                $this->db->exec_INSERTquery('fe_session_data', $insertFields);
                 // Now set the cookie (= fix the session)
                 $this->setSessionCookie();
             } else {
                 // Update session data
-                $updateFields = array(
+                $updateFields = [
                     'content' => serialize($this->sesData),
                     'tstamp' => $GLOBALS['EXEC_TIME']
-                );
+                ];
                 $this->sessionDataTimestamp = $GLOBALS['EXEC_TIME'];
-                $db->exec_UPDATEquery('fe_session_data', 'hash=' . $db->fullQuoteStr($this->id, 'fe_session_data'), $updateFields);
+                $this->db->exec_UPDATEquery('fe_session_data', 'hash=' . $this->db->fullQuoteStr($this->id, 'fe_session_data'), $updateFields);
             }
         }
     }
@@ -466,9 +457,8 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
      */
     public function removeSessionData()
     {
-        $db = $this->getDatabaseConnection();
         $this->sessionDataTimestamp = null;
-        $db->exec_DELETEquery('fe_session_data', 'hash=' . $db->fullQuoteStr($this->id, 'fe_session_data'));
+        $this->db->exec_DELETEquery('fe_session_data', 'hash=' . $this->db->fullQuoteStr($this->id, 'fe_session_data'));
     }
 
     /**
@@ -494,14 +484,13 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
      */
     protected function regenerateSessionId()
     {
-        $db = $this->getDatabaseConnection();
         $oldSessionId = $this->id;
         parent::regenerateSessionId();
         // Update session data with new ID
-        $db->exec_UPDATEquery(
+        $this->db->exec_UPDATEquery(
             'fe_session_data',
-            'hash=' . $db->fullQuoteStr($oldSessionId, 'fe_session_data'),
-            array('hash' => $this->id)
+            'hash=' . $this->db->fullQuoteStr($oldSessionId, 'fe_session_data'),
+            ['hash' => $this->id]
         );
 
         // We force the cookie to be set later in the authentication process
@@ -517,7 +506,7 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
     public function gc()
     {
         $timeoutTimeStamp = (int)($GLOBALS['EXEC_TIME'] - $this->sessionDataLifetime);
-        $this->getDatabaseConnection()->exec_DELETEquery('fe_session_data', 'tstamp < ' . $timeoutTimeStamp);
+        $this->db->exec_DELETEquery('fe_session_data', 'tstamp < ' . $timeoutTimeStamp);
         parent::gc();
     }
 
@@ -627,7 +616,7 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
         // with bogus content and thus bloat the database
         if (!$maxSizeOfSessionData || $this->isCookieSet()) {
             if ($recs['clear_all']) {
-                $this->setKey('ses', 'recs', array());
+                $this->setKey('ses', 'recs', []);
             }
             $change = 0;
             $recs_array = $this->getKey('ses', 'recs');
@@ -662,8 +651,8 @@ class FrontendUserAuthentication extends AbstractUserAuthentication
         $count = parent::isExistingSessionRecord($id);
         // Check if there are any fe_session_data records for the session ID the client claims to have
         if ($count == false) {
-            $statement = $this->getDatabaseConnection()->prepare_SELECTquery('content,tstamp', 'fe_session_data', 'hash = :hash');
-            $res = $statement->execute(array(':hash' => $id));
+            $statement = $this->db->prepare_SELECTquery('content,tstamp', 'fe_session_data', 'hash = :hash');
+            $res = $statement->execute([':hash' => $id]);
             if ($res !== false) {
                 if ($sesDataRow = $statement->fetch()) {
                     $count = true;

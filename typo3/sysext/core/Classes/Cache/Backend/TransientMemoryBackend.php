@@ -20,17 +20,17 @@ namespace TYPO3\CMS\Core\Cache\Backend;
  * This file is a backport from FLOW3
  * @api
  */
-class TransientMemoryBackend extends \TYPO3\CMS\Core\Cache\Backend\AbstractBackend implements \TYPO3\CMS\Core\Cache\Backend\TaggableBackendInterface
+class TransientMemoryBackend extends \TYPO3\CMS\Core\Cache\Backend\AbstractBackend implements TaggableBackendInterface, TransientBackendInterface
 {
     /**
      * @var array
      */
-    protected $entries = array();
+    protected $entries = [];
 
     /**
      * @var array
      */
-    protected $tagsAndEntries = array();
+    protected $tagsAndEntries = [];
 
     /**
      * Saves data in the cache.
@@ -44,13 +44,10 @@ class TransientMemoryBackend extends \TYPO3\CMS\Core\Cache\Backend\AbstractBacke
      * @throws \TYPO3\CMS\Core\Cache\Exception\InvalidDataException
      * @api
      */
-    public function set($entryIdentifier, $data, array $tags = array(), $lifetime = null)
+    public function set($entryIdentifier, $data, array $tags = [], $lifetime = null)
     {
         if (!$this->cache instanceof \TYPO3\CMS\Core\Cache\Frontend\FrontendInterface) {
             throw new \TYPO3\CMS\Core\Cache\Exception('No cache frontend has been set yet via setCache().', 1238244992);
-        }
-        if (!is_string($data)) {
-            throw new \TYPO3\CMS\Core\Cache\Exception\InvalidDataException('The specified data is of type "' . gettype($data) . '" but a string is expected.', 1238244993);
         }
         $this->entries[$entryIdentifier] = $data;
         foreach ($tags as $tag) {
@@ -117,7 +114,7 @@ class TransientMemoryBackend extends \TYPO3\CMS\Core\Cache\Backend\AbstractBacke
         if (isset($this->tagsAndEntries[$tag])) {
             return array_keys($this->tagsAndEntries[$tag]);
         } else {
-            return array();
+            return [];
         }
     }
 
@@ -129,8 +126,8 @@ class TransientMemoryBackend extends \TYPO3\CMS\Core\Cache\Backend\AbstractBacke
      */
     public function flush()
     {
-        $this->entries = array();
-        $this->tagsAndEntries = array();
+        $this->entries = [];
+        $this->tagsAndEntries = [];
     }
 
     /**

@@ -14,7 +14,7 @@ namespace TYPO3\CMS\Backend\Form\Element;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Backend\Routing\UriBuilder;
+use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Resource\Exception\FileDoesNotExistException;
 use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
@@ -33,17 +33,17 @@ class ImageManipulationElement extends AbstractFormElement
      *
      * @var array
      */
-    protected $defaultConfig = array(
+    protected $defaultConfig = [
         'file_field' => 'uid_local',
         'enableZoom' => false,
         'allowedExtensions' => null, // default: $GLOBALS['TYPO3_CONF_VARS']['GFX']['imagefile_ext']
-        'ratios' => array(
+        'ratios' => [
             '1.7777777777777777' => 'LLL:EXT:lang/locallang_wizards.xlf:imwizard.ratio.16_9',
             '1.3333333333333333' => 'LLL:EXT:lang/locallang_wizards.xlf:imwizard.ratio.4_3',
             '1' => 'LLL:EXT:lang/locallang_wizards.xlf:imwizard.ratio.1_1',
             'NaN' => 'LLL:EXT:lang/locallang_wizards.xlf:imwizard.ratio.free',
-        )
-    );
+        ]
+    ];
 
     /**
      * This will render an imageManipulation field
@@ -70,13 +70,13 @@ class ImageManipulationElement extends AbstractFormElement
         }
 
         if ($config['readOnly']) {
-            $options = array();
-            $options['parameterArray'] = array(
-                'fieldConf' => array(
+            $options = [];
+            $options['parameterArray'] = [
+                'fieldConf' => [
                     'config' => $config,
-                ),
+                ],
                 'itemFormElValue' => $parameterArray['itemFormElValue'],
-            );
+            ];
             $options['renderType'] = 'none';
             return $this->nodeFactory->create($options)->render();
         }
@@ -88,41 +88,39 @@ class ImageManipulationElement extends AbstractFormElement
 
         $content = '';
         $preview = '';
-        if (GeneralUtility::inList(mb_strtolower($config['allowedExtensions']), mb_strtolower($file->getExtension()))) {
+        if (GeneralUtility::inList(strtolower($config['allowedExtensions']), strtolower($file->getExtension()))) {
 
             // Get preview
             $preview = $this->getPreview($file, $parameterArray['itemFormElValue']);
 
             // Check if ratio labels hold translation strings
             foreach ((array)$config['ratios'] as $ratio => $label) {
-                $config['ratios'][$ratio] = htmlspecialchars($languageService->sL($label));
+                $config['ratios'][$ratio] = $languageService->sL($label, true);
             }
 
             $formFieldId = StringUtility::getUniqueId('formengine-image-manipulation-');
-            $wizardData = array(
+            $wizardData = [
                 'zoom' => $config['enableZoom'] ? '1' : '0',
                 'ratios' => json_encode($config['ratios']),
                 'file' => $file->getUid(),
-            );
+            ];
             $wizardData['token'] = GeneralUtility::hmac(implode('|', $wizardData), 'ImageManipulationWizard');
 
-            /** @var UriBuilder $uriBuilder */
-            $uriBuilder = GeneralUtility::makeInstance(UriBuilder::class);
-            $buttonAttributes = array(
-                'data-url' => $uriBuilder->buildUriFromRoute('ajax_wizard_image_manipulation', $wizardData),
+            $buttonAttributes = [
+                'data-url' => BackendUtility::getAjaxUrl('wizard_image_manipulation', $wizardData),
                 'data-severity' => 'notice',
                 'data-image-name' => $file->getNameWithoutExtension(),
                 'data-image-uid' => $file->getUid(),
                 'data-file-field' => $config['file_field'],
                 'data-field' => $formFieldId,
-            );
+            ];
 
             $button = '<button class="btn btn-default t3js-image-manipulation-trigger"';
             foreach ($buttonAttributes as $key => $value) {
                 $button .= ' ' . $key . '="' . htmlspecialchars($value) . '"';
             }
             $button .= '><span class="t3-icon fa fa-crop"></span>';
-            $button .= htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_wizards.xlf:imwizard.open-editor'));
+            $button .= $languageService->sL('LLL:EXT:lang/locallang_wizards.xlf:imwizard.open-editor', true);
             $button .= '</button>';
 
             $inputField = '<input type="hidden" '
@@ -134,13 +132,13 @@ class ImageManipulationElement extends AbstractFormElement
 
             $content .= $this->getImageManipulationInfoTable($parameterArray['itemFormElValue']);
 
-            $resultArray['requireJsModules'][] = array(
+            $resultArray['requireJsModules'][] = [
                 'TYPO3/CMS/Backend/ImageManipulation' => 'function(ImageManipulation){ImageManipulation.initializeTrigger()}'
-            );
+            ];
         }
 
-        $content .= '<p class="text-muted"><em>' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_wizards.xlf:imwizard.supported-types-message')) . '<br />';
-        $content .= mb_strtoupper(implode(', ', GeneralUtility::trimExplode(',', $config['allowedExtensions'])));
+        $content .= '<p class="text-muted"><em>' . $languageService->sL('LLL:EXT:lang/locallang_wizards.xlf:imwizard.supported-types-message', true) . '<br />';
+        $content .= strtoupper(implode(', ', GeneralUtility::trimExplode(',', $config['allowedExtensions'])));
         $content .= '</em></p>';
 
         $item = '<div class="media">';
@@ -195,7 +193,7 @@ class ImageManipulationElement extends AbstractFormElement
         $maxWidth = 150;
         $maxHeight = 200;
         if ($crop) {
-            $imageSetup = array('maxWidth' => $maxWidth, 'maxHeight' => $maxHeight, 'crop' => $crop);
+            $imageSetup = ['maxWidth' => $maxWidth, 'maxHeight' => $maxHeight, 'crop' => $crop];
             $processedImage = $file->process(\TYPO3\CMS\Core\Resource\ProcessedFile::CONTEXT_IMAGECROPSCALEMASK, $imageSetup);
             // Only use a thumbnail if the processing process was successful by checking if image width is set
             if ($processedImage->getProperty('width')) {
@@ -245,13 +243,13 @@ class ImageManipulationElement extends AbstractFormElement
 
         $content .= '<div class="table-fit-block table-spacer-wrap">';
         $content .= '<table class="table table-no-borders t3js-image-manipulation-info' . ($imageManipulation === null ? ' hide' : '') . '">';
-        $content .= '<tr><td>' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_wizards.xlf:imwizard.crop-x')) . '</td>';
+        $content .= '<tr><td>' . $languageService->sL('LLL:EXT:lang/locallang_wizards.xlf:imwizard.crop-x', true) . '</td>';
         $content .= '<td class="t3js-image-manipulation-info-crop-x">' . $x . 'px</td></tr>';
-        $content .= '<tr><td>' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_wizards.xlf:imwizard.crop-y')) . '</td>';
+        $content .= '<tr><td>' . $languageService->sL('LLL:EXT:lang/locallang_wizards.xlf:imwizard.crop-y', true) . '</td>';
         $content .= '<td class="t3js-image-manipulation-info-crop-y">' . $y . 'px</td></tr>';
-        $content .= '<tr><td>' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_wizards.xlf:imwizard.crop-width')) . '</td>';
+        $content .= '<tr><td>' . $languageService->sL('LLL:EXT:lang/locallang_wizards.xlf:imwizard.crop-width', true) . '</td>';
         $content .= '<td class="t3js-image-manipulation-info-crop-width">' . $width . 'px</td></tr>';
-        $content .= '<tr><td>' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_wizards.xlf:imwizard.crop-height')) . '</td>';
+        $content .= '<tr><td>' . $languageService->sL('LLL:EXT:lang/locallang_wizards.xlf:imwizard.crop-height', true) . '</td>';
         $content .= '<td class="t3js-image-manipulation-info-crop-height">' . $height . 'px</td></tr>';
         $content .= '</table>';
         $content .= '</div>';

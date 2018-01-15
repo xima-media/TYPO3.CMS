@@ -220,7 +220,7 @@ define(['TYPO3/CMS/Rtehtmlarea/HTMLArea/UserAgent/UserAgent',
 			if (typeof HTMLArea.classesRequiredBy !== 'undefined') {
 				var classes = Dom.getClassNames(node);
 				for (var i = classes.length; --i >= 0;) {
-					if (typeof HTMLArea.classesRequiredBy[classes[i]] !== 'undefined' && HTMLArea.classesRequiredBy[classes[i]].indexOf(className) !== -1) {
+					if (typeof HTMLArea.classesRequiredBy[className] !== 'undefined' && HTMLArea.classesRequiredBy[className].indexOf(classes[i]) !== -1) {
 						return true;
 					}
 				}
@@ -250,7 +250,7 @@ define(['TYPO3/CMS/Rtehtmlarea/HTMLArea/UserAgent/UserAgent',
 		getBlockAncestors: function (node, withinBlock) {
 			var ancestors = [];
 			var ancestor = node;
-			while (ancestor && (ancestor.nodeType === Dom.ELEMENT_NODE) && !/^(body)$/i.test(ancestor.nodeName) && ancestor != withinBlock) {
+			while (ancestor && (ancestor.nodeType === Dom.ELEMENT_NODE) && !/^(html|body)$/i.test(ancestor.nodeName) && ancestor != withinBlock) {
 				if (Dom.isBlockElement(ancestor)) {
 					ancestors.unshift(ancestor);
 				}
@@ -277,7 +277,7 @@ define(['TYPO3/CMS/Rtehtmlarea/HTMLArea/UserAgent/UserAgent',
 			// Is types a non-empty array?
 			if (types && Object.prototype.toString.call(types) === '[object Array]' && types.length > 0) {
 				types = new RegExp( '^(' + types.join('|') + ')$', 'i');
-				while (parent && parent.nodeType === Dom.ELEMENT_NODE && !/^(body)$/i.test(parent.nodeName)) {
+				while (parent && parent.nodeType === Dom.ELEMENT_NODE && !/^(html|body)$/i.test(parent.nodeName)) {
 					if (types.test(parent.nodeName)) {
 						ancestor = parent;
 						break;

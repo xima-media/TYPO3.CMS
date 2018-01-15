@@ -14,8 +14,6 @@ namespace TYPO3\CMS\Install\Service;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Configuration\ConfigurationManager;
-use TYPO3\CMS\Core\Crypto\Random;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Install\Controller\Exception\RedirectException;
@@ -34,9 +32,14 @@ use TYPO3\CMS\Install\Controller\Exception\RedirectException;
 class SilentConfigurationUpgradeService
 {
     /**
+     * @var \TYPO3\CMS\Extbase\Object\ObjectManager
+     */
+    protected $objectManager = null;
+
+    /**
      * @var \TYPO3\CMS\Core\Configuration\ConfigurationManager
      */
-    protected $configurationManager;
+    protected $configurationManager = null;
 
     /**
      * List of obsolete configuration options in LocalConfiguration to be removed
@@ -47,45 +50,74 @@ class SilentConfigurationUpgradeService
      * @var array
      */
     protected $obsoleteLocalConfigurationSettings = [
-        // #72400
-        'BE/spriteIconGenerator_handler',
-        // #72417
-        'SYS/lockingMode',
-        // #72473
-        'FE/secureFormmail',
-        'FE/strictFormmail',
-        'FE/formmailMaxAttachmentSize',
-        // #72337
-        'SYS/t3lib_cs_utils',
-        'SYS/t3lib_cs_convMethod',
-        // #72604
-        'SYS/maxFileNameLength',
-        // #72602
-        'BE/unzip_path',
-        // #72615
-        'BE/notificationPrefix',
-        // #72616
-        'BE/XCLASS',
-        'FE/XCLASS',
-        // #43085
-        'GFX/image_processing',
-        // #70056
-        'SYS/curlUse',
-        'SYS/curlProxyNTLM',
-        'SYS/curlProxyServer',
-        'SYS/curlProxyTunnel',
-        'SYS/curlProxyUserPass',
-        'SYS/curlTimeout',
-        // #75355
-        'BE/niceFlexFormXMLtags',
-        'BE/compactFlexFormXML',
-        // #75625
-        'SYS/clearCacheSystem',
+        // #62402
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\ExtensionManagerTables',
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\FileIdentifierHashUpdate',
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\FilemountUpdateWizard',
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\FilePermissionUpdate',
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\FileTableSplittingUpdate',
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\InitUpdateWizard',
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\MediaFlexformUpdate',
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\ReferenceIntegrityUpdateWizard',
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\RteFileLinksUpdateWizard',
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\RteMagicImagesUpdateWizard',
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\TceformsUpdateWizard',
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\TtContentUploadsUpdateWizard',
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\TruncateSysFileProcessedFileTable',
+        // #68183
+        'INSTALL/wizardDone/TYPO3\\CMS\\Install\\Updates\\MigrateShortcutUrlsUpdate',
+        // #63818
+        'BE/staticFileEditPath',
+        // #64226
+        'BE/accessListRenderMode',
+        // #66431
+        'BE/loginNewsTitle',
+        // #24900
+        'SYS/compat_version',
+        // #64643
+        'GFX/enable_typo3temp_db_tracking',
+        // #48542
+        'GFX/TTFdpi',
+        // #64872
+        'SYS/useCachingFramework',
+        // #65912
+        'FE/allowedTempPaths',
+        // #66034
+        'FE/activateContentAdapter',
+        // #66902
+        'SYS/loginCopyrightShowVersion',
+        // #66903
+        'BE/RTEenabled',
+        // #66906
+        'GFX/png_to_gif',
+        // #67411
+        'SYS/caching/cacheConfigurations/cache_classes',
+        // #68178
+        'SYS/form_enctype',
+        // #69904
+        'BE/diff_path',
+        // #69930
+        'SYS/serverTimeZone',
+        // #70138
+        'BE/flexFormXMLincludeDiffBase',
+        // #71110
+        'BE/maxFileSize',
     ];
 
-    public function __construct(ConfigurationManager $configurationManager = null)
+    /**
+     * @param \TYPO3\CMS\Extbase\Object\ObjectManager $objectManager
+     */
+    public function injectObjectManager(\TYPO3\CMS\Extbase\Object\ObjectManager $objectManager)
     {
-        $this->configurationManager = $configurationManager ?: GeneralUtility::makeInstance(ConfigurationManager::class);
+        $this->objectManager = $objectManager;
+    }
+
+    /**
+     * @param \TYPO3\CMS\Core\Configuration\ConfigurationManager $configurationManager
+     */
+    public function injectConfigurationManager(\TYPO3\CMS\Core\Configuration\ConfigurationManager $configurationManager)
+    {
+        $this->configurationManager = $configurationManager;
     }
 
     /**
@@ -98,15 +130,13 @@ class SilentConfigurationUpgradeService
     {
         $this->generateEncryptionKeyIfNeeded();
         $this->configureBackendLoginSecurity();
-        $this->migrateImageProcessorSetting();
-        $this->transferHttpSettings();
+        $this->configureSaltedPasswords();
+        $this->setProxyAuthScheme();
+        $this->transferDeprecatedCurlSettings();
+        $this->disableImageMagickAndGdlibIfImageProcessingIsDisabled();
         $this->disableImageMagickDetailSettingsIfImageMagickIsDisabled();
         $this->setImageMagickDetailSettings();
         $this->removeObsoleteLocalConfigurationSettings();
-        $this->migrateThumbnailsPngSetting();
-        $this->migrateLockSslSetting();
-        $this->migrateDatabaseConnectionSettings();
-        $this->migrateDatabaseConnectionCharset();
     }
 
     /**
@@ -148,8 +178,44 @@ class SilentConfigurationUpgradeService
             }
         } catch (\RuntimeException $e) {
             // If an exception is thrown, the value is not set in LocalConfiguration
-            $this->configurationManager->setLocalConfigurationValueByPath('BE/loginSecurityLevel',
-                $rsaauthLoaded ? 'rsa' : 'normal');
+            $this->configurationManager->setLocalConfigurationValueByPath('BE/loginSecurityLevel', $rsaauthLoaded ? 'rsa' : 'normal');
+            $this->throwRedirectException();
+        }
+    }
+
+    /**
+     * Check the settings for salted passwords extension to load it as a required extension.
+     * Unset obsolete configuration options if given.
+     *
+     * @return void
+     */
+    protected function configureSaltedPasswords()
+    {
+        $defaultConfiguration = $this->configurationManager->getDefaultConfiguration();
+        $defaultExtensionConfiguration = unserialize($defaultConfiguration['EXT']['extConf']['saltedpasswords']);
+        try {
+            $extensionConfiguration = @unserialize($this->configurationManager->getLocalConfigurationValueByPath('EXT/extConf/saltedpasswords'));
+        } catch (\RuntimeException $e) {
+            $extensionConfiguration = [];
+        }
+        if (is_array($extensionConfiguration) && !empty($extensionConfiguration)) {
+            if (isset($extensionConfiguration['BE.']['enabled'])) {
+                if ($extensionConfiguration['BE.']['enabled']) {
+                    unset($extensionConfiguration['BE.']['enabled']);
+                } else {
+                    $extensionConfiguration['BE.'] = $defaultExtensionConfiguration['BE.'];
+                }
+                $this->configurationManager->setLocalConfigurationValueByPath(
+                    'EXT/extConf/saltedpasswords',
+                    serialize($extensionConfiguration)
+                );
+                $this->throwRedirectException();
+            }
+        } else {
+            $this->configurationManager->setLocalConfigurationValueByPath(
+                'EXT/extConf/saltedpasswords',
+                serialize($defaultExtensionConfiguration)
+            );
             $this->throwRedirectException();
         }
     }
@@ -172,199 +238,135 @@ class SilentConfigurationUpgradeService
         }
 
         if (empty($currentValue)) {
-            $randomKey = GeneralUtility::makeInstance(Random::class)->generateRandomHexString(96);
+            $randomKey = GeneralUtility::getRandomHexString(96);
             $this->configurationManager->setLocalConfigurationValueByPath('SYS/encryptionKey', $randomKey);
             $this->throwRedirectException();
         }
     }
 
     /**
-     * Parse old curl and HTTP options and set new HTTP options, related to Guzzle
+     * $GLOBALS['TYPO3_CONF_VARS']['HTTP']['proxy_auth_scheme'] must be either
+     * 'digest' or 'basic'. 'basic' is default in DefaultConfiguration, so the
+     * setting can be removed from LocalConfiguration if it is not set to 'digest'.
      *
      * @return void
      */
-    protected function transferHttpSettings()
+    protected function setProxyAuthScheme()
+    {
+        // Get current value from LocalConfiguration
+        try {
+            $currentValueInLocalConfiguration = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/proxy_auth_scheme');
+        } catch (\RuntimeException $e) {
+            // If an exception is thrown, the value is not set in LocalConfiguration, so we don't need to do anything
+            return;
+        }
+        if ($currentValueInLocalConfiguration !== 'digest') {
+            $this->configurationManager->removeLocalConfigurationKeysByPath(['HTTP/proxy_auth_scheme']);
+            $this->throwRedirectException();
+        }
+    }
+
+    /**
+     * Parse old curl options and set new http ones instead
+     *
+     * @return void
+     */
+    protected function transferDeprecatedCurlSettings()
     {
         $changed = false;
-        $newParameters = [];
-        $obsoleteParameters = [];
-
-        // Remove / migrate options to new options
         try {
-            // Check if the adapter option is set, if so, set it to the parameters that are obsolete
-            $this->configurationManager->getLocalConfigurationValueByPath('HTTP/adapter');
-            $obsoleteParameters[] = 'HTTP/adapter';
+            $curlProxyServer = $this->configurationManager->getLocalConfigurationValueByPath('SYS/curlProxyServer');
         } catch (\RuntimeException $e) {
+            $curlProxyServer = '';
         }
         try {
-            $newParameters['HTTP/version'] = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/protocol_version');
-            $obsoleteParameters[] = 'HTTP/protocol_version';
+            $proxyHost = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/proxy_host');
         } catch (\RuntimeException $e) {
+            $proxyHost = '';
         }
-        try {
-            $this->configurationManager->getLocalConfigurationValueByPath('HTTP/ssl_verify_host');
-            $obsoleteParameters[] = 'HTTP/ssl_verify_host';
-        } catch (\RuntimeException $e) {
-        }
-        try {
-            $legacyUserAgent = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/userAgent');
-            $newParameters['HTTP/headers/User-Agent'] = $legacyUserAgent;
-            $obsoleteParameters[] = 'HTTP/userAgent';
-        } catch (\RuntimeException $e) {
-        }
-
-        // Redirects
-        try {
-            $legacyFollowRedirects = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/follow_redirects');
-            $obsoleteParameters[] = 'HTTP/follow_redirects';
-        } catch (\RuntimeException $e) {
-            $legacyFollowRedirects = '';
-        }
-        try {
-            $legacyMaximumRedirects = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/max_redirects');
-            $obsoleteParameters[] = 'HTTP/max_redirects';
-        } catch (\RuntimeException $e) {
-            $legacyMaximumRedirects = '';
-        }
-        try {
-            $legacyStrictRedirects = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/strict_redirects');
-            $obsoleteParameters[] = 'HTTP/strict_redirects';
-        } catch (\RuntimeException $e) {
-            $legacyStrictRedirects = '';
-        }
-
-        // Check if redirects have been disabled
-        if ($legacyFollowRedirects !== '' && (bool)$legacyFollowRedirects === false) {
-            $newParameters['HTTP/allow_redirects'] = false;
-        } elseif ($legacyMaximumRedirects !== '' || $legacyStrictRedirects !== '') {
-            $newParameters['HTTP/allow_redirects'] = [];
-            if ($legacyMaximumRedirects !== '' && (int)$legacyMaximumRedirects !== 5) {
-                $newParameters['HTTP/allow_redirects']['max'] = (int)$legacyMaximumRedirects;
-            }
-            if ($legacyStrictRedirects !== '' && (bool)$legacyStrictRedirects === true) {
-                $newParameters['HTTP/allow_redirects']['strict'] = true;
-            }
-            // defaults are used, no need to set the option in LocalConfiguration.php
-            if (empty($newParameters['HTTP/allow_redirects'])) {
-                unset($newParameters['HTTP/allow_redirects']);
-            }
-        }
-
-        // Migrate Proxy settings
-        try {
-            // Currently without protocol or port
-            $legacyProxyHost = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/proxy_host');
-            $obsoleteParameters[] = 'HTTP/proxy_host';
-        } catch (\RuntimeException $e) {
-            $legacyProxyHost = '';
-        }
-        try {
-            $legacyProxyPort = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/proxy_port');
-            $obsoleteParameters[] = 'HTTP/proxy_port';
-        } catch (\RuntimeException $e) {
-            $legacyProxyPort = '';
-        }
-        try {
-            $legacyProxyUser = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/proxy_user');
-            $obsoleteParameters[] = 'HTTP/proxy_user';
-        } catch (\RuntimeException $e) {
-            $legacyProxyUser = '';
-        }
-        try {
-            $legacyProxyPassword = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/proxy_password');
-            $obsoleteParameters[] = 'HTTP/proxy_password';
-        } catch (\RuntimeException $e) {
-            $legacyProxyPassword = '';
-        }
-        // Auth Scheme: Basic, digest etc.
-        try {
-            $legacyProxyAuthScheme = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/proxy_auth_scheme');
-            $obsoleteParameters[] = 'HTTP/proxy_auth_scheme';
-        } catch (\RuntimeException $e) {
-            $legacyProxyAuthScheme = '';
-        }
-
-        if ($legacyProxyHost !== '') {
-            $proxy = 'http://';
-            if ($legacyProxyAuthScheme !== '' && $legacyProxyUser !== '' && $legacyProxyPassword !== '') {
-                $proxy .= $legacyProxyUser . ':' . $legacyProxyPassword . '@';
-            }
-            $proxy .= $legacyProxyHost;
-            if ($legacyProxyPort !== '') {
-                $proxy .= ':' . $legacyProxyPort;
-            }
-            $newParameters['HTTP/proxy'] = $proxy;
-        }
-
-        // Verify peers
-        // see http://docs.guzzlephp.org/en/latest/request-options.html#verify
-        try {
-            $legacySslVerifyPeer = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/ssl_verify_peer');
-            $obsoleteParameters[] = 'HTTP/ssl_verify_peer';
-        } catch (\RuntimeException $e) {
-            $legacySslVerifyPeer = '';
-        }
-
-        // Directory holding multiple Certificate Authority files
-        try {
-            $legacySslCaPath = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/ssl_capath');
-            $obsoleteParameters[] = 'HTTP/ssl_capath';
-        } catch (\RuntimeException $e) {
-            $legacySslCaPath = '';
-        }
-        // Certificate Authority file to verify the peer with (use when ssl_verify_peer is TRUE)
-        try {
-            $legacySslCaFile = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/ssl_cafile');
-            $obsoleteParameters[] = 'HTTP/ssl_cafile';
-        } catch (\RuntimeException $e) {
-            $legacySslCaFile = '';
-        }
-        if ($legacySslVerifyPeer !== '') {
-            if ($legacySslCaFile !== '' && $legacySslCaPath !== '') {
-                $newParameters['HTTP/verify'] = $legacySslCaPath . $legacySslCaFile;
-            } elseif ((bool)$legacySslVerifyPeer === false) {
-                $newParameters['HTTP/verify'] = false;
-            }
-        }
-
-        // SSL Key + Passphrase
-        // Name of a file containing local certificate
-        try {
-            $legacySslLocalCert = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/ssl_local_cert');
-            $obsoleteParameters[] = 'HTTP/ssl_local_cert';
-        } catch (\RuntimeException $e) {
-            $legacySslLocalCert = '';
-        }
-
-        // Passphrase with which local certificate was encoded
-        try {
-            $legacySslPassphrase = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/ssl_passphrase');
-            $obsoleteParameters[] = 'HTTP/ssl_passphrase';
-        } catch (\RuntimeException $e) {
-            $legacySslPassphrase = '';
-        }
-
-        if ($legacySslLocalCert !== '') {
-            if ($legacySslPassphrase !== '') {
-                $newParameters['HTTP/ssl_key'] = [
-                    $legacySslLocalCert,
-                    $legacySslPassphrase
-                ];
-            } else {
-                $newParameters['HTTP/ssl_key'] = $legacySslLocalCert;
-            }
-        }
-
-        // Update the LocalConfiguration file if obsolete parameters or new parameters are set
-        if (!empty($obsoleteParameters)) {
-            $this->configurationManager->removeLocalConfigurationKeysByPath($obsoleteParameters);
+        if (!empty($curlProxyServer) && empty($proxyHost)) {
+            $curlProxy = rtrim(preg_replace('#^https?://#', '', $curlProxyServer), '/');
+            $proxyParts = GeneralUtility::revExplode(':', $curlProxy, 2);
+            $this->configurationManager->setLocalConfigurationValueByPath('HTTP/proxy_host', $proxyParts[0]);
+            $this->configurationManager->setLocalConfigurationValueByPath('HTTP/proxy_port', $proxyParts[1]);
             $changed = true;
         }
-        if (!empty($newParameters)) {
-            $this->configurationManager->setLocalConfigurationValuesByPathValuePairs($newParameters);
+
+        try {
+            $curlProxyUserPass = $this->configurationManager->getLocalConfigurationValueByPath('SYS/curlProxyUserPass');
+        } catch (\RuntimeException $e) {
+            $curlProxyUserPass = '';
+        }
+        try {
+            $proxyUser = $this->configurationManager->getLocalConfigurationValueByPath('HTTP/proxy_user');
+        } catch (\RuntimeException $e) {
+            $proxyUser = '';
+        }
+        if (!empty($curlProxyUserPass) && empty($proxyUser)) {
+            $userPassParts = explode(':', $curlProxyUserPass, 2);
+            $this->configurationManager->setLocalConfigurationValueByPath('HTTP/proxy_user', $userPassParts[0]);
+            $this->configurationManager->setLocalConfigurationValueByPath('HTTP/proxy_password', $userPassParts[1]);
+            $changed = true;
+        }
+
+        try {
+            $curlUse = $this->configurationManager->getLocalConfigurationValueByPath('SYS/curlUse');
+        } catch (\RuntimeException $e) {
+            $curlUse = '';
+        }
+        try {
+            $adapter = $this->configurationManager->getConfigurationValueByPath('HTTP/adapter');
+        } catch (\RuntimeException $e) {
+            $adapter = '';
+        }
+        if (!empty($curlUse) && $adapter !== 'curl') {
+            $GLOBALS['TYPO3_CONF_VARS']['HTTP']['adapter'] = 'curl';
+            $this->configurationManager->setLocalConfigurationValueByPath('HTTP/adapter', 'curl');
             $changed = true;
         }
         if ($changed) {
+            $this->throwRedirectException();
+        }
+    }
+
+    /**
+     * GFX/im and GFX/gdlib must be set to 0 if image_processing is disabled.
+     *
+     * "Configuration presets" in install tool is not type safe, so value
+     * comparisons here are not type safe too, to not trigger changes to
+     * LocalConfiguration again.
+     *
+     * @return void
+     */
+    protected function disableImageMagickAndGdlibIfImageProcessingIsDisabled()
+    {
+        $changedValues = [];
+        try {
+            $currentImageProcessingValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/image_processing');
+        } catch (\RuntimeException $e) {
+            $currentImageProcessingValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/image_processing');
+        }
+        try {
+            $currentImValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/im');
+        } catch (\RuntimeException $e) {
+            $currentImValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/im');
+        }
+        try {
+            $currentGdlibValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/gdlib');
+        } catch (\RuntimeException $e) {
+            $currentGdlibValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/gdlib');
+        }
+        // If image processing is fully disabled, im and gdlib sub settings must be 0
+        if (!$currentImageProcessingValue) {
+            if ($currentImValue != 0) {
+                $changedValues['GFX/im'] = 0;
+            }
+            if ($currentGdlibValue != 0) {
+                $changedValues['GFX/gdlib'] = 0;
+            }
+        }
+        if (!empty($changedValues)) {
+            $this->configurationManager->setLocalConfigurationValuesByPathValuePairs($changedValues);
             $this->throwRedirectException();
         }
     }
@@ -383,41 +385,36 @@ class SilentConfigurationUpgradeService
     {
         $changedValues = [];
         try {
-            $currentImValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/processor_enabled');
+            $currentImValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/im');
         } catch (\RuntimeException $e) {
-            $currentImValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/processor_enabled');
+            $currentImValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/im');
         }
-
         try {
-            $currentImPathValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/processor_path');
+            $currentImPathValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/im_path');
         } catch (\RuntimeException $e) {
-            $currentImPathValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/processor_path');
+            $currentImPathValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/im_path');
         }
-
         try {
-            $currentImPathLzwValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/processor_path_lzw');
+            $currentImPathLzwValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/im_path_lzw');
         } catch (\RuntimeException $e) {
-            $currentImPathLzwValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/processor_path_lzw');
+            $currentImPathLzwValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/im_path_lzw');
         }
-
         try {
             $currentImageFileExtValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/imagefile_ext');
         } catch (\RuntimeException $e) {
             $currentImageFileExtValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/imagefile_ext');
         }
-
         try {
             $currentThumbnailsValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/thumbnails');
         } catch (\RuntimeException $e) {
             $currentThumbnailsValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/thumbnails');
         }
-
         if (!$currentImValue) {
             if ($currentImPathValue != '') {
-                $changedValues['GFX/processor_path'] = '';
+                $changedValues['GFX/im_path'] = '';
             }
             if ($currentImPathLzwValue != '') {
-                $changedValues['GFX/processor_path_lzw'] = '';
+                $changedValues['GFX/im_path_lzw'] = '';
             }
             if ($currentImageFileExtValue !== 'gif,jpg,jpeg,png') {
                 $changedValues['GFX/imagefile_ext'] = 'gif,jpg,jpeg,png';
@@ -446,102 +443,32 @@ class SilentConfigurationUpgradeService
     {
         $changedValues = [];
         try {
-            $currentProcessorValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/processor');
+            $currentIm5Value = $this->configurationManager->getLocalConfigurationValueByPath('GFX/im_version_5');
         } catch (\RuntimeException $e) {
-            $currentProcessorValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/processor');
+            $currentIm5Value = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/im_version_5');
         }
-
         try {
-            $currentProcessorMaskValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/processor_allowTemporaryMasksAsPng');
+            $currentImMaskValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/im_mask_temp_ext_gif');
         } catch (\RuntimeException $e) {
-            $currentProcessorMaskValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/processor_allowTemporaryMasksAsPng');
+            $currentImMaskValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/im_mask_temp_ext_gif');
         }
-
         try {
-            $currentProcessorEffectsValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/processor_effects');
+            $currentIm5EffectsValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/im_v5effects');
         } catch (\RuntimeException $e) {
-            $currentProcessorEffectsValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/processor_effects');
+            $currentIm5EffectsValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/im_v5effects');
         }
-
-        if ((string)$currentProcessorValue !== '') {
-            if ($currentProcessorMaskValue != 0) {
-                $changedValues['GFX/processor_allowTemporaryMasksAsPng'] = 0;
+        if ((string)$currentIm5Value !== '') {
+            if ($currentImMaskValue != 1) {
+                $changedValues['GFX/im_mask_temp_ext_gif'] = 1;
             }
-            if ($currentProcessorValue === 'GraphicsMagick') {
-                if ($currentProcessorEffectsValue != -1) {
-                    $changedValues['GFX/processor_effects'] = -1;
+            if ($currentIm5Value === 'gm') {
+                if ($currentIm5EffectsValue != -1) {
+                    $changedValues['GFX/im_v5effects'] = -1;
                 }
             }
         }
         if (!empty($changedValues)) {
             $this->configurationManager->setLocalConfigurationValuesByPathValuePairs($changedValues);
-            $this->throwRedirectException();
-        }
-    }
-
-    /**
-     * Migrate the definition of the image processor from the configuration value
-     * im_version_5 to the setting processor.
-     *
-     * @return void
-     */
-    protected function migrateImageProcessorSetting()
-    {
-        $changedSettings = [];
-        $settingsToRename = [
-            'GFX/im' => 'GFX/processor_enabled',
-            'GFX/im_version_5' => 'GFX/processor',
-            'GFX/im_v5effects' => 'GFX/processor_effects',
-            'GFX/im_path' => 'GFX/processor_path',
-            'GFX/im_path_lzw' => 'GFX/processor_path_lzw',
-            'GFX/im_mask_temp_ext_gif' => 'GFX/processor_allowTemporaryMasksAsPng',
-            'GFX/im_noScaleUp' => 'GFX/processor_allowUpscaling',
-            'GFX/im_noFramePrepended' => 'GFX/processor_allowFrameSelection',
-            'GFX/im_stripProfileCommand' => 'GFX/processor_stripColorProfileCommand',
-            'GFX/im_useStripProfileByDefault' => 'GFX/processor_stripColorProfileByDefault',
-            'GFX/colorspace' => 'GFX/processor_colorspace',
-        ];
-
-        foreach ($settingsToRename as $oldPath => $newPath) {
-            try {
-                $value = $this->configurationManager->getLocalConfigurationValueByPath($oldPath);
-                $this->configurationManager->setLocalConfigurationValueByPath($newPath, $value);
-                $changedSettings[$oldPath] = true;
-            } catch (\RuntimeException $e) {
-                // If an exception is thrown, the value is not set in LocalConfiguration
-                $changedSettings[$oldPath] = false;
-            }
-        }
-
-        if (!empty($changedSettings['GFX/im_version_5'])) {
-            $currentProcessorValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/im_version_5');
-            $newProcessorValue = $currentProcessorValue === 'gm' ? 'GraphicsMagick' : 'ImageMagick';
-            $this->configurationManager->setLocalConfigurationValueByPath('GFX/processor', $newProcessorValue);
-        }
-
-        if (!empty($changedSettings['GFX/im_noScaleUp'])) {
-            $currentProcessorValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/im_noScaleUp');
-            $newProcessorValue = !$currentProcessorValue;
-            $this->configurationManager->setLocalConfigurationValueByPath('GFX/processor_allowUpscaling',
-                $newProcessorValue);
-        }
-
-        if (!empty($changedSettings['GFX/im_noFramePrepended'])) {
-            $currentProcessorValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/im_noFramePrepended');
-            $newProcessorValue = !$currentProcessorValue;
-            $this->configurationManager->setLocalConfigurationValueByPath('GFX/processor_allowFrameSelection',
-                $newProcessorValue);
-        }
-
-        if (!empty($changedSettings['GFX/im_mask_temp_ext_gif'])) {
-            $currentProcessorValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/im_mask_temp_ext_gif');
-            $newProcessorValue = !$currentProcessorValue;
-            $this->configurationManager->setLocalConfigurationValueByPath('GFX/processor_allowTemporaryMasksAsPng',
-                $newProcessorValue);
-        }
-
-        if (!empty(array_filter($changedSettings))) {
-            $this->configurationManager->removeLocalConfigurationKeysByPath(array_keys($changedSettings));
             $this->throwRedirectException();
         }
     }
@@ -557,148 +484,5 @@ class SilentConfigurationUpgradeService
             'Configuration updated, reload needed',
             1379024938
         );
-    }
-
-    /**
-     * Migrate the configuration value thumbnails_png to a boolean value.
-     *
-     * @return void
-     */
-    protected function migrateThumbnailsPngSetting()
-    {
-        $changedValues = [];
-        try {
-            $currentThumbnailsPngValue = $this->configurationManager->getLocalConfigurationValueByPath('GFX/thumbnails_png');
-        } catch (\RuntimeException $e) {
-            $currentThumbnailsPngValue = $this->configurationManager->getDefaultConfigurationValueByPath('GFX/thumbnails_png');
-        }
-
-        if (is_int($currentThumbnailsPngValue) && $currentThumbnailsPngValue > 0) {
-            $changedValues['GFX/thumbnails_png'] = true;
-        }
-        if (!empty($changedValues)) {
-            $this->configurationManager->setLocalConfigurationValuesByPathValuePairs($changedValues);
-            $this->throwRedirectException();
-        }
-    }
-
-    /**
-     * Migrate the configuration setting BE/lockSSL to boolean if set in the LocalConfiguration.php file
-     *
-     * @return void
-     */
-    protected function migrateLockSslSetting()
-    {
-        try {
-            $currentOption = $this->configurationManager->getLocalConfigurationValueByPath('BE/lockSSL');
-            // check if the current option is an integer/string and if it is active
-            if (!is_bool($currentOption) && (int)$currentOption > 0) {
-                $this->configurationManager->setLocalConfigurationValueByPath('BE/lockSSL', true);
-                $this->throwRedirectException();
-            }
-        } catch (\RuntimeException $e) {
-            // no change inside the LocalConfiguration.php found, so nothing needs to be modified
-        }
-    }
-
-    /**
-     * Move the database connection settings to a "Default" connection
-     *
-     * @return void
-     */
-    protected function migrateDatabaseConnectionSettings()
-    {
-        $changedSettings = [];
-        $settingsToRename = [
-            'DB/username' => 'DB/Connections/Default/user',
-            'DB/password' => 'DB/Connections/Default/password',
-            'DB/host' => 'DB/Connections/Default/host',
-            'DB/port' => 'DB/Connections/Default/port',
-            'DB/socket' => 'DB/Connections/Default/unix_socket',
-            'DB/database' => 'DB/Connections/Default/dbname',
-            'SYS/setDBinit' => 'DB/Connections/Default/initCommands',
-            'SYS/no_pconnect' => 'DB/Connections/Default/persistentConnection',
-            'SYS/dbClientCompress' => 'DB/Connections/Default/driverOptions',
-
-        ];
-
-        $confManager = $this->configurationManager;
-
-        foreach ($settingsToRename as $oldPath => $newPath) {
-            try {
-                $value = $confManager->getLocalConfigurationValueByPath($oldPath);
-                $confManager->setLocalConfigurationValueByPath($newPath, $value);
-                $changedSettings[$oldPath] = true;
-            } catch (\RuntimeException $e) {
-                // If an exception is thrown, the value is not set in LocalConfiguration
-                $changedSettings[$oldPath] = false;
-            }
-        }
-
-        // Remove empty socket connects
-        if (!empty($changedSettings['DB/Connections/Default/unix_socket'])) {
-            $value = $confManager->getLocalConfigurationValueByPath('DB/Connections/Default/unix_socket');
-            if (empty($value)) {
-                $confManager->removeLocalConfigurationKeysByPath(array_keys('DB/Connections/Default/unix_socket'));
-            }
-        }
-
-        // Convert the dbClientCompress flag to a mysqli driver option
-        if (!empty($changedSettings['DB/Connections/Default/driverOptions'])) {
-            $value = $confManager->getLocalConfigurationValueByPath('DB/Connections/Default/driverOptions');
-            $confManager->setLocalConfigurationValueByPath(
-                'DB/Connections/Default/driverOptions',
-                (bool)$value ? MYSQLI_CLIENT_COMPRESS : 0
-            );
-        }
-
-        // Swap value as the semantics have changed
-        if (!empty($changedSettings['DB/Connections/Default/persistentConnection'])) {
-            $value = $confManager->getLocalConfigurationValueByPath('DB/Connections/Default/persistentConnection');
-            $confManager->setLocalConfigurationValueByPath(
-                'DB/Connections/Default/persistentConnection',
-                !$value
-            );
-        }
-
-        // Set the utf-8 connection charset by default if no value has been provided yet
-        try {
-            $confManager->getLocalConfigurationValueByPath('DB/Connections/Default/charset');
-        } catch (\RuntimeException $e) {
-            $confManager->setLocalConfigurationValueByPath('DB/Connections/Default/charset', 'utf8');
-        }
-
-        // Use the mysqli driver by default if no value has been provided yet
-        try {
-            $confManager->getLocalConfigurationValueByPath('DB/Connections/Default/driver');
-        } catch (\RuntimeException $e) {
-            $confManager->setLocalConfigurationValueByPath('DB/Connections/Default/driver', 'mysqli');
-        }
-
-        if (!empty(array_filter($changedSettings))) {
-            $confManager->removeLocalConfigurationKeysByPath(array_keys($changedSettings));
-            $this->throwRedirectException();
-        }
-    }
-
-    /**
-     * Migrate the configuration setting DB/Connections/Default/charset to 'utf8' as
-     * 'utf-8' is not supported by all MySQL versions.
-     *
-     * @return void
-     */
-    protected function migrateDatabaseConnectionCharset()
-    {
-        $confManager = $this->configurationManager;
-        try {
-            $driver = $confManager->getLocalConfigurationValueByPath('DB/Connections/Default/driver');
-            $charset = $confManager->getLocalConfigurationValueByPath('DB/Connections/Default/charset');
-            if (in_array($driver, ['mysqli', 'pdo_mysql', 'drizzle_pdo_mysql'], true) && $charset === 'utf-8') {
-                $confManager->setLocalConfigurationValueByPath('DB/Connections/Default/charset', 'utf8');
-                $this->throwRedirectException();
-            }
-        } catch (\RuntimeException $e) {
-            // no incompatible charset configuration found, so nothing needs to be modified
-        }
     }
 }

@@ -1,5 +1,5 @@
 <?php
-$EM_CONF[$_EXTKEY] = array(
+$EM_CONF[$_EXTKEY] = [
     'title' => 'Web>Info',
     'description' => 'Shows various infos',
     'category' => 'module',
@@ -10,12 +10,12 @@ $EM_CONF[$_EXTKEY] = array(
     'author' => 'Kasper Skaarhoj',
     'author_email' => 'kasperYYYY@typo3.com',
     'author_company' => '',
-    'version' => '8.2.0',
-    'constraints' => array(
-        'depends' => array(
-            'typo3' => '8.2.0-8.2.99',
-        ),
-        'conflicts' => array(),
-        'suggests' => array(),
-    ),
-);
+    'version' => '7.6.24',
+    'constraints' => [
+        'depends' => [
+            'typo3' => '7.6.0-7.6.24',
+        ],
+        'conflicts' => [],
+        'suggests' => [],
+    ],
+];

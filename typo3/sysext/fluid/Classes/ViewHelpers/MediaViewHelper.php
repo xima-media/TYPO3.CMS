@@ -78,11 +78,11 @@ class MediaViewHelper extends AbstractTagBasedViewHelper
      * @return string Rendered tag
      * @throws \UnexpectedValueException
      */
-    public function render($file, $additionalConfig = array(), $width = null, $height = null)
+    public function render($file, $additionalConfig = [], $width = null, $height = null)
     {
 
         // get Resource Object (non ExtBase version)
-        if (is_callable(array($file, 'getOriginalResource'))) {
+        if (is_callable([$file, 'getOriginalResource'])) {
             // We have a domain model, so we need to fetch the FAL resource object from there
             $file = $file->getOriginalResource();
         }
@@ -113,11 +113,11 @@ class MediaViewHelper extends AbstractTagBasedViewHelper
     protected function renderImage(FileInterface $image, $width, $height)
     {
         $crop = $image instanceof FileReference ? $image->getProperty('crop') : null;
-        $processingInstructions = array(
+        $processingInstructions = [
             'width' => $width,
             'height' => $height,
             'crop' => $crop,
-        );
+        ];
         $imageService = $this->getImageService();
         $processedImage = $imageService->applyProcessingInstructions($image, $processingInstructions);
         $imageUri = $imageService->getImageUri($processedImage);

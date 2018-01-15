@@ -1,5 +1,5 @@
 <?php
-$EM_CONF[$_EXTKEY] = array(
+$EM_CONF[$_EXTKEY] = [
     'title' => 'htmlArea RTE',
     'description' => 'Rich Text Editor.',
     'category' => 'be',
@@ -10,15 +10,20 @@ $EM_CONF[$_EXTKEY] = array(
     'author' => 'Stanislas Rolland',
     'author_email' => 'typo3(arobas)sjbr.ca',
     'author_company' => 'SJBR',
-    'version' => '8.2.0',
-    'constraints' => array(
-        'depends' => array(
-            'typo3' => '8.2.0-8.2.99',
-        ),
-        'conflicts' => array(),
-        'suggests' => array(
+    'version' => '7.6.24',
+    'constraints' => [
+        'depends' => [
+            'typo3' => '7.6.0-7.6.24',
+        ],
+        'conflicts' => [
+            'rte_conf' => '',
+            'tkr_rteanchors' => '',
+            'ad_rtepasteplain' => '',
+            'rtehtmlarea_definitionlist' => '',
+        ],
+        'suggests' => [
             'rtehtmlarea_api_manual' => '',
             'setup' => '',
-        ),
-    ),
-);
+        ],
+    ],
+];

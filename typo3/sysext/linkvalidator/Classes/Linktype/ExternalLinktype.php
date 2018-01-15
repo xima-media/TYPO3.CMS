@@ -14,9 +14,7 @@ namespace TYPO3\CMS\Linkvalidator\Linktype;
  * The TYPO3 project - inspiring people to share!
  */
 
-use GuzzleHttp\Cookie\CookieJar;
-use GuzzleHttp\Exception\TooManyRedirectsException;
-use TYPO3\CMS\Core\Http\RequestFactory;
+use TYPO3\CMS\Core\Http\HttpRequest;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -29,21 +27,21 @@ class ExternalLinktype extends AbstractLinktype
      *
      * @var array $urlReports
      */
-    protected $urlReports = array();
+    protected $urlReports = [];
 
     /**
      * Cached list of all error parameters of the URLs, which were already checked for the current processing
      *
      * @var array $urlErrorParams
      */
-    protected $urlErrorParams = array();
+    protected $urlErrorParams = [];
 
     /**
      * List of headers to be used for matching an URL for the current processing
      *
      * @var array $additionalHeaders
      */
-    protected $additionalHeaders = array();
+    protected $additionalHeaders = [];
 
     /**
      * Checks a given URL for validity
@@ -55,7 +53,7 @@ class ExternalLinktype extends AbstractLinktype
      */
     public function checkLink($url, $softRefEntry, $reference)
     {
-        $errorParams = array();
+        $errorParams = [];
         $isValidUrl = true;
         if (isset($this->urlReports[$url])) {
             if (!$this->urlReports[$url]) {
@@ -65,36 +63,50 @@ class ExternalLinktype extends AbstractLinktype
             }
             return $this->urlReports[$url];
         }
-
-        $options = array(
-            'cookies' => GeneralUtility::makeInstance(CookieJar::class),
-            'allow_redirects' => ['strict' => true]
-        );
-
-        /** @var RequestFactory $requestFactory */
-        $requestFactory = GeneralUtility::makeInstance(RequestFactory::class);
+        $config = [
+            'follow_redirects' => true,
+            'strict_redirects' => true
+        ];
+        /** @var $request HttpRequest */
+        $request = GeneralUtility::makeInstance(HttpRequest::class, $url, 'HEAD', $config);
+        // Observe cookies
+        $request->setCookieJar(true);
         try {
-            $response = $requestFactory->request($url, 'HEAD', $options);
+            /** @var $response \HTTP_Request2_Response */
+            $response = $request->send();
+            $status = isset($response) ? $response->getStatus() : 0;
             // HEAD was not allowed or threw an error, now trying GET
-            if ($response->getStatusCode() >= 400) {
-                $options['headers']['Range'] = 'bytes = 0 - 4048';
-                $response = $requestFactory->request($url, 'GET', $options);
+            if ($status >= 400) {
+                $request->setMethod('GET');
+                $request->setHeader('Range', 'bytes = 0 - 4048');
+                /** @var $response \HTTP_Request2_Response */
+                $response = $request->send();
             }
-            if ($response->getStatusCode() >= 300) {
-                $isValidUrl = false;
-                $errorParams['errorType'] = $response->getStatusCode();
-                $errorParams['message'] = $response->getReasonPhrase();
-            }
-        } catch (TooManyRedirectsException $e) {
-            $lastRequest = $e->getRequest();
-            $response = $e->getResponse();
-            $errorParams['errorType'] = 'loop';
-            $errorParams['location'] = (string)$lastRequest->getUri();
-            $errorParams['errorCode'] = $response->getStatusCode();
         } catch (\Exception $e) {
             $isValidUrl = false;
-            $errorParams['errorType'] = 'exception';
+            // A redirect loop occurred
+            if ($e->getCode() === 40) {
+                $traceUrl = $request->getUrl()->getURL();
+                /** @var \HTTP_Request2_Response $event['data'] */
+                $event = $request->getLastEvent();
+                if ($event['data'] instanceof \HTTP_Request2_Response) {
+                    $traceCode = $event['data']->getStatus();
+                } else {
+                    $traceCode = 'loop';
+                }
+                $errorParams['errorType'] = 'loop';
+                $errorParams['location'] = $traceUrl;
+                $errorParams['errorCode'] = $traceCode;
+            } else {
+                $errorParams['errorType'] = 'exception';
+            }
             $errorParams['message'] = $e->getMessage();
+        }
+        $status = isset($response) ? $response->getStatus() : 0;
+        if ($status >= 300) {
+            $isValidUrl = false;
+            $errorParams['errorType'] = $status;
+            $errorParams['message'] = $response->getReasonPhrase();
         }
         if (!$isValidUrl) {
             $this->setErrorParams($errorParams);

@@ -34,7 +34,7 @@ namespace TYPO3\CMS\Core\Utility;
  * checkCommand() returns TRUE if a command is available
  *
  * Search paths that are included:
- * $TYPO3_CONF_VARS['GFX']['processor_path_lzw'] or $TYPO3_CONF_VARS['GFX']['processor_path']
+ * $TYPO3_CONF_VARS['GFX']['im_path_lzw'] or $TYPO3_CONF_VARS['GFX']['im_path']
  * $TYPO3_CONF_VARS['SYS']['binPath']
  * $GLOBALS['_SERVER']['PATH']
  * '/usr/bin/,/usr/local/bin/' on Unix
@@ -60,7 +60,7 @@ class CommandUtility
      *
      * @var array
      */
-    protected static $applications = array();
+    protected static $applications = [];
 
     /**
      * Paths where to search for applications
@@ -73,14 +73,16 @@ class CommandUtility
      * Wrapper function for php exec function
      * Needs to be central to have better control and possible fix for issues
      *
+     * @static
      * @param string $command
-     * @param null|array $output
+     * @param NULL|array $output
      * @param int $returnValue
-     * @return string
+     * @return NULL|array
      */
     public static function exec($command, &$output = null, &$returnValue = 0)
     {
-        return exec($command, $output, $returnValue);
+        $lastLine = exec($command, $output, $returnValue);
+        return $lastLine;
     }
 
     /**
@@ -89,43 +91,49 @@ class CommandUtility
      * @param string $command Command to be run: identify, convert or combine/composite
      * @param string $parameters The parameters string
      * @param string $path Override the default path (e.g. used by the install tool)
-     * @return string Compiled command that deals with ImageMagick & GraphicsMagick
+     * @return string Compiled command that deals with IM6 & GraphicsMagick
      */
     public static function imageMagickCommand($command, $parameters, $path = '')
     {
         $gfxConf = $GLOBALS['TYPO3_CONF_VARS']['GFX'];
-        $isExt = TYPO3_OS === 'WIN' ? '.exe' : '';
+        $isExt = TYPO3_OS == 'WIN' ? '.exe' : '';
+        $switchCompositeParameters = false;
         if (!$path) {
-            $path = $gfxConf['processor_path'];
+            $path = $gfxConf['im_path'];
         }
         $path = GeneralUtility::fixWindowsFilePath($path);
+        $im_version = strtolower($gfxConf['im_version_5']);
         // This is only used internally, has no effect outside
         if ($command === 'combine') {
             $command = 'composite';
         }
         // Compile the path & command
-        if ($gfxConf['processor'] === 'GraphicsMagick') {
+        if ($im_version === 'gm') {
+            $switchCompositeParameters = true;
             $path = self::escapeShellArgument($path . 'gm' . $isExt) . ' ' . self::escapeShellArgument($command);
         } else {
-            $path = self::escapeShellArgument($path . $command . $isExt);
+            if ($im_version === 'im6') {
+                $switchCompositeParameters = true;
+            }
+            $path = self::escapeShellArgument($path . ($command == 'composite' ? 'composite' : $command) . $isExt);
         }
         // strip profile information for thumbnails and reduce their size
-        if ($parameters && $command !== 'identify'
-            && $gfxConf['processor_stripColorProfileByDefault']
-            && $gfxConf['processor_stripColorProfileCommand'] !== ''
-            && strpos($parameters, $gfxConf['processor_stripColorProfileCommand']) === false
-        ) {
-            // Determine whether the strip profile action has be disabled by TypoScript:
-            if ($parameters !== '-version' && strpos($parameters, '###SkipStripProfile###') === false) {
-                $parameters = $gfxConf['processor_stripColorProfileCommand'] . ' ' . $parameters;
-            } else {
-                $parameters = str_replace('###SkipStripProfile###', '', $parameters);
+        if ($parameters && $command != 'identify' && $gfxConf['im_useStripProfileByDefault'] && $gfxConf['im_stripProfileCommand'] != '') {
+            if (strpos($parameters, $gfxConf['im_stripProfileCommand']) === false) {
+                // Determine whether the strip profile action has be disabled by TypoScript:
+                if ($parameters !== '-version' && strpos($parameters, '###SkipStripProfile###') === false) {
+                    $parameters = $gfxConf['im_stripProfileCommand'] . ' ' . $parameters;
+                } else {
+                    $parameters = str_replace('###SkipStripProfile###', '', $parameters);
+                }
             }
         }
         $cmdLine = $path . ' ' . $parameters;
-        // It is needed to change the parameters order when a mask image has been specified
-        if ($command === 'composite') {
+        // Because of some weird incompatibilities between ImageMagick 4 and 6 (plus GraphicsMagick),
+        // it is needed to change the parameters order under some preconditions
+        if ($command == 'composite' && $switchCompositeParameters) {
             $paramsArr = GeneralUtility::unQuoteFilenames($parameters);
+            // The mask image has been specified => swap the parameters
             $paramsArrCount = count($paramsArr);
             if ($paramsArrCount > 5) {
                 $tmp = $paramsArr[$paramsArrCount - 3];
@@ -165,7 +173,7 @@ class CommandUtility
         foreach (self::$paths as $path => $validPath) {
             // Ignore invalid (FALSE) paths
             if ($validPath) {
-                if (TYPO3_OS === 'WIN') {
+                if (TYPO3_OS == 'WIN') {
                     // Windows OS
                         // @todo Why is_executable() is not called here?
                     if (@is_file($path . $cmd)) {
@@ -195,7 +203,7 @@ class CommandUtility
 
             // Try to get the executable with the command 'which'.
             // It does the same like already done, but maybe on other paths
-        if (TYPO3_OS !== 'WIN') {
+        if (TYPO3_OS != 'WIN') {
             $cmd = @self::exec('which ' . $cmd);
             if (@is_executable($cmd)) {
                 self::$applications[$cmd]['app'] = $cmd;
@@ -222,7 +230,7 @@ class CommandUtility
             return false;
         }
 
-        // Handler
+            // Handler
         if ($handler) {
             $handler = self::getCommand($handler);
 
@@ -232,7 +240,7 @@ class CommandUtility
             $handler .= ' ' . $handlerOpt . ' ';
         }
 
-        // Command
+            // Command
         if (!self::checkCommand($cmd)) {
             return false;
         }
@@ -261,7 +269,7 @@ class CommandUtility
     public static function getPaths($addInvalid = false)
     {
         if (!self::init()) {
-            return array();
+            return [];
         }
 
         $paths = self::$paths;
@@ -332,7 +340,7 @@ class CommandUtility
         if ($doCheck) {
             foreach (self::$paths as $path => $valid) {
                 // Ignore invalid (FALSE) paths
-                if ($valid && !@is_dir($path)) {
+                if ($valid and !@is_dir($path)) {
                     self::$paths[$path] = false;
                 }
             }
@@ -346,10 +354,10 @@ class CommandUtility
      */
     protected static function getConfiguredApps()
     {
-        $cmdArr = array();
+        $cmdArr = [];
 
         if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['binSetup']) {
-            $binSetup = str_replace(array('\'.chr(10).\'', '\' . LF . \''), LF, $GLOBALS['TYPO3_CONF_VARS']['SYS']['binSetup']);
+            $binSetup = str_replace(['\'.chr(10).\'', '\' . LF . \''], LF, $GLOBALS['TYPO3_CONF_VARS']['SYS']['binSetup']);
             $pathSetup = preg_split('/[\n,]+/', $binSetup);
             foreach ($pathSetup as $val) {
                 if (trim($val) === '') {
@@ -372,12 +380,12 @@ class CommandUtility
      */
     protected static function getPathsInternal()
     {
-        $pathsArr = array();
-        $sysPathArr = array();
+        $pathsArr = [];
+        $sysPathArr = [];
 
             // Image magick paths first
-            // processor_path_lzw take precedence over processor_path
-        if ($imPath = $GLOBALS['TYPO3_CONF_VARS']['GFX']['processor_path_lzw'] ?: $GLOBALS['TYPO3_CONF_VARS']['GFX']['processor_path']) {
+            // im_path_lzw take precedence over im_path
+        if (($imPath = ($GLOBALS['TYPO3_CONF_VARS']['GFX']['im_path_lzw'] ?: $GLOBALS['TYPO3_CONF_VARS']['GFX']['im_path']))) {
             $imPath = self::fixPath($imPath);
             $pathsArr[$imPath] = $imPath;
         }
@@ -391,11 +399,11 @@ class CommandUtility
             }
         }
 
-            // Add path from environment
-            // @todo how does this work for WIN
-        if ($GLOBALS['_SERVER']['PATH']) {
+        // Add path from environment
+        if (!empty($GLOBALS['_SERVER']['PATH']) || !empty($GLOBALS['_SERVER']['Path'])) {
             $sep = (TYPO3_OS === 'WIN' ? ';' : ':');
-            $envPath = GeneralUtility::trimExplode($sep, $GLOBALS['_SERVER']['PATH'], true);
+            $serverPath = !empty($GLOBALS['_SERVER']['PATH']) ? $GLOBALS['_SERVER']['PATH'] : $GLOBALS['_SERVER']['Path'];
+            $envPath = GeneralUtility::trimExplode($sep, $serverPath, true);
             foreach ($envPath as $val) {
                 $val = self::fixPath($val);
                 $sysPathArr[$val] = $val;
@@ -404,10 +412,10 @@ class CommandUtility
 
             // Set common paths for Unix (only)
         if (TYPO3_OS !== 'WIN') {
-            $sysPathArr = array_merge($sysPathArr, array(
+            $sysPathArr = array_merge($sysPathArr, [
                 '/usr/bin/' => '/usr/bin/',
                 '/usr/local/bin/' => '/usr/local/bin/',
-            ));
+            ]);
         }
 
         $pathsArr = array_merge($pathsArr, $sysPathArr);
@@ -461,6 +469,6 @@ class CommandUtility
      */
     public static function escapeShellArgument($input)
     {
-        return self::escapeShellArguments(array($input))[0];
+        return self::escapeShellArguments([$input])[0];
     }
 }

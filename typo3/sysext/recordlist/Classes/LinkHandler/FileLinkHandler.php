@@ -87,6 +87,7 @@ class FileLinkHandler extends AbstractLinkHandler implements LinkHandlerInterfac
                     $this->linkParts = $linkParts;
                     $this->linkParts['url'] = $rel;
                     $this->linkParts['name'] = $fileOrFolderObject->getName();
+
                     return true;
                 }
             } catch (FileDoesNotExistException $e) {
@@ -231,7 +232,7 @@ class FileLinkHandler extends AbstractLinkHandler implements LinkHandlerInterfac
             $out .= '<ul class="list-tree">';
             foreach ($folderContent as $fileOrFolderObject) {
                 list($fileIdentifier, $icon) = $this->renderItem($fileOrFolderObject);
-                $selected = $currentIdentifier === $fileIdentifier ? ' class="active"' : '';
+                $selected = (int)$currentIdentifier === $fileIdentifier ? ' class="active"' : '';
                 $out .=
                     '<li' . $selected . '>
                         <span class="list-tree-group">
@@ -267,7 +268,7 @@ class FileLinkHandler extends AbstractLinkHandler implements LinkHandlerInterfac
             /** @var FileExtensionFilter $filter */
             $filter = GeneralUtility::makeInstance(FileExtensionFilter::class);
             $filter->setAllowedFileExtensions($extensionList);
-            $folder->setFileAndFolderNameFilters(array(array($filter, 'filterFileList')));
+            $folder->setFileAndFolderNameFilters([[$filter, 'filterFileList']]);
         }
         return $folder->getFiles();
     }

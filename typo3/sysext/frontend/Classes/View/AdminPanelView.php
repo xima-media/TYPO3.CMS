@@ -17,7 +17,6 @@ namespace TYPO3\CMS\Frontend\View;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
-use TYPO3\CMS\Core\TimeTracker\TimeTracker;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -157,11 +156,11 @@ class AdminPanelView
         $beUser = $this->getBackendUser();
         if (is_array($input)) {
             // Setting
-            $beUser->uc['TSFE_adminConfig'] = array_merge(!is_array($beUser->uc['TSFE_adminConfig']) ? array() : $beUser->uc['TSFE_adminConfig'], $input);
+            $beUser->uc['TSFE_adminConfig'] = array_merge(!is_array($beUser->uc['TSFE_adminConfig']) ? [] : $beUser->uc['TSFE_adminConfig'], $input);
             unset($beUser->uc['TSFE_adminConfig']['action']);
             // Actions:
             if ($input['action']['clearCache'] && $this->isAdminModuleEnabled('cache')) {
-                $beUser->extPageInTreeInfo = array();
+                $beUser->extPageInTreeInfo = [];
                 $theStartId = (int)$input['cache_clearCacheId'];
                 $this->getTypoScriptFrontendController()->clearPageCacheContent_pidList($beUser->extGetTreeList($theStartId, $this->extGetFeAdminValue('cache', 'clearCacheLevels'), 0, $beUser->getPagePermsClause(1)) . $theStartId);
             }
@@ -336,7 +335,7 @@ class AdminPanelView
 					TSFEtypo3FormFieldSet(theField, evallist, is_in, checkbox, checkboxValue);
 				}') . '/*]]>*/</script><script language="javascript" type="text/javascript">' . $this->extJSCODE . '</script>';
         }
-        $cssPath = htmlspecialchars($this->getTypoScriptFrontendController()->absRefPrefix . ExtensionManagementUtility::siteRelPath('frontend')) . 'Resources/Public/Css/adminpanel.css';
+        $cssPath = htmlspecialchars($this->getTypoScriptFrontendController()->absRefPrefix . ExtensionManagementUtility::siteRelPath('t3skin')) . 'stylesheets/standalone/admin_panel.css';
         $out .= '<script src="' . GeneralUtility::locationHeaderUrl(ExtensionManagementUtility::siteRelPath('frontend') . 'Resources/Public/JavaScript/AdminPanel.js') . '" type="text/javascript"></script><script type="text/javascript">/*<![CDATA[*/' . 'typo3AdminPanel = new TYPO3AdminPanel();typo3AdminPanel.init("typo3-adminPanel-header", "TSFE_ADMIN_PANEL_FORM");' . '/*]]>*/</script>
 <link type="text/css" rel="stylesheet" href="' . $cssPath . '" media="all" />';
         $out .= $this->getAdminPanelHeaderData();
@@ -436,8 +435,8 @@ class AdminPanelView
             $depth = (int)$this->extGetFeAdminValue('cache', 'clearCacheLevels');
             $outTable = '';
             $tsfe = $this->getTypoScriptFrontendController();
-            $beUser->extPageInTreeInfo = array();
-            $beUser->extPageInTreeInfo[] = array($tsfe->page['uid'], htmlspecialchars($tsfe->page['title']), $depth + 1);
+            $beUser->extPageInTreeInfo = [];
+            $beUser->extPageInTreeInfo[] = [$tsfe->page['uid'], htmlspecialchars($tsfe->page['title']), $depth + 1];
             $beUser->extGetTreeList($tsfe->id, $depth, 0, $beUser->getPagePermsClause(1));
             foreach ($beUser->extPageInTreeInfo as $key => $row) {
                 $outTable .= '<tr class="typo3-adminPanel-itemRow ' . ($key % 2 == 0 ? 'line-even' : 'line-odd') . '">' . '<td><span style="width: ' . ($depth + 1 - $row[2]) * 18 . 'px; height: 1px; display: inline-block;"></span>' . $this->iconFactory->getIcon('apps-pagetree-page-default', Icon::SIZE_SMALL)->render() . htmlspecialchars($row[1]) . '</td><td>' . $beUser->extGetNumberOfCachedPages($row[0]) . '</td></tr>';
@@ -533,35 +532,35 @@ class AdminPanelView
         $out = '';
         $tsfe = $this->getTypoScriptFrontendController();
         if ($this->getBackendUser()->uc['TSFE_adminConfig']['display_info']) {
-            $tableArr = array();
+            $tableArr = [];
             if ($this->extGetFeAdminValue('cache', 'noCache')) {
                 $theBytes = 0;
                 $count = 0;
                 if (!empty($tsfe->imagesOnPage)) {
-                    $tableArr[] = array($this->extGetLL('info_imagesOnPage'), count($tsfe->imagesOnPage), true);
+                    $tableArr[] = [$this->extGetLL('info_imagesOnPage'), count($tsfe->imagesOnPage), true];
                     foreach ($GLOBALS['TSFE']->imagesOnPage as $file) {
                         $fs = @filesize($file);
-                        $tableArr[] = array(TAB . $file, GeneralUtility::formatSize($fs));
+                        $tableArr[] = [TAB . $file, GeneralUtility::formatSize($fs)];
                         $theBytes += $fs;
                         $count++;
                     }
                 }
                 // Add an empty line
-                $tableArr[] = array($this->extGetLL('info_imagesSize'), GeneralUtility::formatSize($theBytes), true);
-                $tableArr[] = array($this->extGetLL('info_DocumentSize'), GeneralUtility::formatSize(strlen($tsfe->content)), true);
-                $tableArr[] = array('', '');
+                $tableArr[] = [$this->extGetLL('info_imagesSize'), GeneralUtility::formatSize($theBytes), true];
+                $tableArr[] = [$this->extGetLL('info_DocumentSize'), GeneralUtility::formatSize(strlen($tsfe->content)), true];
+                $tableArr[] = ['', ''];
             }
-            $tableArr[] = array($this->extGetLL('info_id'), $tsfe->id);
-            $tableArr[] = array($this->extGetLL('info_type'), $tsfe->type);
-            $tableArr[] = array($this->extGetLL('info_groupList'), $tsfe->gr_list);
-            $tableArr[] = array($this->extGetLL('info_noCache'), $this->extGetLL('info_noCache_' . ($tsfe->no_cache ? 'no' : 'yes')));
-            $tableArr[] = array($this->extGetLL('info_countUserInt'), count($tsfe->config['INTincScript']));
+            $tableArr[] = [$this->extGetLL('info_id'), $tsfe->id];
+            $tableArr[] = [$this->extGetLL('info_type'), $tsfe->type];
+            $tableArr[] = [$this->extGetLL('info_groupList'), $tsfe->gr_list];
+            $tableArr[] = [$this->extGetLL('info_noCache'), $this->extGetLL('info_noCache_' . ($tsfe->no_cache ? 'no' : 'yes'))];
+            $tableArr[] = [$this->extGetLL('info_countUserInt'), isset($tsfe->config['INTincScript']) && is_array($tsfe->config['INTincScript']) ? count($tsfe->config['INTincScript']) : 0];
 
             if (!empty($tsfe->fe_user->user['uid'])) {
-                $tableArr[] = array($this->extGetLL('info_feuserName'), htmlspecialchars($tsfe->fe_user->user['username']));
-                $tableArr[] = array($this->extGetLL('info_feuserId'), htmlspecialchars($tsfe->fe_user->user['uid']));
+                $tableArr[] = [$this->extGetLL('info_feuserName'), htmlspecialchars($tsfe->fe_user->user['username'])];
+                $tableArr[] = [$this->extGetLL('info_feuserId'), htmlspecialchars($tsfe->fe_user->user['uid'])];
             }
-            $tableArr[] = array($this->extGetLL('info_totalParsetime'), $tsfe->scriptParseTime . ' ms', true);
+            $tableArr[] = [$this->extGetLL('info_totalParsetime'), $tsfe->scriptParseTime . ' ms', true];
             $table = '';
             foreach ($tableArr as $key => $arr) {
                 $label = (isset($arr[2]) ? '<strong>' . $arr[0] . '</strong>' : $arr[0]);
@@ -663,7 +662,7 @@ class AdminPanelView
         $returnUrl = GeneralUtility::getIndpEnv('REQUEST_URI');
 
         $icon = $this->iconFactory->getIcon('actions-document-history-open', Icon::SIZE_SMALL)->render();
-        $link = BackendUtility::getModuleUrl('record_history', array('element' => 'pages:' . $id, 'returnUrl' => $returnUrl));
+        $link = BackendUtility::getModuleUrl('record_history', ['element' => 'pages:' . $id, 'returnUrl' => $returnUrl]);
         $toolBar = '<a class="t3-icon btn btn-default" href="' . htmlspecialchars($link) . '#latest" title="' . $this->extGetLL('edit_recordHistory') . '">' . $icon . '</a>';
         if ($perms & Permission::CONTENT_EDIT && $langAllowed) {
             $params = '';
@@ -672,7 +671,7 @@ class AdminPanelView
             }
             $icon = $this->iconFactory->getIcon('actions-document-new', Icon::SIZE_SMALL)->render();
             $link = $newContentWizScriptPath . 'id=' . $id . $params . '&returnUrl=' . rawurlencode($returnUrl);
-            $toolBar .= '<a class="t3-icon btn btn-default" href="' . htmlspecialchars($link) . '" title="' . $this->extGetLL('edit_newContentElement') .  '"">' . $icon . '</a>';
+            $toolBar .= '<a class="t3-icon btn btn-default" href="' . htmlspecialchars($link) . '" title="' . $this->extGetLL('edit_newContentElement') . '"">' . $icon . '</a>';
         }
         if ($perms & Permission::PAGE_EDIT) {
             $icon = $this->iconFactory->getIcon('actions-document-move', Icon::SIZE_SMALL)->render();
@@ -686,11 +685,11 @@ class AdminPanelView
         }
         if ($perms & Permission::PAGE_EDIT) {
             $icon = $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render();
-            $url = BackendUtility::getModuleUrl('record_edit', array(
+            $url = BackendUtility::getModuleUrl('record_edit', [
                 'edit[pages][' . $id . ']' => 'edit',
                 'noView' => 1,
                 'returnUrl' => $returnUrl
-            ));
+            ]);
             $toolBar .= '<a class="t3-icon btn btn-default" href="' . htmlspecialchars($url) . '">' . $icon . '</a>';
             if ($tsfe->sys_language_uid && $langAllowed) {
                 $row = $this->getDatabaseConnection()->exec_SELECTgetSingleRow(
@@ -704,20 +703,20 @@ class AdminPanelView
                 if (is_array($row)) {
                     $icon = '<span title="' . $this->extGetLL('edit_editPageOverlay', true) . '">'
                         . $this->iconFactory->getIcon('mimetypes-x-content-page-language-overlay', Icon::SIZE_SMALL)->render() . '</span>';
-                    $url = BackendUtility::getModuleUrl('record_edit', array(
+                    $url = BackendUtility::getModuleUrl('record_edit', [
                         'edit[pages_language_overlay][' . $row['uid'] . ']' => 'edit',
                         'noView' => 1,
                         'returnUrl' => $returnUrl
-                    ));
+                    ]);
                     $toolBar .= '<a href="' . htmlspecialchars($url) . '">' . $icon . '</a>';
                 }
             }
         }
         if ($this->getBackendUser()->check('modules', 'web_list')) {
-            $urlParams = array(
+            $urlParams = [
                 'id' => $id,
                 'returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')
-            );
+            ];
             $icon = '<span title="' . $this->extGetLL('edit_db_list', false) . '">' . $this->iconFactory->getIcon('actions-system-list-open', Icon::SIZE_SMALL)->render() . '</span>';
             $toolBar .= '<a class="t3-icon btn btn-default" href="' . htmlspecialchars(BackendUtility::getModuleUrl('web_list', $urlParams)) . '">' . $icon . '</a>';
         }
@@ -781,10 +780,10 @@ class AdminPanelView
     }
 
     /**
-     * @return TimeTracker
+     * @return \TYPO3\CMS\Core\TimeTracker\TimeTracker
      */
     protected function getTimeTracker()
     {
-        return GeneralUtility::makeInstance(TimeTracker::class);
+        return $GLOBALS['TT'];
     }
 }

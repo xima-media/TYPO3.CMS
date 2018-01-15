@@ -13,7 +13,6 @@ namespace TYPO3\CMS\Core\Tests\Unit\Cache\Frontend;
  *
  * The TYPO3 project - inspiring people to share!
  */
-use TYPO3\CMS\Core\Cache\Exception\InvalidDataException;
 
 /**
  * Testcase for the string cache frontend
@@ -23,14 +22,12 @@ use TYPO3\CMS\Core\Cache\Exception\InvalidDataException;
 class StringFrontendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
 {
     /**
+     * @expectedException \InvalidArgumentException
      * @test
      */
     public function setChecksIfTheIdentifierIsValid()
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionCode(1233057566);
-
-        $cache = $this->getMock(\TYPO3\CMS\Core\Cache\Frontend\StringFrontend::class, array('isValidEntryIdentifier'), array(), '', false);
+        $cache = $this->getMock(\TYPO3\CMS\Core\Cache\Frontend\StringFrontend::class, ['isValidEntryIdentifier'], [], '', false);
         $cache->expects($this->once())->method('isValidEntryIdentifier')->with('foo')->will($this->returnValue(false));
         $cache->set('foo', 'bar');
     }
@@ -41,7 +38,7 @@ class StringFrontendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function setPassesStringToBackend()
     {
         $theString = 'Just some value';
-        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, array('get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'), array(), '', false);
+        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, ['get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'], [], '', false);
         $backend->expects($this->once())->method('set')->with($this->equalTo('StringCacheTest'), $this->equalTo($theString));
         $cache = new \TYPO3\CMS\Core\Cache\Frontend\StringFrontend('StringFrontend', $backend);
         $cache->set('StringCacheTest', $theString);
@@ -54,23 +51,21 @@ class StringFrontendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     {
         $theString = 'Just some value';
         $theLifetime = 1234;
-        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, array('get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'), array(), '', false);
-        $backend->expects($this->once())->method('set')->with($this->equalTo('StringCacheTest'), $this->equalTo($theString), $this->equalTo(array()), $this->equalTo($theLifetime));
+        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, ['get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'], [], '', false);
+        $backend->expects($this->once())->method('set')->with($this->equalTo('StringCacheTest'), $this->equalTo($theString), $this->equalTo([]), $this->equalTo($theLifetime));
         $cache = new \TYPO3\CMS\Core\Cache\Frontend\StringFrontend('StringFrontend', $backend);
-        $cache->set('StringCacheTest', $theString, array(), $theLifetime);
+        $cache->set('StringCacheTest', $theString, [], $theLifetime);
     }
 
     /**
      * @test
+     * @expectedException \TYPO3\CMS\Core\Cache\Exception\InvalidDataException
      */
     public function setThrowsInvalidDataExceptionOnNonStringValues()
     {
-        $this->expectException(InvalidDataException::class);
-        $this->expectExceptionCode(1222808333);
-
-        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, array('get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'), array(), '', false);
+        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, ['get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'], [], '', false);
         $cache = new \TYPO3\CMS\Core\Cache\Frontend\StringFrontend('StringFrontend', $backend);
-        $cache->set('StringCacheTest', array());
+        $cache->set('StringCacheTest', []);
     }
 
     /**
@@ -78,7 +73,7 @@ class StringFrontendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function getFetchesStringValueFromBackend()
     {
-        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, array('get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'), array(), '', false);
+        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, ['get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'], [], '', false);
         $backend->expects($this->once())->method('get')->will($this->returnValue('Just some value'));
         $cache = new \TYPO3\CMS\Core\Cache\Frontend\StringFrontend('StringFrontend', $backend);
         $this->assertEquals('Just some value', $cache->get('StringCacheTest'), 'The returned value was not the expected string.');
@@ -89,7 +84,7 @@ class StringFrontendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function hasReturnsResultFromBackend()
     {
-        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, array('get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'), array(), '', false);
+        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, ['get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'], [], '', false);
         $backend->expects($this->once())->method('has')->with($this->equalTo('StringCacheTest'))->will($this->returnValue(true));
         $cache = new \TYPO3\CMS\Core\Cache\Frontend\StringFrontend('StringFrontend', $backend);
         $this->assertTrue($cache->has('StringCacheTest'), 'has() did not return TRUE.');
@@ -101,7 +96,7 @@ class StringFrontendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function removeCallsBackend()
     {
         $cacheIdentifier = 'someCacheIdentifier';
-        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, array('get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'), array(), '', false);
+        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, ['get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'], [], '', false);
         $backend->expects($this->once())->method('remove')->with($this->equalTo($cacheIdentifier))->will($this->returnValue(true));
         $cache = new \TYPO3\CMS\Core\Cache\Frontend\StringFrontend('StringFrontend', $backend);
         $this->assertTrue($cache->remove($cacheIdentifier), 'remove() did not return TRUE');
@@ -109,13 +104,12 @@ class StringFrontendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
 
     /**
      * @test
+     * @expectedException \InvalidArgumentException
      */
     public function getByTagRejectsInvalidTags()
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionCode(1233057772);
-
-        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\TaggableBackendInterface::class, array(), array(), '', false);
+        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\BackendInterface::class, [], [], '', false);
+        $backend->expects($this->never())->method('getByTag');
         $cache = new \TYPO3\CMS\Core\Cache\Frontend\StringFrontend('StringFrontend', $backend);
         $cache->getByTag('SomeInvalid\\Tag');
     }
@@ -126,9 +120,9 @@ class StringFrontendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function getByTagCallsBackend()
     {
         $tag = 'sometag';
-        $identifiers = array('one', 'two');
-        $entries = array('one value', 'two value');
-        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, array('get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'), array(), '', false);
+        $identifiers = ['one', 'two'];
+        $entries = ['one value', 'two value'];
+        $backend = $this->getMock(\TYPO3\CMS\Core\Cache\Backend\AbstractBackend::class, ['get', 'set', 'has', 'remove', 'findIdentifiersByTag', 'flush', 'flushByTag', 'collectGarbage'], [], '', false);
         $backend->expects($this->once())->method('findIdentifiersByTag')->with($this->equalTo($tag))->will($this->returnValue($identifiers));
         $backend->expects($this->exactly(2))->method('get')->will($this->onConsecutiveCalls('one value', 'two value'));
         $cache = new \TYPO3\CMS\Core\Cache\Frontend\StringFrontend('StringFrontend', $backend);

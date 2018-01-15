@@ -15,7 +15,6 @@ namespace TYPO3\CMS\Frontend\Hooks;
  */
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
@@ -31,11 +30,11 @@ class TreelistCacheUpdateHooks
      *
      * @var array
      */
-    private $updateRequiringFields = array(
+    private $updateRequiringFields = [
         'pid',
         'php_tree_stop',
         'extendToSubpages'
-    );
+    ];
 
     /**
      * Constructor, adds update requiring fields to the default ones
@@ -111,7 +110,7 @@ class TreelistCacheUpdateHooks
             $affectedPagePid = $affectedRecord['pid'];
 
             // Faking the updated fields
-            $updatedFields = array();
+            $updatedFields = [];
             if ($command === 'delete') {
                 $updatedFields['deleted'] = 1;
             } else {
@@ -244,21 +243,15 @@ class TreelistCacheUpdateHooks
     protected function clearCacheForAllParents($affectedParentPage)
     {
         $rootLine = BackendUtility::BEgetRootLine($affectedParentPage);
-        $rootLineIds = array();
+        $rootLineIds = [];
         foreach ($rootLine as $page) {
             if ($page['uid'] != 0) {
                 $rootLineIds[] = $page['uid'];
             }
         }
         if (!empty($rootLineIds)) {
-            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-                ->getQueryBuilderForTable('cache_treelist');
-            $queryBuilder
-                ->delete('cache_treelist')
-                ->where(
-                    $queryBuilder->expr()->in('pid', $rootLineIds)
-                )
-                ->execute();
+            $rootLineIdsImploded = implode(',', $rootLineIds);
+            $this->getDatabaseConnection()->exec_DELETEquery('cache_treelist', 'pid IN(' . $rootLineIdsImploded . ')');
         }
     }
 
@@ -271,14 +264,7 @@ class TreelistCacheUpdateHooks
      */
     protected function clearCacheWhereUidInTreelist($affectedPage)
     {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable('cache_treelist');
-        $queryBuilder
-            ->delete('cache_treelist')
-            ->where(
-                $queryBuilder->expr()->inSet('treelist', (int)$affectedPage)
-            )
-            ->execute();
+        $this->getDatabaseConnection()->exec_DELETEquery('cache_treelist', $this->getDatabaseConnection()->listQuery('treelist', $affectedPage, 'cache_treelist'));
     }
 
     /**
@@ -291,15 +277,9 @@ class TreelistCacheUpdateHooks
      */
     protected function setCacheExpiration($affectedPage, $expirationTime)
     {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable('cache_treelist');
-        $queryBuilder
-            ->update('cache_treelist')
-            ->where(
-                $queryBuilder->expr()->inSet('treelist', (int)$affectedPage)
-            )
-            ->set('expires', $expirationTime)
-            ->execute();
+        $this->getDatabaseConnection()->exec_UPDATEquery('cache_treelist', $this->getDatabaseConnection()->listQuery('treelist', $affectedPage, 'cache_treelist'), [
+            'expires' => $expirationTime
+        ]);
     }
 
     /**
@@ -309,14 +289,7 @@ class TreelistCacheUpdateHooks
      */
     protected function removeExpiredCacheEntries()
     {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable('cache_treelist');
-        $queryBuilder
-            ->delete('cache_treelist')
-            ->where(
-                $queryBuilder->expr()->lte('expires', (int)$GLOBALS['EXEC_TIME'])
-            )
-            ->execute();
+        $this->getDatabaseConnection()->exec_DELETEquery('cache_treelist', 'expires <= ' . $GLOBALS['EXEC_TIME']);
     }
 
     /**
@@ -329,7 +302,7 @@ class TreelistCacheUpdateHooks
      */
     protected function determineClearCacheActions($status, $updatedFields)
     {
-        $actions = array();
+        $actions = [];
         if ($status == 'new') {
             // New page
             $actions['allParents'] = true;
@@ -375,5 +348,15 @@ class TreelistCacheUpdateHooks
             }
         }
         return $actions;
+    }
+
+    /**
+     * Returns the database connection
+     *
+     * @return \TYPO3\CMS\Core\Database\DatabaseConnection
+     */
+    protected function getDatabaseConnection()
+    {
+        return $GLOBALS['TYPO3_DB'];
     }
 }

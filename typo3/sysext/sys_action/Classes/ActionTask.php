@@ -15,17 +15,12 @@ namespace TYPO3\CMS\SysAction;
  */
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
-use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
-use TYPO3\CMS\Core\Database\Query\Restriction\RootLevelRestriction;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\HttpUtility;
 
 /**
  * This class provides a task for the taskcenter
@@ -42,7 +37,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
      *
      * @var array
      */
-    protected $hookObjects = array();
+    protected $hookObjects = [];
 
     /**
      * URL to task module
@@ -127,7 +122,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
                             $this->getLanguageService()->getLL('action_error'),
                             FlashMessage::ERROR
                         );
-                        $content .= $this->renderFlashMessages();
+                        $content .= '<br />' . $this->renderFlashMessages();
                 }
             }
         }
@@ -148,10 +143,12 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
             $items = '';
             // Render a single action menu item
             foreach ($actionList as $action) {
-                $active = GeneralUtility::_GP('show') === $action['uid'] ? 'active' : '';
-                $items .= '<a class="list-group-item ' . $active . '" href="' . $action['link'] . '" title="' . htmlspecialchars($action['description']) . '">' . htmlspecialchars($action['title']) . '</a>';
+                $active = GeneralUtility::_GP('show') === $action['uid'] ? ' class="active" ' : '';
+                $items .= '<li' . $active . '>
+								<a href="' . $action['link'] . '" title="' . htmlspecialchars($action['description']) . '">' . htmlspecialchars($action['title']) . '</a>
+							</li>';
             }
-            $content .= '<div class="list-group">' . $items . '</div>';
+            $content .= '<ul>' . $items . '</ul>';
         }
         return $content;
     }
@@ -164,90 +161,42 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
      */
     protected function getActions()
     {
-        $backendUser = $this->getBackendUser();
-        $actionList = array();
-
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('sys_action');
-        $queryBuilder->select('sys_action.*')
-            ->from('sys_action');
-
-        if (!empty($GLOBALS['TCA']['sys_action']['ctrl']['sortby'])) {
-            $queryBuilder->orderBy('sys_action.' . $GLOBALS['TCA']['sys_action']['ctrl']['sortby']);
+        $actionList = [];
+        // admins can see any record
+        if ($this->getBackendUser()->isAdmin()) {
+            $res = $this->getDatabaseConnection()->exec_SELECTquery('*', 'sys_action', '', '', 'sys_action.sorting');
+        } else {
+            // Editors can only see the actions which are assigned to a usergroup they belong to
+            $additionalWhere = 'be_groups.uid IN (' . ($this->getBackendUser()->groupList ?: 0) . ')';
+            $res = $this->getDatabaseConnection()->exec_SELECT_mm_query('sys_action.*', 'sys_action', 'sys_action_asgr_mm', 'be_groups', ' AND sys_action.hidden=0 AND ' . $additionalWhere, 'sys_action.uid', 'sys_action.sorting');
         }
-
-        $queryBuilder->getRestrictions()
-            ->removeAll()
-            ->add(GeneralUtility::makeInstance(RootLevelRestriction::class, ['sys_action']));
-
-        // Editors can only see the actions which are assigned to a usergroup they belong to
-        if (!$backendUser->isAdmin()) {
-            $groupList = $backendUser->groupList ?: '0';
-
-            $queryBuilder->getRestrictions()
-                ->add(GeneralUtility::makeInstance(HiddenRestriction::class));
-
-            $queryBuilder
-                ->join(
-                    'sys_action',
-                    'sys_action_asgr_mm',
-                    'sys_action_asgr_mm',
-                    $queryBuilder->expr()->eq(
-                        'sys_action_asgr_mm.uid_local',
-                        $queryBuilder->quoteIdentifier('sys_action.uid')
-                    )
-                )
-                ->join(
-                    'sys_action_asgr_mm',
-                    'be_groups',
-                    'be_groups',
-                    $queryBuilder->expr()->eq(
-                        'sys_action_asgr_mm.uid_foreign',
-                        $queryBuilder->quoteIdentifier('be_groups.uid')
-                    )
-                )
-                ->where($queryBuilder->expr()->in('be_groups.uid', GeneralUtility::intExplode(',', $groupList, true)))
-                ->groupBy('sys_action.uid');
-        }
-
-        $queryResult = $queryBuilder->execute();
-        while ($actionRow = $queryResult->fetch()) {
+        while ($actionRow = $this->getDatabaseConnection()->sql_fetch_assoc($res)) {
             $editActionLink = '';
-
             // Admins are allowed to edit sys_action records
             if ($this->getBackendUser()->isAdmin()) {
-                $uidEditArgument = 'edit[sys_action][' . (int)$actionRow['uid'] . ']';
-
                 $link = BackendUtility::getModuleUrl(
                     'record_edit',
-                    array(
-                        $uidEditArgument => 'edit',
+                    [
+                        'edit[sys_action][' . $actionRow['uid'] . ']' => 'edit',
                         'returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')
-                    )
+                    ],
+                    false,
+                    true
                 );
-
                 $title = 'title="' . $this->getLanguageService()->getLL('edit-sys_action') . '"';
-                $icon = $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render();
-                $editActionLink = '<a class="btn btn-default btn-sm" href="' . $link . '"' . $title . '>';
-                $editActionLink .= $icon . ' ' . $this->getLanguageService()->getLL('edit-sys_action') . '</a>';
+                $icon = $this->iconFactory->getIcon('actions-document-info', Icon::SIZE_SMALL)->render();
+                $editActionLink = '<a class="edit" href="' . $link . '"' . $title . '>';
+                $editActionLink .= $icon . $this->getLanguageService()->getLL('edit-sys_action') . '</a>';
             }
-
             $actionList[] = [
-                'uid' => 'actiontask' . $actionRow['uid'],
+                'uid' => $actionRow['uid'],
                 'title' => $actionRow['title'],
                 'description' => $actionRow['description'],
-                'descriptionHtml' => (
-                    $actionRow['description']
-                        ? '<p>' . nl2br(htmlspecialchars($actionRow['description'])) . '</p>'
-                        : ''
-                    ) . $editActionLink,
-                'link' => $this->moduleUrl
-                    . '&SET[function]=sys_action.'
-                    . ActionTask::class
-                    . '&show='
-                    . (int)$actionRow['uid']
+                'descriptionHtml' => nl2br(htmlspecialchars($actionRow['description'])) . $editActionLink,
+                'link' => $this->moduleUrl . '&SET[function]=sys_action.TYPO3\\CMS\\SysAction\\ActionTask&show=' . $actionRow['uid']
             ];
         }
-
+        $this->getDatabaseConnection()->sql_free_result($res);
         return $actionList;
     }
 
@@ -275,15 +224,16 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
         if ($this->getBackendUser()->isAdmin()) {
             $link = BackendUtility::getModuleUrl(
                 'record_edit',
-                array(
+                [
                     'edit[sys_action][0]' => 'new',
                     'returnUrl' => $this->moduleUrl
-                )
+                ],
+                false,
+                true
             );
-
             $content .= '<p>' .
-                '<a class="btn btn-default" href="' . $link . '" title="' . $this->getLanguageService()->getLL('new-sys_action') . '">' .
-                $this->iconFactory->getIcon('actions-document-new', Icon::SIZE_SMALL)->render() . ' ' .
+                '<a href="' . $link . '" title="' . $this->getLanguageService()->getLL('new-sys_action') . '">' .
+                $this->iconFactory->getIcon('actions-document-new', Icon::SIZE_SMALL)->render() .
                 $this->getLanguageService()->getLL('new-sys_action') .
                 '</a></p>';
         }
@@ -313,7 +263,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
         $vars = GeneralUtility::_POST('data');
         $key = 'NEW';
         if ($vars['sent'] == 1) {
-            $errors = array();
+            $errors = [];
             // Basic error checks
             if (!empty($vars['email']) && !GeneralUtility::validEmail($vars['email'])) {
                 $errors[] = $this->getLanguageService()->getLL('error-wrong-email');
@@ -351,7 +301,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
                     $this->getLanguageService()->getLL('success')
                 );
             }
-            $content .= $this->renderFlashMessages();
+            $content .= $this->renderFlashMessages() . '<br />';
         }
         // Load BE user to edit
         if ((int)GeneralUtility::_GP('be_users_uid') > 0) {
@@ -367,45 +317,46 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
                 $vars = $rawRecord;
             }
         }
-        $content .= '<form action="" class="panel panel-default" method="post" enctype="multipart/form-data">
-                        <fieldset class="form-section">
-                            <h4 class="form-section-headline">' . $this->getLanguageService()->getLL('action_t1_legend_generalFields') . '</h4>
-                            <div class="form-group">
-                                <label for="field_disable">' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_general.xlf:LGL.disable') . '</label>
-                                <input type="checkbox" id="field_disable" name="data[disable]" value="1" class="checkbox" ' . ($vars['disable'] == 1 ? ' checked="checked" ' : '') . ' />
-                            </div>
-                            <div class="form-group">
-                                <label for="field_realname">' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_general.xlf:LGL.name') . '</label>
-                                <input type="text" id="field_realname" class="form-control" name="data[realName]" value="' . htmlspecialchars($vars['realName']) . '" />
-                            </div>
-                            <div class="form-group">
-                                <label for="field_username">' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tca.xlf:be_users.username') . '</label>
-                                <input type="text" id="field_username" class="form-control" name="data[username]" value="' . htmlspecialchars($vars['username']) . '" />
-                            </div>
-                            <div class="form-group">
-                                <label for="field_password">' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tca.xlf:be_users.password') . '</label>
-                                <input type="password" id="field_password" class="form-control" name="data[password]" value="" />
-                            </div>
-                            <div class="form-group">
-                                <label for="field_email">' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_general.xlf:LGL.email') . '</label>
-                                <input type="text" id="field_email" class="form-control" name="data[email]" value="' . htmlspecialchars($vars['email']) . '" />
-                            </div>
-                        </fieldset>
-                        <fieldset class="form-section">
-                            <h4 class="form-section-headline">' . $this->getLanguageService()->getLL('action_t1_legend_configuration') . '</h4>
-                            <div class="form-group">
-                                <label for="field_usergroup">' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tca.xlf:be_users.usergroup') . '</label>
-                                <select id="field_usergroup" class="form-control" name="data[usergroup][]" multiple="multiple">
-                                    ' . $this->getUsergroups($record, $vars) . '
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <input type="hidden" name="data[key]" value="' . $key . '" />
-                                <input type="hidden" name="data[sent]" value="1" />
-                                <input class="btn btn-default" type="submit" value="' . ($key === 'NEW' ? $this->getLanguageService()->getLL('action_Create') : $this->getLanguageService()->getLL('action_Update')) . '" />
-                            </div>
-                        </fieldset>
-                    </form>';
+        $content .= '<form action="" method="post" enctype="multipart/form-data">
+						<fieldset class="fields">
+							<legend>' . $this->getLanguageService()->getLL('action_t1_legend_generalFields') . '</legend>
+							<div class="row">
+								<label for="field_disable">' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_general.xlf:LGL.disable') . '</label>
+								<input type="checkbox" id="field_disable" name="data[disable]" value="1" class="checkbox" ' . ($vars['disable'] == 1 ? ' checked="checked" ' : '') . ' />
+							</div>
+							<div class="row">
+								<label for="field_realname">' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_general.xlf:LGL.name') . '</label>
+								<input type="text" id="field_realname" name="data[realName]" value="' . htmlspecialchars($vars['realName']) . '" />
+							</div>
+							<div class="row">
+								<label for="field_username">' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tca.xlf:be_users.username') . '</label>
+								<input type="text" id="field_username" name="data[username]" value="' . htmlspecialchars($vars['username']) . '" />
+							</div>
+							<div class="row">
+								<label for="field_password">' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tca.xlf:be_users.password') . '</label>
+								<input type="password" id="field_password" name="data[password]" value="" />
+							</div>
+							<div class="row">
+								<label for="field_email">' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_general.xlf:LGL.email') . '</label>
+								<input type="text" id="field_email" name="data[email]" value="' . htmlspecialchars($vars['email']) . '" />
+							</div>
+						</fieldset>
+						<fieldset class="fields">
+							<legend>' . $this->getLanguageService()->getLL('action_t1_legend_configuration') . '</legend>
+
+							<div class="row">
+								<label for="field_usergroup">' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tca.xlf:be_users.usergroup') . '</label>
+								<select id="field_usergroup" name="data[usergroup][]" multiple="multiple">
+									' . $this->getUsergroups($record, $vars) . '
+								</select>
+							</div>
+							<div class="row">
+								<input type="hidden" name="data[key]" value="' . $key . '" />
+								<input type="hidden" name="data[sent]" value="1" />
+								<input class="btn btn-default" type="submit" value="' . ($key === 'NEW' ? $this->getLanguageService()->getLL('action_Create') : $this->getLanguageService()->getLL('action_Update')) . '" />
+							</div>
+						</fieldset>
+					</form>';
         $content .= $this->getCreatedUsers($record, $key);
         return $content;
     }
@@ -419,14 +370,13 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
      */
     protected function deleteUser($userId, $actionId)
     {
-        GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable('be_users')->update(
-            'be_users',
-            ['deleted' => 1, 'tstamp' => (int)$GLOBALS['ACCESS_TIME']],
-            ['uid' => (int)$userId]
-        );
-
+        $this->getDatabaseConnection()->exec_UPDATEquery('be_users', 'uid=' . $userId, [
+            'deleted' => 1,
+            'tstamp' => $GLOBALS['ACCESS_TIME']
+        ]);
         // redirect to the original task
-        HttpUtility::redirect($this->moduleUrl . '&show=' . (int)$actionId);
+        $redirectUrl = $this->moduleUrl . '&show=' . $actionId;
+        \TYPO3\CMS\Core\Utility\HttpUtility::redirect($redirectUrl);
     }
 
     /**
@@ -456,44 +406,23 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
     protected function getCreatedUsers($action, $selectedUser)
     {
         $content = '';
-        $userList = array();
-
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable('be_users');
-
-        $queryBuilder->getRestrictions()
-            ->removeAll()
-            ->add(GeneralUtility::makeInstance(DeletedRestriction::class));
-
-        $res = $queryBuilder
-            ->select('*')
-            ->from('be_users')
-            ->where(
-                $queryBuilder->expr()->eq('cruser_id', (int)$this->getBackendUser()->user['uid']),
-                $queryBuilder->expr()->eq('createdByAction', (int)$action['uid'])
-            )
-            ->orderBy('username')
-            ->execute();
-
+        $userList = [];
+        // List of users
+        $res = $this->getDatabaseConnection()->exec_SELECTquery('*', 'be_users', 'cruser_id=' . $this->getBackendUser()->user['uid'] . ' AND createdByAction=' . (int)$action['uid'] . BackendUtility::deleteClause('be_users'), '', 'username');
         // Render the user records
-        while ($row = $res->fetch()) {
+        while ($row = $this->getDatabaseConnection()->sql_fetch_assoc($res)) {
             $icon = '<span title="' . htmlspecialchars('uid=' . $row['uid']) . '">' . $this->iconFactory->getIconForRecord('be_users', $row, Icon::SIZE_SMALL)->render() . '</span>';
             $line = $icon . $this->action_linkUserName($row['username'], $row['realName'], $action['uid'], $row['uid']);
             // Selected user
             if ($row['uid'] == $selectedUser) {
                 $line = '<strong>' . $line . '</strong>';
             }
-            $userList[] = '<li class="list-group-item">' . $line . '</li>';
+            $userList[] = $line;
         }
-
+        $this->getDatabaseConnection()->sql_free_result($res);
         // If any records found
         if (!empty($userList)) {
-            $content .= '<div class="panel panel-default">';
-            $content .= '<div class="panel-heading">';
-            $content .= '<h3 class="panel-title">' . htmlspecialchars($this->getLanguageService()->getLL('action_t1_listOfUsers')) . '</h3>';
-            $content .= '</div>';
-            $content .= '<ul class="list-group">' . implode($userList) . '</ul>';
-            $content .= '</div>';
+            $content .= '<br /><h3>' . $this->getLanguageService()->getLL('action_t1_listOfUsers', true) . '</h3><div>' . implode('<br />', $userList) . '</div>';
         }
         return $content;
     }
@@ -517,7 +446,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
         $link = '<a href="' . htmlspecialchars($href) . '">' . htmlspecialchars($username) . '</a>';
         // Link to delete the user record
         $link .= '
-				<a href="' . htmlspecialchars(($href . '&delete=1')) . '" class="t3js-confirm-trigger" data-title="' . htmlspecialchars($this->getLanguageService()->getLL('lDelete_warning_title')) . '" data-message="' . htmlspecialchars($this->getLanguageService()->getLL('lDelete_warning')) . '">'
+				<a href="' . htmlspecialchars(($href . '&delete=1')) . '" class="t3js-confirm-trigger" data-title="' . $this->getLanguageService()->getLL('lDelete_warning_title', true) . '" data-message="' . $this->getLanguageService()->getLL('lDelete_warning', true) . '">'
                     . $this->iconFactory->getIcon('actions-edit-delete', Icon::SIZE_SMALL)->render() .
                 '</a>';
         return $link;
@@ -547,7 +476,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
         if ($key === 'NEW') {
             $beRec = BackendUtility::getRecord('be_users', (int)$record['t1_copy_of_user']);
             if (is_array($beRec)) {
-                $data = array();
+                $data = [];
                 $data['be_users'][$key] = $beRec;
                 $data['be_users'][$key]['username'] = $this->fixUsername($vars['username'], $record['t1_userprefix']);
                 $data['be_users'][$key]['password'] = $vars['password'];
@@ -563,7 +492,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
             // Check ownership
             $beRec = BackendUtility::getRecord('be_users', (int)$key);
             if (is_array($beRec) && $beRec['cruser_id'] == $this->getBackendUser()->user['uid']) {
-                $data = array();
+                $data = [];
                 $data['be_users'][$key]['username'] = $this->fixUsername($vars['username'], $record['t1_userprefix']);
                 if ($vars['password'] !== '') {
                     $data['be_users'][$key]['password'] = $vars['password'];
@@ -580,7 +509,8 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
         // Save/update user by using TCEmain
         if (is_array($data)) {
             $tce = GeneralUtility::makeInstance(\TYPO3\CMS\Core\DataHandling\DataHandler::class);
-            $tce->start($data, array(), $this->getBackendUser());
+            $tce->stripslashes_values = 0;
+            $tce->start($data, [], $this->getBackendUser());
             $tce->admin = 1;
             $tce->process_datamap();
             $newUserId = (int)$tce->substNEWwithIDs['NEW'];
@@ -622,7 +552,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
     protected function fixUserGroup($appliedUsergroups, $actionRecord)
     {
         if (is_array($appliedUsergroups)) {
-            $cleanGroupList = array();
+            $cleanGroupList = [];
             // Create an array from the allowed usergroups using the uid as key
             $allowedUsergroups = array_flip(explode(',', $actionRecord['t1_allowed_groups']));
             // Walk through the array and check every uid if it is under the allowed ines
@@ -646,7 +576,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
     {
         // Admins can see any page, no need to check there
         if (!empty($appliedDbMounts) && !$this->getBackendUser()->isAdmin()) {
-            $cleanDbMountList = array();
+            $cleanDbMountList = [];
             $dbMounts = GeneralUtility::trimExplode(',', $appliedDbMounts, true);
             // Walk through every wanted DB-Mount and check if it allowed for the current user
             foreach ($dbMounts as $dbMount) {
@@ -747,12 +677,14 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
     {
         $link = BackendUtility::getModuleUrl(
             'record_edit',
-            array(
+            [
                 'edit[' . $record['t3_tables'] . '][' . (int)$record['t3_listPid'] . ']' => 'new',
                 'returnUrl' => $this->moduleUrl
-            )
+            ],
+            false,
+            true
         );
-        HttpUtility::redirect($link);
+        \TYPO3\CMS\Core\Utility\HttpUtility::redirect($link);
     }
 
     /**
@@ -764,7 +696,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
     protected function viewEditRecord($record)
     {
         $content = '';
-        $actionList = array();
+        $actionList = [];
         $dbAnalysis = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Database\RelationHandler::class);
         $dbAnalysis->setFetchAllFields(true);
         $dbAnalysis->start($record['t4_recordsToEdit'], '*');
@@ -774,26 +706,27 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
             $path = BackendUtility::getRecordPath($el['id'], $this->taskObject->perms_clause, $this->getBackendUser()->uc['titleLen']);
             $record = BackendUtility::getRecord($el['table'], $dbAnalysis->results[$el['table']][$el['id']]);
             $title = BackendUtility::getRecordTitle($el['table'], $dbAnalysis->results[$el['table']][$el['id']]);
-            $description = htmlspecialchars($this->getLanguageService()->sL($GLOBALS['TCA'][$el['table']]['ctrl']['title']));
+            $description = $this->getLanguageService()->sL($GLOBALS['TCA'][$el['table']]['ctrl']['title'], true);
             // @todo: which information could be needful
             if (isset($record['crdate'])) {
                 $description .= ' - ' . BackendUtility::dateTimeAge($record['crdate']);
             }
             $link = BackendUtility::getModuleUrl(
                 'record_edit',
-                array(
+                [
                     'edit[' . $el['table'] . '][' . $el['id'] . ']' => 'edit',
                     'returnUrl' => $this->moduleUrl
-                )
+                ],
+                false,
+                true
             );
-            $actionList[$el['id']] = array(
-                'uid' => 'record-' . $el['table'] . '-' . $el['id'],
+            $actionList[$el['id']] = [
                 'title' => $title,
                 'description' => BackendUtility::getRecordTitle($el['table'], $dbAnalysis->results[$el['table']][$el['id']]),
                 'descriptionHtml' => $description,
                 'link' => $link,
                 'icon' => '<span title="' . htmlspecialchars($path) . '">' . $this->iconFactory->getIconForRecord($el['table'], $dbAnalysis->results[$el['table']][$el['id']], Icon::SIZE_SMALL)->render() . '</span>'
-            );
+            ];
         }
         // Render the record list
         $content .= $this->taskObject->renderListMenu($actionList);
@@ -833,7 +766,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
                         $actionContent = $cP['content'];
                         // If the result is rendered as csv or xml, show a download link
                         if ($type === 'csv' || $type === 'xml') {
-                            $actionContent .= '<a href="' . GeneralUtility::getIndpEnv('REQUEST_URI') . '&download_file=1"><strong>' . $this->getLanguageService()->getLL('action_download_file') . '</strong></a>';
+                            $actionContent .= '<br /><br /><a href="' . GeneralUtility::getIndpEnv('REQUEST_URI') . '&download_file=1"><strong>' . $this->getLanguageService()->getLL('action_download_file') . '</strong></a>';
                         }
                     } else {
                         $actionContent .= $this->getDatabaseConnection()->sql_error();
@@ -846,23 +779,23 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
                         $this->getLanguageService()->getLL('action_error'),
                         FlashMessage::ERROR
                     );
-                    $content .= $this->renderFlashMessages();
+                    $content .= '<br />' . $this->renderFlashMessages();
                 }
                 // Admin users are allowed to see and edit the query
                 if ($this->getBackendUser()->isAdmin()) {
                     if (!$queryIsEmpty) {
-                        $actionContent .= '<div class="panel panel-default"><div class="panel-body">' . $fullsearch->tableWrap($sql_query['qSelect']) . '</div></div>';
+                        $actionContent .= '<hr /> ' . $fullsearch->tableWrap($sql_query['qSelect']);
                     }
-                    $actionContent .= '<a title="' . $this->getLanguageService()->getLL('action_editQuery') . '" class="btn btn-default" href="'
+                    $actionContent .= '<br /><a title="' . $this->getLanguageService()->getLL('action_editQuery') . '" href="'
                         . htmlspecialchars(BackendUtility::getModuleUrl('system_dbint')
                             . '&id=' . '&SET[function]=search' . '&SET[search]=query'
                             . '&storeControl[STORE]=-' . $record['uid'] . '&storeControl[LOAD]=1')
                         . '">'
-                        . $this->iconFactory->getIcon('actions-document-info', Icon::SIZE_SMALL)->render() . ' '
+                        . $this->iconFactory->getIcon('actions-document-info', Icon::SIZE_SMALL)->render()
                         . $this->getLanguageService()->getLL(($queryIsEmpty ? 'action_createQuery'
-                        : 'action_editQuery')) . '</a>';
+                        : 'action_editQuery')) . '</a><br /><br />';
                 }
-                $content .= '<h2>' . htmlspecialchars($this->getLanguageService()->getLL('action_t2_result')) . '</h2>' . $actionContent;
+                $content .= '<h2>' . $this->getLanguageService()->getLL('action_t2_result', true) . '</h2><div>' . $actionContent . '</div>';
             } else {
                 // Query is not configured
                 $this->addMessage(
@@ -870,7 +803,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
                     $this->getLanguageService()->getLL('action_error'),
                     FlashMessage::ERROR
                 );
-                $content .= $this->renderFlashMessages();
+                $content .= '<br />' . $this->renderFlashMessages();
             }
         } else {
             // Required sysext lowlevel is not installed
@@ -879,7 +812,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
                 $this->getLanguageService()->getLL('action_error'),
                 FlashMessage::ERROR
             );
-            $content .= $this->renderFlashMessages();
+            $content .= '<br />' . $this->renderFlashMessages();
         }
         return $content;
     }
@@ -901,7 +834,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
                 $this->getLanguageService()->getLL('action_error'),
                 FlashMessage::ERROR
             );
-            $content .= $this->renderFlashMessages();
+            $content .= '<br />' . $this->renderFlashMessages();
             return $content;
         }
         // Loading current page record and checking access:
@@ -912,6 +845,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
             // Initialize the dblist object:
             $dblist = GeneralUtility::makeInstance(\TYPO3\CMS\SysAction\ActionList::class);
             $dblist->script = GeneralUtility::getIndpEnv('REQUEST_URI');
+            $dblist->backPath = $GLOBALS['BACK_PATH'];
             $dblist->calcPerms = $this->getBackendUser()->calcPerms($this->pageinfo);
             $dblist->thumbs = $this->getBackendUser()->uc['thumbnailsByDefault'];
             $dblist->returnUrl = $this->taskObject->returnUrl;
@@ -921,7 +855,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
             $dblist->disableSingleTableView = 1;
             $dblist->pageRow = $this->pageinfo;
             $dblist->counter++;
-            $dblist->MOD_MENU = array('bigControlPanel' => '', 'clipBoard' => '', 'localization' => '');
+            $dblist->MOD_MENU = ['bigControlPanel' => '', 'clipBoard' => '', 'localization' => ''];
             $dblist->modTSconfig = $this->taskObject->modTSconfig;
             $dblist->dontShowClipControlPanels = (!$this->taskObject->MOD_SETTINGS['bigControlPanel'] && $dblist->clipObj->current == 'normal' && !$this->modTSconfig['properties']['showClipControlPanelsDespiteOfCMlayers']);
             // Initialize the listing object, dblist, for rendering the list:
@@ -956,7 +890,7 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
 
 				' . $dblist->CBfunctions() . '
 				function editRecords(table,idList,addParams,CBflag) {
-					window.location.href="' . BackendUtility::getModuleUrl('record_edit', array('returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI'))) . '&edit["+table+"]["+idList+"]=edit"+addParams;
+					window.location.href="' . BackendUtility::getModuleUrl('record_edit', ['returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')]) . '&edit["+table+"]["+idList+"]=edit"+addParams;
 				}
 				function editList(table,idList) {
 					var list="";
@@ -988,9 +922,14 @@ class ActionTask implements \TYPO3\CMS\Taskcenter\TaskInterface
             $content .= '<form action="' . htmlspecialchars($dblist->listURL()) . '" method="post" name="dblistForm">' . $dblist->HTMLcode . '<input type="hidden" name="cmd_table" /><input type="hidden" name="cmd" />
 						</form>';
             // If a listing was produced, create the page footer with search form etc:
-            // Making field select box (when extended view for a single table is enabled):
-            if ($dblist->HTMLcode && $dblist->table) {
-                $content .= $dblist->fieldSelectBox($dblist->table);
+            if ($dblist->HTMLcode) {
+                // Making field select box (when extended view for a single table is enabled):
+                if ($dblist->table) {
+                    $tmpBackpath = $GLOBALS['BACK_PATH'];
+                    $GLOBALS['BACK_PATH'] = '';
+                    $content .= $dblist->fieldSelectBox($dblist->table);
+                    $GLOBALS['BACK_PATH'] = $tmpBackpath;
+                }
             }
         } else {
             // Not enough rights to access the list view or the page

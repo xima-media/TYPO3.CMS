@@ -182,6 +182,10 @@ table.typo3-TCEforms-select-checkbox {
 	padding: 2px;
 }
 
+.t3-form-original-language .icon {
+	margin-right: 5px;
+}
+
 // Default. Always used on main-palettes in the bottom of the forms
 
 .typo3-TCEforms .typo3-TCEforms-checkboxArray td {
@@ -230,7 +234,7 @@ div.t3-form-field-container:first-child .t3-form-field-label-flex {
 .t3js-formengine-field-item.disabled {
 	position: relative;
 	.t3-form-field-disable {
-		z-index: 8000;
+		z-index: 100;
 		background: #fafafa;
 		display: block;
 		position: absolute;
@@ -240,6 +244,11 @@ div.t3-form-field-container:first-child .t3-form-field-label-flex {
 		opacity: 0.5;
 		filter: alpha(opacity=50);
 	}
+}
+// z-index must be higher as .t3-form-field-disable z-index
+// this is required for the eval=null field checkbox
+.t3-form-field-eval-null-checkbox {
+	z-index: 150;
 }
 .t3-form-palette-field-label {
 	text-indent: 2px;

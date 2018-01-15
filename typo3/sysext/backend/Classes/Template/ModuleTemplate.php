@@ -88,6 +88,11 @@ class ModuleTemplate
     protected $pageRenderer;
 
     /**
+     * @var bool
+     */
+    protected $uiBlock = false;
+
+    /**
      * TemplateRootPath
      *
      * @var string[]
@@ -348,6 +353,7 @@ class ModuleTemplate
         if ($this->moduleName) {
             $this->view->assign('moduleName', $this->moduleName);
         }
+        $this->view->assign('uiBlock', $this->uiBlock);
         $this->view->assign('flashMessageQueueIdentifier', $this->getFlashMessageQueue()->getIdentifier());
         $renderedPage = $this->pageRenderer->render(PageRenderer::PART_HEADER);
         $renderedPage .= $this->bodyTag;
@@ -449,13 +455,13 @@ class ModuleTemplate
         $templatePathAndFileName = 'EXT:backend/Resources/Private/Templates/DocumentTemplate/' . ($collapsible ? 'Collapse.html' : 'Tabs.html');
         $view = GeneralUtility::makeInstance(StandaloneView::class);
         $view->setTemplatePathAndFilename(GeneralUtility::getFileAbsFileName($templatePathAndFileName));
-        $view->assignMultiple(array(
+        $view->assignMultiple([
             'id' => 'DTM-' . GeneralUtility::shortMD5($domId),
             'items' => $menuItems,
             'defaultTabIndex' => $defaultTabIndex,
             'wrapContent' => $wrapContent,
             'storeLastActiveTab' => $storeLastActiveTab,
-        ));
+        ]);
         return $view->render();
     }
 
@@ -569,7 +575,7 @@ class ModuleTemplate
         $getParams = GeneralUtility::_GET();
         $storeArray = array_merge(
             GeneralUtility::compileSelectedGetVarsFromArray($gvList, $getParams),
-            array('SET' => GeneralUtility::compileSelectedGetVarsFromArray($setList, (array)$GLOBALS['SOBE']->MOD_SETTINGS))
+            ['SET' => GeneralUtility::compileSelectedGetVarsFromArray($setList, (array)$GLOBALS['SOBE']->MOD_SETTINGS)]
         );
         return GeneralUtility::implodeArrayForUrl('', $storeArray);
     }
@@ -670,12 +676,12 @@ class ModuleTemplate
      */
     public function redirectUrls($thisLocation = '')
     {
-        $thisLocation = $thisLocation ? $thisLocation : GeneralUtility::linkThisScript(array(
+        $thisLocation = $thisLocation ? $thisLocation : GeneralUtility::linkThisScript([
             'CB' => '',
             'SET' => '',
             'cmd' => '',
             'popViewId' => ''
-        ));
+        ]);
         $out = '
 	var T3_RETURN_URL = ' . GeneralUtility::quoteJSvalue(str_replace('%20', '', rawurlencode(GeneralUtility::sanitizeLocalUrl(GeneralUtility::_GP('returnUrl'))))) . ';
 	var T3_THIS_LOCATION = ' . GeneralUtility::quoteJSvalue(str_replace('%20', '', rawurlencode($thisLocation))) . '
@@ -745,5 +751,21 @@ class ModuleTemplate
             $this->flashMessageQueue = $service->getMessageQueueByIdentifier();
         }
         return $this->flashMessageQueue;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isUiBlock()
+    {
+        return $this->uiBlock;
+    }
+
+    /**
+     * @param bool $uiBlock
+     */
+    public function setUiBlock($uiBlock)
+    {
+        $this->uiBlock = (bool)$uiBlock;
     }
 }

@@ -25,8 +25,8 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function anObjectCanBeAttached()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass();
-        $object2 = new \stdClass();
+        $object1 = new \StdClass();
+        $object2 = new \StdClass();
         $objectStorage->attach($object1);
         $objectStorage->attach($object2, 'foo');
         $this->assertEquals($objectStorage[$object1], null);
@@ -39,8 +39,8 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function anObjectCanBeDetached()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass();
-        $object2 = new \stdClass();
+        $object1 = new \StdClass();
+        $object2 = new \StdClass();
         $objectStorage->attach($object1);
         $objectStorage->attach($object2, 'foo');
         $this->assertEquals(count($objectStorage), 2);
@@ -56,8 +56,8 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function offsetSetAssociatesDataToAnObjectInTheStorage()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass();
-        $object2 = new \stdClass();
+        $object1 = new \StdClass();
+        $object2 = new \StdClass();
         $objectStorage->offsetSet($object1, 'foo');
         $this->assertEquals(count($objectStorage), 1);
         $objectStorage[$object2] = 'bar';
@@ -70,8 +70,8 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function offsetUnsetRemovesAnObjectFromTheStorage()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass();
-        $object2 = new \stdClass();
+        $object1 = new \StdClass();
+        $object2 = new \StdClass();
         $objectStorage->attach($object1);
         $objectStorage->attach($object2, 'foo');
         $this->assertEquals(count($objectStorage), 2);
@@ -87,8 +87,8 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function offsetGetReturnsTheDataAssociatedWithAnObject()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass();
-        $object2 = new \stdClass();
+        $object1 = new \StdClass();
+        $object2 = new \StdClass();
         $objectStorage[$object1] = 'foo';
         $objectStorage->attach($object2);
         $this->assertEquals($objectStorage->offsetGet($object1), 'foo');
@@ -101,8 +101,8 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function offsetExistsChecksWhetherAnObjectExistsInTheStorage()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass();
-        $object2 = new \stdClass();
+        $object1 = new \StdClass();
+        $object2 = new \StdClass();
         $objectStorage->attach($object1);
         $this->assertEquals($objectStorage->offsetExists($object1), true);
         $this->assertEquals($objectStorage->offsetExists($object2), false);
@@ -132,18 +132,18 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function getInfoReturnsTheDataAssociatedWithTheCurrentIteratorEntry()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass();
-        $object2 = new \stdClass();
-        $object3 = new \stdClass();
+        $object1 = new \StdClass();
+        $object2 = new \StdClass();
+        $object3 = new \StdClass();
         $objectStorage->attach($object1, 42);
         $objectStorage->attach($object2, 'foo');
-        $objectStorage->attach($object3, array('bar', 'baz'));
+        $objectStorage->attach($object3, ['bar', 'baz']);
         $objectStorage->rewind();
         $this->assertEquals($objectStorage->getInfo(), 42);
         $objectStorage->next();
         $this->assertEquals($objectStorage->getInfo(), 'foo');
         $objectStorage->next();
-        $this->assertEquals($objectStorage->getInfo(), array('bar', 'baz'));
+        $this->assertEquals($objectStorage->getInfo(), ['bar', 'baz']);
     }
 
     /**
@@ -152,8 +152,8 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function setInfoSetsTheDataAssociatedWithTheCurrentIteratorEntry()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass();
-        $object2 = new \stdClass();
+        $object1 = new \StdClass();
+        $object2 = new \StdClass();
         $objectStorage->attach($object1);
         $objectStorage->attach($object2, 'foo');
         $objectStorage->rewind();
@@ -169,8 +169,8 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function removeAllRemovesObjectsContainedInAnotherStorageFromTheCurrentStorage()
     {
-        $object1 = new \stdClass();
-        $object2 = new \stdClass();
+        $object1 = new \StdClass();
+        $object2 = new \StdClass();
         $objectStorageA = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
         $objectStorageA->attach($object1, 'foo');
         $objectStorageB = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
@@ -186,8 +186,8 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function addAllAddsAllObjectsFromAnotherStorage()
     {
-        $object1 = new \stdClass();
-        $object2 = new \stdClass();
+        $object1 = new \StdClass();
+        $object2 = new \StdClass();
         $objectStorageA = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
         // It might be better to mock this
         $objectStorageA->attach($object1, 'foo');
@@ -205,12 +205,11 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function theStorageCanBeRetrievedAsArray()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass();
-        $object2 = new \stdClass();
+        $object1 = new \StdClass();
+        $object2 = new \StdClass();
         $objectStorage->attach($object1, 'foo');
         $objectStorage->attach($object2, 'bar');
-        $this->assertEquals(array($object1, $object2), $objectStorage->toArray());
-        $this->assertEquals(array($object1, $object2), $objectStorage->getArray());
+        $this->assertEquals($objectStorage->toArray(), [$object1, $object2]);
     }
 
     /**
@@ -219,9 +218,9 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function allRelationsAreNotDirtyOnAttaching()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass();
-        $object2 = new \stdClass();
-        $object3 = new \stdClass();
+        $object1 = new \StdClass();
+        $object2 = new \StdClass();
+        $object3 = new \StdClass();
         $objectStorage->attach($object1);
         $objectStorage->attach($object2);
         $objectStorage->attach($object3);
@@ -236,9 +235,9 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function allRelationsAreNotDirtyOnAttachingAndRemoving()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass;
-        $object2 = new \stdClass;
-        $object3 = new \stdClass;
+        $object1 = new \StdClass;
+        $object2 = new \StdClass;
+        $object3 = new \StdClass;
         $objectStorage->attach($object1);
         $objectStorage->attach($object2);
         $objectStorage->detach($object2);
@@ -253,8 +252,8 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function theRelationsAreNotDirtyOnReAddingAtSamePosition()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass;
-        $object2 = new \stdClass;
+        $object1 = new \StdClass;
+        $object2 = new \StdClass;
         $objectStorage->attach($object1);
         $objectStorage->attach($object2);
         $clonedStorage = clone $objectStorage;
@@ -271,8 +270,8 @@ class ObjectStorageTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function theRelationsAreDirtyOnReAddingAtOtherPosition()
     {
         $objectStorage = new \TYPO3\CMS\Extbase\Persistence\ObjectStorage();
-        $object1 = new \stdClass;
-        $object2 = new \stdClass;
+        $object1 = new \StdClass;
+        $object2 = new \StdClass;
         $objectStorage->attach($object1);
         $objectStorage->attach($object2);
         $clonedStorage = clone $objectStorage;

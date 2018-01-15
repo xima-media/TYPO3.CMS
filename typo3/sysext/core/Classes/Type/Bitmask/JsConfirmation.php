@@ -14,13 +14,10 @@ namespace TYPO3\CMS\Core\Type\Bitmask;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Type\Enumeration;
-use TYPO3\CMS\Core\Type\Exception;
-
 /**
  * A class providing constants for bitwise operations on javascript confirmation popups
  */
-class JsConfirmation extends Enumeration
+class JsConfirmation extends \TYPO3\CMS\Core\Type\Enumeration
 {
     /**
      * @var int
@@ -50,9 +47,7 @@ class JsConfirmation extends Enumeration
     /**
      * @var int
      */
-    const ALL = 255;
-
-    protected static $allowedValues = self::TYPE_CHANGE | self::COPY_MOVE_PASTE | self::DELETE | self::FE_EDIT | self::OTHER;
+    const __default = 255;
 
     /**
      * Returns TRUE if a given value matches the internal value
@@ -63,51 +58,8 @@ class JsConfirmation extends Enumeration
     public function matches(JsConfirmation $value)
     {
         $value = (int)(string)$value;
-        $thisValue = (int)$this->value;
+        $thisValue = (int)(string)$this;
 
         return ($value & $thisValue) == $thisValue;
-    }
-
-    /**
-     * Set the Enumeration value to the associated enumeration value by a loose comparison.
-     * The value, that is used as the enumeration value, will be of the same type like defined in the enumeration
-     *
-     * @param mixed $value
-     * @throws Exception\InvalidEnumerationValueException
-     */
-    protected function setValue($value)
-    {
-        if ($value < 255) {
-            if (($value & self::$allowedValues) !== $value) {
-                throw new Exception\InvalidEnumerationValueException(
-                    sprintf('Invalid value %s for %s', $value, __CLASS__),
-                    1457175152
-                );
-            }
-            $this->value = $value;
-        } else {
-            parent::setValue($value);
-        }
-    }
-
-    /**
-     * Check if the value on this enum is a valid value for the enum
-     *
-     * @param mixed $value
-     * @return bool
-     */
-    protected function isValid($value)
-    {
-        if ($value < 255) {
-            return (($value & self::$allowedValues) === $value);
-        }
-
-        $value = (string)$value;
-        foreach (static::$enumConstants[get_class($this)] as $constantValue) {
-            if ($value === (string)$constantValue) {
-                return true;
-            }
-        }
-        return false;
     }
 }

@@ -48,7 +48,7 @@ class FormProtectionFactory
      *
      * @var array<AbstracFormtProtection>
      */
-    protected static $instances = array();
+    protected static $instances = [];
 
     /**
      * Private constructor to prevent instantiation.
@@ -67,20 +67,19 @@ class FormProtectionFactory
      * @param string $classNameOrType Name of a form protection class, or one
      *                                of the pre-defined form protection types:
      *                                frontend, backend, installtool
-     * @param mixed $constructorArguments Arguments for the class-constructor
      * @return \TYPO3\CMS\Core\FormProtection\AbstractFormProtection the requested instance
      */
-    public static function get($classNameOrType = 'default', ...$constructorArguments)
+    public static function get($classNameOrType = 'default')
     {
         if (isset(self::$instances[$classNameOrType])) {
             return self::$instances[$classNameOrType];
         }
         if ($classNameOrType === 'default' || $classNameOrType === 'installtool' || $classNameOrType === 'frontend' || $classNameOrType === 'backend') {
             $classNameAndConstructorArguments = self::getClassNameAndConstructorArgumentsByType($classNameOrType);
-            self::$instances[$classNameOrType] = self::createInstance(...$classNameAndConstructorArguments);
         } else {
-            self::$instances[$classNameOrType] = self::createInstance($classNameOrType, ...$constructorArguments);
+            $classNameAndConstructorArguments = func_get_args();
         }
+        self::$instances[$classNameOrType] = self::createInstance($classNameAndConstructorArguments);
         return self::$instances[$classNameOrType];
     }
 
@@ -129,7 +128,7 @@ class FormProtectionFactory
      */
     protected static function isInstallToolSession()
     {
-        return (TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_INSTALL);
+        return defined('TYPO3_enterInstallScript') && TYPO3_enterInstallScript;
     }
 
     /**
@@ -178,17 +177,17 @@ class FormProtectionFactory
      * Creates an instance for the requested class $className
      * and stores it internally.
      *
-     * @param array $className
-     * @param mixed $constructorArguments
+     * @param array $classNameAndConstructorArguments
      * @throws \InvalidArgumentException
      * @return AbstractFormProtection
      */
-    protected static function createInstance($className, ...$constructorArguments)
+    protected static function createInstance(array $classNameAndConstructorArguments)
     {
+        $className = $classNameAndConstructorArguments[0];
         if (!class_exists($className)) {
             throw new \InvalidArgumentException('$className must be the name of an existing class, but ' . 'actually was "' . $className . '".', 1285352962);
         }
-        $instance = GeneralUtility::makeInstance($className, ...$constructorArguments);
+        $instance = call_user_func_array([GeneralUtility::class, 'makeInstance'], $classNameAndConstructorArguments);
         if (!$instance instanceof AbstractFormProtection) {
             throw new \InvalidArgumentException('$className must be a subclass of ' . AbstractFormProtection::class . ', but actually was "' . $className . '".', 1285353026);
         }

@@ -17,8 +17,7 @@ namespace TYPO3\CMS\Backend\Controller\Wizard;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\Form\FormDataCompiler;
-use TYPO3\CMS\Backend\Form\FormDataGroup\OnTheFly;
-use TYPO3\CMS\Backend\Form\FormDataProvider\DatabaseEditRow;
+use TYPO3\CMS\Backend\Form\FormDataGroup\TcaDatabaseRecord;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Configuration\FlexForm\FlexFormTools;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
@@ -110,7 +109,7 @@ class AddController extends AbstractWizardController
         // Get TSconfig for it.
         $TSconfig = BackendUtility::getTCEFORM_TSconfig(
             $this->P['table'],
-            is_array($record) ? $record : array('pid' => $this->P['pid'])
+            is_array($record) ? $record : ['pid' => $this->P['pid']]
         );
         // Set [params][pid]
         if (substr($this->P['params']['pid'], 0, 3) === '###' && substr($this->P['params']['pid'], -3) === '###') {
@@ -178,12 +177,10 @@ class AddController extends AbstractWizardController
     {
         if ($this->returnEditConf) {
             if ($this->processDataFlag) {
-                // This data processing is done here to basically just get the current record. It can be discussed
-                // if this isn't overkill here. In case this construct does not work out well, it would be less
-                // overhead to just BackendUtility::fetchRecord the current parent here.
-                /** @var OnTheFly $formDataGroup */
-                $formDataGroup = GeneralUtility::makeInstance(OnTheFly::class);
-                $formDataGroup->setProviderList([ DatabaseEditRow::class ]);
+                // Because OnTheFly can't handle MM relations with intermediate tables we use TcaDatabaseRecord here
+                // Otherwise already stored relations are overwritten with the new entry
+                /** @var TcaDatabaseRecord $formDataGroup */
+                $formDataGroup = GeneralUtility::makeInstance(TcaDatabaseRecord::class);
                 /** @var FormDataCompiler $formDataCompiler */
                 $formDataCompiler = GeneralUtility::makeInstance(FormDataCompiler::class, $formDataGroup);
                 $input = [
@@ -199,7 +196,8 @@ class AddController extends AbstractWizardController
                 if (is_array($currentParentRow)) {
                     /** @var DataHandler $dataHandler */
                     $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
-                    $data = array();
+                    $dataHandler->stripslashes_values = false;
+                    $data = [];
                     $recordId = $this->table . '_' . $this->id;
                     // Setting the new field data:
                     // If the field is a flexForm field, work with the XML structure instead:
@@ -225,22 +223,29 @@ class AddController extends AbstractWizardController
                                 break;
                         }
                         $insertValue = implode(',', GeneralUtility::trimExplode(',', $insertValue, true));
-                        $data[$this->P['table']][$this->P['uid']][$this->P['field']] = array();
+                        $data[$this->P['table']][$this->P['uid']][$this->P['field']] = [];
                         $flexFormTools->setArrayValueByPath(
                             $this->P['flexFormPath'],
                             $data[$this->P['table']][$this->P['uid']][$this->P['field']],
                             $insertValue
                         );
                     } else {
+                        // Check the row for its datatype. If it is an array it stores the relation
+                        // to other rows. Implode it into a comma separated list to be able to restore the stored
+                        // values after the wizard falls back to the parent record
+                        $currentValue = $currentParentRow[$this->P['field']];
+                        if (is_array($currentValue)) {
+                            $currentValue = implode(',', array_column($currentValue, 'uid'));
+                        }
                         switch ((string)$this->P['params']['setValue']) {
                             case 'set':
                                 $data[$this->P['table']][$this->P['uid']][$this->P['field']] = $recordId;
                                 break;
                             case 'prepend':
-                                $data[$this->P['table']][$this->P['uid']][$this->P['field']] = $currentParentRow[$this->P['field']] . ',' . $recordId;
+                                $data[$this->P['table']][$this->P['uid']][$this->P['field']] = $currentValue . ',' . $recordId;
                                 break;
                             case 'append':
-                                $data[$this->P['table']][$this->P['uid']][$this->P['field']] = $recordId . ',' . $currentParentRow[$this->P['field']];
+                                $data[$this->P['table']][$this->P['uid']][$this->P['field']] = $recordId . ',' . $currentValue;
                                 break;
                         }
                         $data[$this->P['table']][$this->P['uid']][$this->P['field']] = implode(
@@ -253,7 +258,7 @@ class AddController extends AbstractWizardController
                         );
                     }
                     // Submit the data:
-                    $dataHandler->start($data, array());
+                    $dataHandler->start($data, []);
                     $dataHandler->process_datamap();
                 }
             }
@@ -262,11 +267,11 @@ class AddController extends AbstractWizardController
         } else {
             // Redirecting to FormEngine with instructions to create a new record
             // AND when closing to return back with information about that records ID etc.
-            $redirectUrl = BackendUtility::getModuleUrl('record_edit', array(
+            $redirectUrl = BackendUtility::getModuleUrl('record_edit', [
                 'returnEditConf' => 1,
                 'edit[' . $this->P['params']['table'] . '][' . $this->pid . ']' => 'new',
-                'returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')
-            ));
+                'returnUrl' => GeneralUtility::removeXSS(GeneralUtility::getIndpEnv('REQUEST_URI'))
+            ]);
             HttpUtility::redirect($redirectUrl);
         }
     }

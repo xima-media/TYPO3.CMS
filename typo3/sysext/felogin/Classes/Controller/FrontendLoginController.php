@@ -14,9 +14,6 @@ namespace TYPO3\CMS\Felogin\Controller;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Crypto\Random;
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Database\Query\Restriction\FrontendRestrictionContainer;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\StringUtility;
 
@@ -111,7 +108,6 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
      * @param string $content The PlugIn content
      * @param array $conf The PlugIn configuration
      * @return string The content that is displayed on the website
-     * @throws \RuntimeException when no storage PID was configured.
      */
     public function main($content, $conf)
     {
@@ -133,7 +129,9 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                 $this->spid = $this->conf['storagePid'];
             }
         } else {
-            throw new \RuntimeException('No storage folder (option storagePid) for frontend users given.', 1450904202);
+            GeneralUtility::deprecationLog('Extension "felogin" must have a storagePid set via TypoScript or the plugin configuration.');
+            $pids = $this->frontendController->getStorageSiterootPids();
+            $this->spid = $pids['_STORAGE_PID'];
         }
         // GPvars:
         $this->logintype = GeneralUtility::_GP('logintype');
@@ -184,10 +182,10 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                     isset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['beforeRedirect']) &&
                     is_array($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['beforeRedirect'])
                 ) {
-                    $_params = array(
+                    $_params = [
                         'loginType' => $this->logintype,
                         'redirectUrl' => &$this->redirectUrl
-                    );
+                    ];
                     foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['beforeRedirect'] as $_funcRef) {
                         if ($_funcRef) {
                             GeneralUtility::callUserFunction($_funcRef, $_params, $this);
@@ -202,9 +200,9 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
             isset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['postProcContent'])
             && is_array($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['postProcContent'])
         ) {
-            $_params = array(
+            $_params = [
                 'content' => $content
-            );
+            ];
             foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['postProcContent'] as $_funcRef) {
                 $content = GeneralUtility::callUserFunction($_funcRef, $_params, $this);
             }
@@ -220,35 +218,24 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
     protected function showForgot()
     {
         $subpart = $this->cObj->getSubpart($this->template, '###TEMPLATE_FORGOT###');
-        $subpartArray = ($linkpartArray = array());
+        $subpartArray = ($linkpartArray = []);
         $postData = GeneralUtility::_POST($this->prefixId);
         if ($postData['forgot_email']) {
             // Get hashes for compare
             $postedHash = $postData['forgot_hash'];
             $hashData = $this->frontendController->fe_user->getKey('ses', 'forgot_hash');
             if ($postedHash === $hashData['forgot_hash']) {
-                $userTable = $this->frontendController->fe_user->user_table;
-                $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable($userTable);
-                $queryBuilder->setRestrictions(GeneralUtility::makeInstance(FrontendRestrictionContainer::class));
-                $row = $queryBuilder
-                    ->select('uid', 'username', 'password', 'email')
-                    ->from($userTable)
-                    ->where(
-                        $queryBuilder->expr()->orX(
-                            $queryBuilder->expr()->eq(
-                                'email',
-                                $queryBuilder->createNamedParameter($this->piVars['forgot_email'])
-                            ),
-                            $queryBuilder->expr()->eq(
-                                'username',
-                                $queryBuilder->createNamedParameter($this->piVars['forgot_email'])
-                            )
-                        ),
-                        $queryBuilder->expr()->in('pid', GeneralUtility::intExplode(',', $this->spid))
-                    )
-                    ->execute()
-                    ->fetch();
-
+                $row = false;
+                // Look for user record
+                $data = $this->databaseConnection->fullQuoteStr($this->piVars['forgot_email'], 'fe_users');
+                $res = $this->databaseConnection->exec_SELECTquery(
+                    'uid, username, password, email',
+                    'fe_users',
+                    '(email=' . $data . ' OR username=' . $data . ') AND pid IN (' . $this->databaseConnection->cleanIntList($this->spid) . ') ' . $this->cObj->enableFields('fe_users')
+                );
+                if ($this->databaseConnection->sql_num_rows($res)) {
+                    $row = $this->databaseConnection->sql_fetch_assoc($res);
+                }
                 $error = null;
                 if ($row) {
                     // Generate an email with the hashed link
@@ -275,10 +262,10 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
             $markerArray['###STATUS_MESSAGE###'] = $this->getDisplayText('forgot_reset_message', $this->conf['forgotMessage_stdWrap.']);
             $markerArray['###BACKLINK_LOGIN###'] = '';
         }
-        $markerArray['###BACKLINK_LOGIN###'] = $this->getPageLink($this->pi_getLL('ll_forgot_header_backToLogin', '', true), array());
+        $markerArray['###BACKLINK_LOGIN###'] = $this->getPageLink($this->pi_getLL('ll_forgot_header_backToLogin', '', true), []);
         $markerArray['###STATUS_HEADER###'] = $this->getDisplayText('forgot_header', $this->conf['forgotHeader_stdWrap.']);
         $markerArray['###LEGEND###'] = $this->pi_getLL('legend', $this->pi_getLL('reset_password'), true);
-        $markerArray['###ACTION_URI###'] = $this->getPageLink('', array($this->prefixId . '[forgot]' => 1), true);
+        $markerArray['###ACTION_URI###'] = $this->getPageLink('', [$this->prefixId . '[forgot]' => 1], true);
         $markerArray['###EMAIL_LABEL###'] = $this->pi_getLL('your_email', '', true);
         $markerArray['###FORGOT_PASSWORD_ENTEREMAIL###'] = $this->pi_getLL('forgot_password_enterEmail', '', true);
         $markerArray['###FORGOT_EMAIL###'] = $this->prefixId . '[forgot_email]';
@@ -289,7 +276,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
         $hash = md5($this->generatePassword(3));
         $markerArray['###FORGOTHASH###'] = $hash;
         // Set hash in feuser session
-        $this->frontendController->fe_user->setKey('ses', 'forgot_hash', array('forgot_hash' => $hash));
+        $this->frontendController->fe_user->setKey('ses', 'forgot_hash', ['forgot_hash' => $hash]);
         return $this->cObj->substituteMarkerArrayCached($subpart, $markerArray, $subpartArray, $linkpartArray);
     }
 
@@ -301,7 +288,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
      */
     protected function changePassword()
     {
-        $subpartArray = ($linkpartArray = array());
+        $subpartArray = ($linkpartArray = []);
         $done = false;
         $minLength = (int)$this->conf['newPasswordMinLength'] ?: 6;
         $subpart = $this->cObj->getSubpart($this->template, '###TEMPLATE_CHANGEPASSWORD###');
@@ -350,11 +337,11 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                     } else {
                         $newPass = $postData['password1'];
                         if ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['password_changed']) {
-                            $_params = array(
+                            $_params = [
                                 'user' => $user,
                                 'newPassword' => $newPass,
                                 'newPasswordUnencrypted' => $newPass
-                            );
+                            ];
                             foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['password_changed'] as $_funcRef) {
                                 if ($_funcRef) {
                                     GeneralUtility::callUserFunction($_funcRef, $_params, $this);
@@ -362,18 +349,12 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                             }
                             $newPass = $_params['newPassword'];
                         }
-
                         // Save new password and clear DB-hash
-                        $userTable = $this->frontendController->fe_user->user_table;
-                        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable($userTable);
-                        $queryBuilder->getRestrictions()->removeAll();
-                        $queryBuilder->update($userTable)
-                            ->set('password', $newPass)
-                            ->set('felogin_forgotHash', '')
-                            ->set('tstamp', (int)$GLOBALS['EXEC_TIME'])
-                            ->where($queryBuilder->expr()->eq('uid', (int)$user['uid']))
-                            ->execute();
-
+                        $res = $this->databaseConnection->exec_UPDATEquery(
+                            'fe_users',
+                            'uid=' . $user['uid'],
+                            ['password' => $newPass, 'felogin_forgotHash' => '', 'tstamp' => $GLOBALS['EXEC_TIME']]
+                        );
                         $markerArray['###STATUS_MESSAGE###'] = $this->getDisplayText(
                             'change_password_done_message',
                             $this->conf['changePasswordDoneMessage_stdWrap.']
@@ -382,16 +363,16 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                         $subpartArray['###CHANGEPASSWORD_FORM###'] = '';
                         $markerArray['###BACKLINK_LOGIN###'] = $this->getPageLink(
                             $this->pi_getLL('ll_forgot_header_backToLogin', '', true),
-                            array($this->prefixId . '[redirectReferrer]' => 'off')
+                            [$this->prefixId . '[redirectReferrer]' => 'off']
                         );
                     }
                 }
                 if (!$done) {
                     // Change password form
-                    $markerArray['###ACTION_URI###'] = $this->getPageLink('', array(
+                    $markerArray['###ACTION_URI###'] = $this->getPageLink('', [
                         $this->prefixId . '[user]' => $user['uid'],
                         $this->prefixId . '[forgothash]' => $piHash
-                    ), true);
+                    ], true);
                     $markerArray['###LEGEND###'] = $this->pi_getLL('change_password', '', true);
                     $markerArray['###NEWPASSWORD1_LABEL###'] = $this->pi_getLL('newpassword_label1', '', true);
                     $markerArray['###NEWPASSWORD2_LABEL###'] = $this->pi_getLL('newpassword_label2', '', true);
@@ -417,28 +398,20 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
         $hours = (int)$this->conf['forgotLinkHashValidTime'] > 0 ? (int)$this->conf['forgotLinkHashValidTime'] : 24;
         $validEnd = time() + 3600 * $hours;
         $validEndString = date($this->conf['dateFormat'], $validEnd);
-        $hash = md5(GeneralUtility::makeInstance(Random::class)->generateRandomBytes(64));
+        $hash = md5(GeneralUtility::generateRandomBytes(64));
         $randHash = $validEnd . '|' . $hash;
         $randHashDB = $validEnd . '|' . md5($hash);
-
         // Write hash to DB
-        $userTable = $this->frontendController->fe_user->user_table;
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable($userTable);
-        $queryBuilder->getRestrictions()->removeAll();
-        $queryBuilder->update($userTable)
-            ->set('felogin_forgotHash', $randHashDB)
-            ->where($queryBuilder->expr()->eq('uid', (int)$user['uid']))
-            ->execute();
-
+        $res = $this->databaseConnection->exec_UPDATEquery('fe_users', 'uid=' . $user['uid'], ['felogin_forgotHash' => $randHashDB]);
         // Send hashlink to user
         $this->conf['linkPrefix'] = -1;
         $isAbsRefPrefix = !empty($this->frontendController->absRefPrefix);
         $isBaseURL = !empty($this->frontendController->baseUrl);
         $isFeloginBaseURL = !empty($this->conf['feloginBaseURL']);
-        $link = $this->pi_getPageLink($this->frontendController->id, '', array(
+        $link = $this->pi_getPageLink($this->frontendController->id, '', [
             rawurlencode($this->prefixId . '[user]') => $user['uid'],
             rawurlencode($this->prefixId . '[forgothash]') => $randHash
-        ));
+        ]);
         // Prefix link if necessary
         if ($isFeloginBaseURL) {
             // First priority, use specific base URL
@@ -465,10 +438,10 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
             isset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['forgotPasswordMail'])
             && is_array($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['forgotPasswordMail'])
         ) {
-            $params = array(
+            $params = [
                 'message' => &$msg,
                 'user' => &$user
-            );
+            ];
             foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['forgotPasswordMail'] as $reference) {
                 if ($reference) {
                     GeneralUtility::callUserFunction($reference, $params, $this);
@@ -490,12 +463,12 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
     protected function showLogout()
     {
         $subpart = $this->cObj->getSubpart($this->template, '###TEMPLATE_LOGOUT###');
-        $subpartArray = ($linkpartArray = array());
+        $subpartArray = ($linkpartArray = []);
         $markerArray['###STATUS_HEADER###'] = $this->getDisplayText('status_header', $this->conf['logoutHeader_stdWrap.']);
         $markerArray['###STATUS_MESSAGE###'] = $this->getDisplayText('status_message', $this->conf['logoutMessage_stdWrap.']);
         $this->cObj->stdWrap($this->flexFormValue('message', 's_status'), $this->conf['logoutMessage_stdWrap.']);
         $markerArray['###LEGEND###'] = $this->pi_getLL('logout', '', true);
-        $markerArray['###ACTION_URI###'] = $this->getPageLink('', array(), true);
+        $markerArray['###ACTION_URI###'] = $this->getPageLink('', [], true);
         $markerArray['###LOGOUT_LABEL###'] = $this->pi_getLL('logout', '', true);
         $markerArray['###NAME###'] = htmlspecialchars($this->frontendController->fe_user->user['name']);
         $markerArray['###STORAGE_PID###'] = $this->spid;
@@ -520,7 +493,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
     protected function showLogin()
     {
         $subpart = $this->cObj->getSubpart($this->template, '###TEMPLATE_LOGIN###');
-        $subpartArray = ($linkpartArray = ($markerArray = array()));
+        $subpartArray = ($linkpartArray = ($markerArray = []));
         $gpRedirectUrl = '';
         $markerArray['###LEGEND###'] = $this->pi_getLL('oLabel_header_welcome', '', true);
         if ($this->logintype === 'login') {
@@ -532,7 +505,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                 $subpartArray['###LOGIN_FORM###'] = '';
                 // Hook for general actions after after login has been confirmed (by Thomas Danzl <thomas@danzl.org>)
                 if ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['login_confirmed']) {
-                    $_params = array();
+                    $_params = [];
                     foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['login_confirmed'] as $_funcRef) {
                         if ($_funcRef) {
                             GeneralUtility::callUserFunction($_funcRef, $_params, $this);
@@ -550,7 +523,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                     isset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['login_error'])
                     && is_array($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['login_error'])
                 ) {
-                    $params = array();
+                    $params = [];
                     foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['login_error'] as $funcRef) {
                         if ($funcRef) {
                             GeneralUtility::callUserFunction($funcRef, $params, $this);
@@ -578,8 +551,8 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
         // The methods should also set the required JS functions to get included
         $onSubmit = '';
         $extraHidden = '';
-        $onSubmitAr = array();
-        $extraHiddenAr = array();
+        $onSubmitAr = [];
+        $extraHiddenAr = [];
         // Check for referer redirect method. if present, save referer in form field
         if (GeneralUtility::inList($this->conf['redirectMode'], 'referer') || GeneralUtility::inList($this->conf['redirectMode'], 'refererDomains')) {
             $referer = $this->referer ? $this->referer : GeneralUtility::getIndpEnv('HTTP_REFERER');
@@ -591,7 +564,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
             }
         }
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['loginFormOnSubmitFuncs'])) {
-            $_params = array();
+            $_params = [];
             foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['loginFormOnSubmitFuncs'] as $funcRef) {
                 list($onSub, $hid) = GeneralUtility::callUserFunction($funcRef, $_params, $this);
                 $onSubmitAr[] = $onSub;
@@ -608,7 +581,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
             $gpRedirectUrl = $this->redirectUrl;
         }
         // Login form
-        $markerArray['###ACTION_URI###'] = $this->getPageLink('', array(), true);
+        $markerArray['###ACTION_URI###'] = $this->getPageLink('', [], true);
         // Used by kb_md5fepw extension...
         $markerArray['###EXTRA_HIDDEN###'] = $extraHidden;
         $markerArray['###LEGEND###'] = $this->pi_getLL('login', '', true);
@@ -623,7 +596,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
         $markerArray['###PREFIXID###'] = $this->prefixId;
         $markerArray = array_merge($markerArray, $this->getUserFieldMarkers());
         if ($this->conf['showForgotPasswordLink']) {
-            $linkpartArray['###FORGOT_PASSWORD_LINK###'] = explode('|', $this->getPageLink('|', array($this->prefixId . '[forgot]' => 1)));
+            $linkpartArray['###FORGOT_PASSWORD_LINK###'] = explode('|', $this->getPageLink('|', [$this->prefixId . '[forgot]' => 1]));
             $markerArray['###FORGOT_PASSWORD###'] = $this->pi_getLL('ll_forgot_header', '', true);
         } else {
             $subpartArray['###FORGOTP_VALID###'] = '';
@@ -657,7 +630,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
      */
     protected function processRedirect()
     {
-        $redirect_url = array();
+        $redirect_url = [];
         if ($this->conf['redirectMode']) {
             $redirectMethods = GeneralUtility::trimExplode(',', $this->conf['redirectMode'], true);
             foreach ($redirectMethods as $redirMethod) {
@@ -668,48 +641,26 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                             // taken from dkd_redirect_at_login written by Ingmar Schlecht; database-field changed
                             $groupData = $this->frontendController->fe_user->groupData;
                             if (!empty($groupData['uid'])) {
-
                                 // take the first group with a redirect page
-                                $userGroupTable = $this->frontendController->fe_user->usergroup_table;
-                                $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable($userGroupTable);
-                                $queryBuilder->getRestrictions()->removeAll();
-                                $row = $queryBuilder
-                                    ->select('felogin_redirectPid')
-                                    ->from($userGroupTable)
-                                    ->where(
-                                        $queryBuilder->expr()->neq('felogin_redirectPid', $queryBuilder->quote('')),
-                                        $queryBuilder->expr()->in('uid', array_map('intval', $groupData['uid']))
-                                    )
-                                    ->execute()
-                                    ->fetch();
-
+                                $row = $this->databaseConnection->exec_SELECTgetSingleRow(
+                                    'felogin_redirectPid',
+                                    $this->frontendController->fe_user->usergroup_table,
+                                    'felogin_redirectPid<>\'\' AND uid IN (' . implode(',', $groupData['uid']) . ')'
+                                );
                                 if ($row) {
                                     $redirect_url[] = $this->pi_getPageLink($row['felogin_redirectPid']);
                                 }
                             }
                             break;
                         case 'userLogin':
-
-                            $userTable = $this->frontendController->fe_user->user_table;
-                            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable($userTable);
-                            $queryBuilder->getRestrictions()->removeAll();
-                            $row = $queryBuilder
-                                ->select('felogin_redirectPid')
-                                ->from($userTable)
-                                ->where(
-                                    $queryBuilder->expr()->neq('felogin_redirectPid', $queryBuilder->quote('')),
-                                    $queryBuilder->expr()->eq(
-                                        $this->frontendController->fe_user->userid_column,
-                                        (int)$this->frontendController->fe_user->user['uid']
-                                    )
-                                )
-                                ->execute()
-                                ->fetch();
-
+                            $row = $this->databaseConnection->exec_SELECTgetSingleRow(
+                                'felogin_redirectPid',
+                                $this->frontendController->fe_user->user_table,
+                                $this->frontendController->fe_user->userid_column . '=' . $this->frontendController->fe_user->user['uid'] . ' AND felogin_redirectPid<>\'\''
+                            );
                             if ($row) {
                                 $redirect_url[] = $this->pi_getPageLink($row['felogin_redirectPid']);
                             }
-
                             break;
                         case 'login':
                             if ($this->conf['redirectPageLogin']) {
@@ -735,7 +686,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                             if ($this->conf['domains'] && $this->piVars['redirectReferrer'] !== 'off') {
                                 $url = $this->referer;
                                 // Is referring url allowed to redirect?
-                                $match = array();
+                                $match = [];
                                 if (preg_match('#^http://([[:alnum:]._-]+)/#', $url, $match)) {
                                     $redirect_domain = $match[1];
                                     $found = false;
@@ -767,10 +718,10 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                     }
                 } elseif ($this->logintype == '' && $redirMethod == 'login' && $this->conf['redirectPageLogin']) {
                     // If login and page not accessible
-                    $this->cObj->typoLink('', array(
+                    $this->cObj->typoLink('', [
                         'parameter' => $this->conf['redirectPageLogin'],
                         'linkAccessRestrictedPages' => true
-                    ));
+                    ]);
                     $redirect_url[] = $this->cObj->lastTypoLinkUrl;
                 } elseif ($this->logintype == '' && $redirMethod == 'logout' && $this->conf['redirectPageLogout'] && $this->frontendController->loginUser) {
                     // If logout and page not accessible
@@ -779,7 +730,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                     // after logout
                     // Hook for general actions after after logout has been confirmed
                     if ($this->logintype === 'logout' && $GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['logout_confirmed']) {
-                        $_params = array();
+                        $_params = [];
                         foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['felogin']['logout_confirmed'] as $_funcRef) {
                             if ($_funcRef) {
                                 GeneralUtility::callUserFunction($_funcRef, $_params, $this);
@@ -805,11 +756,11 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                 }
             }
         }
-        // Remove empty values
+        // Remove empty values, but keep "0" as value (that's why "strlen" is used as second parameter)
         if (!empty($redirect_url)) {
-            return GeneralUtility::trimExplode(',', implode(',', $redirect_url), true);
+            return array_filter($redirect_url, 'strlen');
         }
-        return array();
+        return [];
     }
 
     /**
@@ -819,7 +770,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
      */
     protected function mergeflexFormValuesIntoConf()
     {
-        $flex = array();
+        $flex = [];
         if ($this->flexFormValue('showForgotPassword', 'sDEF')) {
             $flex['showForgotPasswordLink'] = $this->flexFormValue('showForgotPassword', 'sDEF');
         }
@@ -962,7 +913,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
      * @param array $stdWrapArray TS stdWrap array
      * @return string label text
      */
-    protected function getDisplayText($label, $stdWrapArray = array())
+    protected function getDisplayText($label, $stdWrapArray = [])
     {
         $text = $this->flexFormValue($label, 's_messages') ? $this->cObj->stdWrap($this->flexFormValue($label, 's_messages'), $stdWrapArray) : $this->cObj->stdWrap($this->pi_getLL('ll_' . $label), $stdWrapArray);
         $replace = $this->getUserFieldMarkers();
@@ -976,7 +927,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
      */
     protected function getUserFieldMarkers()
     {
-        $marker = array();
+        $marker = [];
         // replace markers with fe_user data
         if ($this->frontendController->fe_user->user) {
             // All fields of fe_user will be replaced, scheme is ###FEUSER_FIELDNAME###
@@ -999,6 +950,12 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
     {
         $url = strval($url);
         if ($url === '') {
+            return '';
+        }
+        $decodedUrl = rawurldecode($url);
+        $sanitizedUrl = GeneralUtility::removeXSS($decodedUrl);
+        if ($decodedUrl !== $sanitizedUrl || preg_match('#["<>\\\\]+#', $url)) {
+            GeneralUtility::sysLog(sprintf($this->pi_getLL('xssAttackDetected'), $url), 'felogin', GeneralUtility::SYSLOG_SEVERITY_WARNING);
             return '';
         }
         // Validate the URL:
@@ -1041,14 +998,7 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
                 $host = $parsedUrl['host'];
                 // Removes the last path segment and slash sequences like /// (if given):
                 $path = preg_replace('#/+[^/]*$#', '', $parsedUrl['path']);
-
-                $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('sys_domain');
-                $queryBuilder->setRestrictions(GeneralUtility::makeInstance(FrontendRestrictionContainer::class));
-                $localDomains = $queryBuilder->select('domainName')
-                    ->from('sys_domain')
-                    ->execute()
-                    ->fetchAll();
-
+                $localDomains = $this->databaseConnection->exec_SELECTgetRows('domainName', 'sys_domain', '1=1' . $this->cObj->enableFields('sys_domain'));
                 if (is_array($localDomains)) {
                     foreach ($localDomains as $localDomain) {
                         // strip trailing slashes (if given)
@@ -1073,13 +1023,10 @@ class FrontendLoginController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlugin
      */
     protected function isRelativeUrl($url)
     {
-        $url = GeneralUtility::sanitizeLocalUrl($url);
-        if (!empty($url)) {
-            $parsedUrl = @parse_url($url);
-            if ($parsedUrl !== false && !isset($parsedUrl['scheme']) && !isset($parsedUrl['host'])) {
-                // If the relative URL starts with a slash, we need to check if it's within the current site path
-                return $parsedUrl['path'][0] !== '/' || GeneralUtility::isFirstPartOfStr($parsedUrl['path'], GeneralUtility::getIndpEnv('TYPO3_SITE_PATH'));
-            }
+        $parsedUrl = @parse_url($url);
+        if ($parsedUrl !== false && !isset($parsedUrl['scheme']) && !isset($parsedUrl['host'])) {
+            // If the relative URL starts with a slash, we need to check if it's within the current site path
+            return $parsedUrl['path'][0] !== '/' || GeneralUtility::isFirstPartOfStr($parsedUrl['path'], GeneralUtility::getIndpEnv('TYPO3_SITE_PATH'));
         }
         return false;
     }

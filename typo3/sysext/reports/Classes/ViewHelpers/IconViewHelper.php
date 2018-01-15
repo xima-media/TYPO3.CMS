@@ -43,10 +43,10 @@ class IconViewHelper extends AbstractBackendViewHelper
     public function render($icon, $title = '')
     {
         return static::renderStatic(
-            array(
+            [
                 'icon' => $icon,
                 'title' => $title,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

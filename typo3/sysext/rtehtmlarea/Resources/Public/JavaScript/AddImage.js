@@ -53,6 +53,8 @@ define(['jquery', 'TYPO3/CMS/Rtehtmlarea/SelectImage', 'TYPO3/CMS/Backend/Legacy
 		}
 	};
 
+	Tree.ajaxID = 'sc_alt_file_navframe_expandtoggle';
+
 	$(function () {
 		$.extend(AddImage.elements, $('body').data('elements'));
 

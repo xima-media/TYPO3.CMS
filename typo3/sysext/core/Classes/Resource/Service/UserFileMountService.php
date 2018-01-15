@@ -14,11 +14,8 @@ namespace TYPO3\CMS\Core\Resource\Service;
  * The TYPO3 project - inspiring people to share!
  */
 
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
-use TYPO3\CMS\Core\Messaging\FlashMessageService;
-use TYPO3\CMS\Core\Resource\Exception\InsufficientFolderReadPermissionsException;
-use TYPO3\CMS\Core\Resource\Folder;
-use TYPO3\CMS\Core\Resource\StorageRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -36,34 +33,39 @@ class UserFileMountService
      * of a selected mount
      *
      * @param array $PA the array with additional configuration options.
-     * @return string The HTML code for the TCEform field
      */
     public function renderTceformsSelectDropdown(&$PA)
     {
+        $allowedStorageIds = array_map(
+            function (\TYPO3\CMS\Core\Resource\ResourceStorage $storage) {
+                return $storage->getUid();
+            },
+            $this->getBackendUserAuthentication()->getFileStorages()
+        );
         // If working for sys_filemounts table
         $storageUid = (int)$PA['row']['base'][0];
         if (!$storageUid) {
             // If working for sys_file_collection table
             $storageUid = (int)$PA['row']['storage'][0];
         }
-        if ($storageUid > 0) {
-            /** @var $storageRepository StorageRepository */
-            $storageRepository = GeneralUtility::makeInstance(StorageRepository::class);
+        if ($storageUid > 0 && in_array($storageUid, $allowedStorageIds, true)) {
+            /** @var $storageRepository \TYPO3\CMS\Core\Resource\StorageRepository */
+            $storageRepository = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Resource\StorageRepository::class);
             /** @var $storage \TYPO3\CMS\Core\Resource\ResourceStorage */
             $storage = $storageRepository->findByUid($storageUid);
             if ($storage === null) {
-                /** @var FlashMessageService $flashMessageService */
-                $flashMessageService = GeneralUtility::makeInstance(FlashMessageService::class);
+                /** @var \TYPO3\CMS\Core\Messaging\FlashMessageService $flashMessageService */
+                $flashMessageService = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Messaging\FlashMessageService::class);
                 $queue = $flashMessageService->getMessageQueueByIdentifier();
                 $queue->enqueue(new FlashMessage('Storage #' . $storageUid . ' does not exist. No folder is currently selectable.', '', FlashMessage::ERROR));
                 if (empty($PA['items'])) {
-                    $PA['items'][] = array(
+                    $PA['items'][] = [
                         $PA['row'][$PA['field']],
                         $PA['row'][$PA['field']]
-                    );
+                    ];
                 }
             } elseif ($storage->isBrowsable()) {
-                $rootLevelFolders = array();
+                $rootLevelFolders = [];
 
                 $fileMounts = $storage->getFileMounts();
                 if (!empty($fileMounts)) {
@@ -77,26 +79,26 @@ class UserFileMountService
                 foreach ($rootLevelFolders as $rootLevelFolder) {
                     $folderItems = $this->getSubfoldersForOptionList($rootLevelFolder);
                     foreach ($folderItems as $item) {
-                        $PA['items'][] = array(
+                        $PA['items'][] = [
                             $item->getIdentifier(),
                             $item->getIdentifier()
-                        );
+                        ];
                     }
                 }
             } else {
-                /** @var FlashMessageService $flashMessageService */
-                $flashMessageService = GeneralUtility::makeInstance(FlashMessageService::class);
+                /** @var \TYPO3\CMS\Core\Messaging\FlashMessageService $flashMessageService */
+                $flashMessageService = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Messaging\FlashMessageService::class);
                 $queue = $flashMessageService->getMessageQueueByIdentifier();
                 $queue->enqueue(new FlashMessage('Storage "' . $storage->getName() . '" is not browsable. No folder is currently selectable.', '', FlashMessage::WARNING));
                 if (empty($PA['items'])) {
-                    $PA['items'][] = array(
+                    $PA['items'][] = [
                         $PA['row'][$PA['field']],
                         $PA['row'][$PA['field']]
-                    );
+                    ];
                 }
             }
         } else {
-            $PA['items'][] = array('', 'Please choose a FAL mount from above first.');
+            $PA['items'][] = ['', 'Please choose a FAL mount from above first.'];
         }
     }
 
@@ -104,27 +106,37 @@ class UserFileMountService
      * Simple function to make a hierarchical subfolder request into
      * a "flat" option list
      *
-     * @param Folder $parentFolder
+     * @param \TYPO3\CMS\Core\Resource\Folder $parentFolder
      * @param int $level a limiter
-     * @return Folder[]
+     * @return \TYPO3\CMS\Core\Resource\Folder[]
      */
-    protected function getSubfoldersForOptionList(Folder $parentFolder, $level = 0)
+    protected function getSubfoldersForOptionList(\TYPO3\CMS\Core\Resource\Folder $parentFolder, $level = 0)
     {
         $level++;
         // hard break on recursion
         if ($level > 99) {
-            return array();
+            return [];
         }
-        $allFolderItems = array($parentFolder);
+        $allFolderItems = [$parentFolder];
         $subFolders = $parentFolder->getSubfolders();
         foreach ($subFolders as $subFolder) {
             try {
                 $subFolderItems = $this->getSubfoldersForOptionList($subFolder, $level);
-            } catch (InsufficientFolderReadPermissionsException $e) {
-                $subFolderItems  = array();
+            } catch (\TYPO3\CMS\Core\Resource\Exception\InsufficientFolderReadPermissionsException $e) {
+                $subFolderItems  = [];
             }
             $allFolderItems = array_merge($allFolderItems, $subFolderItems);
         }
         return $allFolderItems;
+    }
+
+    /**
+     * Returns the BE USER Object
+     *
+     * @return BackendUserAuthentication
+     */
+    protected function getBackendUserAuthentication()
+    {
+        return $GLOBALS['BE_USER'];
     }
 }

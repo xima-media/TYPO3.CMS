@@ -13,9 +13,6 @@ namespace TYPO3\CMS\Core\Resource\Collection;
  *
  * The TYPO3 project - inspiring people to share!
  */
-use TYPO3\CMS\Core\Collection\CollectionInterface;
-use TYPO3\CMS\Core\Resource\File;
-use TYPO3\CMS\Core\Resource\FileInterface;
 
 /**
  * Abstract collection.
@@ -87,7 +84,7 @@ abstract class AbstractFileCollection extends \TYPO3\CMS\Core\Collection\Abstrac
      */
     public function key()
     {
-        /** @var $currentRecord File */
+        /** @var $currentRecord \TYPO3\CMS\Core\Resource\File */
         $currentRecord = $this->storage->current();
         return $currentRecord->getIdentifier();
     }
@@ -100,8 +97,8 @@ abstract class AbstractFileCollection extends \TYPO3\CMS\Core\Collection\Abstrac
      */
     protected function getItemUidList($includeTableName = false)
     {
-        $list = array();
-        /** @var $entry File */
+        $list = [];
+        /** @var $entry \TYPO3\CMS\Core\Resource\File */
         foreach ($this->storage as $entry) {
             $list[] = $this->getItemTableName() . '_' . $entry->getUid();
         }
@@ -116,12 +113,12 @@ abstract class AbstractFileCollection extends \TYPO3\CMS\Core\Collection\Abstrac
      */
     protected function getPersistableDataArray()
     {
-        return array(
+        return [
             'title' => $this->getTitle(),
             'type' => static::$type,
             'description' => $this->getDescription(),
             static::$itemsCriteriaField => $this->getItemsCriteria()
-        );
+        ];
     }
 
     /**
@@ -132,17 +129,17 @@ abstract class AbstractFileCollection extends \TYPO3\CMS\Core\Collection\Abstrac
      */
     public function toArray()
     {
-        $itemArray = array();
-        /** @var $item File */
+        $itemArray = [];
+        /** @var $item \TYPO3\CMS\Core\Resource\File */
         foreach ($this->storage as $item) {
             $itemArray[] = $item->toArray();
         }
-        return array(
+        return [
             'uid' => $this->getIdentifier(),
             'title' => $this->getTitle(),
             'description' => $this->getDescription(),
             'items' => $itemArray
-        );
+        ];
     }
 
     /**
@@ -152,8 +149,8 @@ abstract class AbstractFileCollection extends \TYPO3\CMS\Core\Collection\Abstrac
      */
     public function getItems()
     {
-        $itemArray = array();
-        /** @var $item File */
+        $itemArray = [];
+        /** @var $item \TYPO3\CMS\Core\Resource\File */
         foreach ($this->storage as $item) {
             $itemArray[] = $item;
         }
@@ -198,9 +195,9 @@ abstract class AbstractFileCollection extends \TYPO3\CMS\Core\Collection\Abstrac
     /**
      * Adds a file to this collection.
      *
-     * @param FileInterface $data
+     * @param \TYPO3\CMS\Core\Resource\FileInterface $data
      */
-    public function add(FileInterface $data)
+    public function add(\TYPO3\CMS\Core\Resource\FileInterface $data)
     {
         $this->storage->push($data);
     }
@@ -208,11 +205,11 @@ abstract class AbstractFileCollection extends \TYPO3\CMS\Core\Collection\Abstrac
     /**
      * Adds all files of another collection to the corrent one.
      *
-     * @param CollectionInterface $other
+     * @param \TYPO3\CMS\Core\Collection\CollectionInterface $other
      */
-    public function addAll(CollectionInterface $other)
+    public function addAll(\TYPO3\CMS\Core\Collection\CollectionInterface $other)
     {
-        /** @var $value File */
+        /** @var $value \TYPO3\CMS\Core\Resource\File */
         foreach ($other as $value) {
             $this->add($value);
         }
@@ -221,12 +218,12 @@ abstract class AbstractFileCollection extends \TYPO3\CMS\Core\Collection\Abstrac
     /**
      * Removes a file from this collection.
      *
-     * @param File $file
+     * @param \TYPO3\CMS\Core\Resource\File $file
      */
-    public function remove(File $file)
+    public function remove(\TYPO3\CMS\Core\Resource\File $file)
     {
         $offset = 0;
-        /** @var $value File */
+        /** @var $value \TYPO3\CMS\Core\Resource\File */
         foreach ($this->storage as $value) {
             if ($value === $file) {
                 break;

@@ -54,8 +54,8 @@ class ExtensionCompatibilityTester extends AbstractAjaxAction
      */
     public function __construct()
     {
-        $this->protocolFile = PATH_site . 'typo3temp/assets/ExtensionCompatibilityTester.txt';
-        $this->errorProtocolFile = PATH_site . 'typo3temp/assets/ExtensionCompatibilityTesterErrors.json';
+        $this->protocolFile = PATH_site . 'typo3temp/ExtensionCompatibilityTester.txt';
+        $this->errorProtocolFile = PATH_site . 'typo3temp/ExtensionCompatibilityTesterErrors.json';
     }
 
     /**
@@ -67,7 +67,7 @@ class ExtensionCompatibilityTester extends AbstractAjaxAction
      */
     protected function executeAction()
     {
-        register_shutdown_function(array($this, 'logError'));
+        register_shutdown_function([$this, 'logError']);
         $getVars = GeneralUtility::_GET('install');
         if (isset($getVars['extensionCompatibilityTester']) && isset($getVars['extensionCompatibilityTester']['forceCheck']) && ($getVars['extensionCompatibilityTester']['forceCheck'] == 1)) {
             $this->deleteProtocolFile();
@@ -100,7 +100,7 @@ class ExtensionCompatibilityTester extends AbstractAjaxAction
      */
     protected function getExtensionsToLoad()
     {
-        $extensionsToLoad = array();
+        $extensionsToLoad = [];
         $extensionsToExclude = $this->getExtensionsToExclude();
         foreach ($GLOBALS['TYPO3_LOADED_EXT'] as $key => $extension) {
             if (!in_array($key, $extensionsToExclude)) {
@@ -119,12 +119,8 @@ class ExtensionCompatibilityTester extends AbstractAjaxAction
      */
     protected function getExtensionsToExclude()
     {
-        if (is_file($this->protocolFile)) {
-            $exclude = (string)file_get_contents($this->protocolFile);
-            return GeneralUtility::trimExplode(',', $exclude);
-        } else {
-            return [];
-        }
+        $exclude = GeneralUtility::getUrl($this->protocolFile);
+        return GeneralUtility::trimExplode(',', (string)$exclude);
     }
 
     /**
@@ -173,6 +169,7 @@ class ExtensionCompatibilityTester extends AbstractAjaxAction
             // and are explicitly set in cached file as well
             $_EXTCONF = $GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf'][$_EXTKEY];
             require $extension['ext_tables.php'];
+            ExtensionManagementUtility::loadNewTcaColumnsConfigFiles();
         }
     }
 
@@ -209,9 +206,8 @@ class ExtensionCompatibilityTester extends AbstractAjaxAction
      */
     protected function writeCurrentExtensionToFile($extensionKey)
     {
-        $incompatibleExtensions = $this->getExtensionsToExclude();
-        $incompatibleExtensions = array_filter($incompatibleExtensions);
-        $incompatibleExtensions = array_merge($incompatibleExtensions, array($extensionKey));
+        $incompatibleExtensions = array_filter(GeneralUtility::trimExplode(',', (string)GeneralUtility::getUrl($this->protocolFile)));
+        $incompatibleExtensions = array_merge($incompatibleExtensions, [$extensionKey]);
         GeneralUtility::writeFile($this->protocolFile, implode(', ', $incompatibleExtensions));
         $this->logError = true;
     }
@@ -224,8 +220,7 @@ class ExtensionCompatibilityTester extends AbstractAjaxAction
      */
     protected function removeCurrentExtensionFromFile($extensionKey)
     {
-        $extensionsInFile = $this->getExtensionsToExclude();
-        $extensionsInFile = array_filter($extensionsInFile);
+        $extensionsInFile = array_filter(GeneralUtility::trimExplode(',', (string)GeneralUtility::getUrl($this->protocolFile)));
         $extensionsByKey = array_flip($extensionsInFile);
         unset($extensionsByKey[$extensionKey]);
         $extensionsForFile = array_flip($extensionsByKey);
@@ -247,10 +242,10 @@ class ExtensionCompatibilityTester extends AbstractAjaxAction
 
         // Fetch existing errors, add last one and write to file again.
         $lastError = error_get_last();
-        $errors = array();
+        $errors = [];
 
         if (file_exists($this->errorProtocolFile)) {
-            $errors = json_decode(file_get_contents($this->errorProtocolFile));
+            $errors = json_decode(GeneralUtility::getUrl($this->errorProtocolFile));
         }
         switch ($lastError['type']) {
             case E_ERROR:
@@ -261,6 +256,9 @@ class ExtensionCompatibilityTester extends AbstractAjaxAction
                 break;
             case E_PARSE:
                 $lastError['type'] = 'E_PARSE';
+                break;
+            case E_NOTICE:
+                $lastError['type'] = 'E_NOTICE';
                 break;
             case E_NOTICE:
                 $lastError['type'] = 'E_NOTICE';

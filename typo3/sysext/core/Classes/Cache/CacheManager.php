@@ -14,16 +14,7 @@ namespace TYPO3\CMS\Core\Cache;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Cache\Backend\BackendInterface;
-use TYPO3\CMS\Core\Cache\Backend\Typo3DatabaseBackend;
-use TYPO3\CMS\Core\Cache\Exception\DuplicateIdentifierException;
-use TYPO3\CMS\Core\Cache\Exception\InvalidBackendException;
-use TYPO3\CMS\Core\Cache\Exception\InvalidCacheException;
-use TYPO3\CMS\Core\Cache\Exception\NoSuchCacheException;
 use TYPO3\CMS\Core\Cache\Exception\NoSuchCacheGroupException;
-use TYPO3\CMS\Core\Cache\Frontend\FrontendInterface;
-use TYPO3\CMS\Core\Cache\Frontend\VariableFrontend;
-use TYPO3\CMS\Core\SingletonInterface;
 
 /**
  * The Cache Manager
@@ -32,17 +23,22 @@ use TYPO3\CMS\Core\SingletonInterface;
  * @scope singleton
  * @api
  */
-class CacheManager implements SingletonInterface
+class CacheManager implements \TYPO3\CMS\Core\SingletonInterface
 {
     /**
-     * @var FrontendInterface[]
+     * @var \TYPO3\CMS\Core\Cache\CacheFactory
      */
-    protected $caches = array();
+    protected $cacheFactory;
+
+    /**
+     * @var \TYPO3\CMS\Core\Cache\Frontend\FrontendInterface[]
+     */
+    protected $caches = [];
 
     /**
      * @var array
      */
-    protected $cacheConfigurations = array();
+    protected $cacheConfigurations = [];
 
     /**
      * Used to flush caches of a specific group
@@ -52,17 +48,26 @@ class CacheManager implements SingletonInterface
      *
      * @var array
      */
-    protected $cacheGroups = array();
+    protected $cacheGroups = [];
 
     /**
      * @var array Default cache configuration as fallback
      */
-    protected $defaultCacheConfiguration = array(
-        'frontend' => VariableFrontend::class,
-        'backend' => Typo3DatabaseBackend::class,
-        'options' => array(),
-        'groups' => array('all')
-    );
+    protected $defaultCacheConfiguration = [
+        'frontend' => \TYPO3\CMS\Core\Cache\Frontend\VariableFrontend::class,
+        'backend' => \TYPO3\CMS\Core\Cache\Backend\Typo3DatabaseBackend::class,
+        'options' => [],
+        'groups' => ['all']
+    ];
+
+    /**
+     * @param \TYPO3\CMS\Core\Cache\CacheFactory $cacheFactory
+     * @return void
+     */
+    public function injectCacheFactory(\TYPO3\CMS\Core\Cache\CacheFactory $cacheFactory)
+    {
+        $this->cacheFactory = $cacheFactory;
+    }
 
     /**
      * Sets configurations for caches. The key of each entry specifies the
@@ -93,16 +98,16 @@ class CacheManager implements SingletonInterface
     /**
      * Registers a cache so it can be retrieved at a later point.
      *
-     * @param FrontendInterface $cache The cache frontend to be registered
+     * @param \TYPO3\CMS\Core\Cache\Frontend\FrontendInterface $cache The cache frontend to be registered
      * @return void
-     * @throws DuplicateIdentifierException if a cache with the given identifier has already been registered.
+     * @throws \TYPO3\CMS\Core\Cache\Exception\DuplicateIdentifierException if a cache with the given identifier has already been registered.
      * @api
      */
-    public function registerCache(FrontendInterface $cache)
+    public function registerCache(\TYPO3\CMS\Core\Cache\Frontend\FrontendInterface $cache)
     {
         $identifier = $cache->getIdentifier();
         if (isset($this->caches[$identifier])) {
-            throw new DuplicateIdentifierException('A cache with identifier "' . $identifier . '" has already been registered.', 1203698223);
+            throw new \TYPO3\CMS\Core\Cache\Exception\DuplicateIdentifierException('A cache with identifier "' . $identifier . '" has already been registered.', 1203698223);
         }
         $this->caches[$identifier] = $cache;
     }
@@ -111,14 +116,14 @@ class CacheManager implements SingletonInterface
      * Returns the cache specified by $identifier
      *
      * @param string $identifier Identifies which cache to return
-     * @return FrontendInterface The specified cache frontend
-     * @throws NoSuchCacheException
+     * @return \TYPO3\CMS\Core\Cache\Frontend\FrontendInterface The specified cache frontend
+     * @throws \TYPO3\CMS\Core\Cache\Exception\NoSuchCacheException
      * @api
      */
     public function getCache($identifier)
     {
         if ($this->hasCache($identifier) === false) {
-            throw new NoSuchCacheException('A cache with identifier "' . $identifier . '" does not exist.', 1203699034);
+            throw new \TYPO3\CMS\Core\Cache\Exception\NoSuchCacheException('A cache with identifier "' . $identifier . '" does not exist.', 1203699034);
         }
         if (!isset($this->caches[$identifier])) {
             $this->createCache($identifier);
@@ -232,9 +237,7 @@ class CacheManager implements SingletonInterface
      * Instantiates the cache for $identifier.
      *
      * @param string $identifier
-     * @throws DuplicateIdentifierException
-     * @throws InvalidBackendException
-     * @throws InvalidCacheException
+     * @return void
      */
     protected function createCache($identifier)
     {
@@ -262,31 +265,11 @@ class CacheManager implements SingletonInterface
         }
         foreach ($assignedGroups as $groupIdentifier) {
             if (!isset($this->cacheGroups[$groupIdentifier])) {
-                $this->cacheGroups[$groupIdentifier] = array();
+                $this->cacheGroups[$groupIdentifier] = [];
             }
             $this->cacheGroups[$groupIdentifier][] = $identifier;
         }
 
-        // New operator used on purpose: This class is required early during
-        // bootstrap before makeInstance() is properly set up
-        $backend = '\\' . ltrim($backend, '\\');
-        $backendInstance = new $backend('production', $backendOptions);
-        if (!$backendInstance instanceof BackendInterface) {
-            throw new InvalidBackendException('"' . $backend . '" is not a valid cache backend object.', 1464550977);
-        }
-        if (is_callable(array($backendInstance, 'initializeObject'))) {
-            $backendInstance->initializeObject();
-        }
-
-        // New used on purpose, see comment above
-        $frontendInstance = new $frontend($identifier, $backendInstance);
-        if (!$frontendInstance instanceof FrontendInterface) {
-            throw new InvalidCacheException('"' . $frontend . '" is not a valid cache frontend object.', 1464550984);
-        }
-        if (is_callable(array($frontendInstance, 'initializeObject'))) {
-            $frontendInstance->initializeObject();
-        }
-
-        $this->registerCache($frontendInstance);
+        $this->cacheFactory->create($identifier, $frontend, $backend, $backendOptions);
     }
 }

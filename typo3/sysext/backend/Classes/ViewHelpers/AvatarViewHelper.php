@@ -41,11 +41,11 @@ class AvatarViewHelper extends AbstractViewHelper
     public function render($backendUser = 0, $size = 32, $showIcon = false)
     {
         return static::renderStatic(
-            array(
+            [
                 'backendUser' => $backendUser,
                 'size' => $size,
                 'showIcon' => $showIcon
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

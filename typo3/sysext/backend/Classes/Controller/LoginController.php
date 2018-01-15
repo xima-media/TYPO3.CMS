@@ -20,10 +20,8 @@ use TYPO3\CMS\Backend\Exception;
 use TYPO3\CMS\Backend\LoginProvider\LoginProviderInterface;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
-use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\FormProtection\BackendFormProtection;
 use TYPO3\CMS\Core\FormProtection\FormProtectionFactory;
-use TYPO3\CMS\Core\Localization\Locales;
 use TYPO3\CMS\Core\Page\PageRenderer;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\HttpUtility;
@@ -101,9 +99,7 @@ class LoginController
         $this->submitValue = GeneralUtility::_GP('commandLI');
 
         // Try to get the preferred browser language
-        /** @var Locales $locales */
-        $locales = GeneralUtility::makeInstance(Locales::class);
-        $preferredBrowserLanguage = $locales
+        $preferredBrowserLanguage = $this->getLanguageService()->csConvObj
             ->getPreferredClientLanguage(GeneralUtility::getIndpEnv('HTTP_ACCEPT_LANGUAGE'));
 
         // If we found a $preferredBrowserLanguage and it is not the default language and no be_user is logged in
@@ -154,12 +150,18 @@ class LoginController
         $pageRenderer = GeneralUtility::makeInstance(PageRenderer::class);
         $pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/Login');
 
+        // support placeholders for IE9 and lower
+        $clientInfo = GeneralUtility::clientInfo();
+        if ($clientInfo['BROWSER'] === 'msie' && $clientInfo['VERSION'] <= 9) {
+            $pageRenderer->addJsLibrary('placeholders', 'sysext/core/Resources/Public/JavaScript/Contrib/placeholders.min.js');
+        }
+
         // Checking, if we should make a redirect.
         // Might set JavaScript in the header to close window.
         $this->checkRedirect();
 
         // Extension Configuration
-        $extConf = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['backend'], ['allowed_classes' => false]);
+        $extConf = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['backend']);
 
         // Background Image
         if (!empty($extConf['loginBackgroundImage'])) {
@@ -193,6 +195,10 @@ class LoginController
         // Logo
         if (!empty($extConf['loginLogo'])) {
             $logo = $extConf['loginLogo'];
+        } elseif (!empty($GLOBALS['TBE_STYLES']['logo_login'])) {
+            // Fallback to old TBE_STYLES login logo
+            $logo = $GLOBALS['TBE_STYLES']['logo_login'];
+            GeneralUtility::deprecationLog('$GLOBALS["TBE_STYLES"]["logo_login"] is deprecated since TYPO3 CMS 7 and will be removed in TYPO3 CMS 8, please use the backend extension\'s configuration instead.');
         } else {
             // Use TYPO3 logo depending on highlight color
             if (!empty($extConf['loginHighlightColor'])) {
@@ -208,20 +214,21 @@ class LoginController
 
         // Start form
         $formType = empty($this->getBackendUserAuthentication()->user['uid']) ? 'LoginForm' : 'LogoutForm';
-        $this->view->assignMultiple(array(
+        $this->view->assignMultiple([
             'backendUser' => $this->getBackendUserAuthentication()->user,
             'hasLoginError' => $this->isLoginInProgress(),
             'formType' => $formType,
             'logo' => $logo,
-            'images' => array(
+            'images' => [
                 'capslock' => $this->getUriForFileName('EXT:backend/Resources/Public/Images/icon_capslock.svg'),
                 'typo3' => $this->getUriForFileName('EXT:backend/Resources/Public/Images/typo3_orange.svg'),
-            ),
+            ],
             'copyright' => BackendUtility::TYPO3_copyRightNotice(),
+            'redirectUrl' => $this->redirectUrl,
             'loginNewsItems' => $this->getSystemNews(),
             'loginProviderIdentifier' => $this->loginProviderIdentifier,
             'loginProviders' => $this->loginProviders
-        ));
+        ]);
 
         // Initialize interface selectors:
         $this->makeInterfaceSelectorBox();
@@ -307,7 +314,7 @@ class LoginController
         if ($this->loginRefresh) {
             $formProtection->setSessionTokenFromRegistry();
             $formProtection->persistSessionToken();
-            $this->getDocumentTemplate()->JScode .= GeneralUtility::wrapJS('
+            $this->getDocumentTemplate()->JScode .= $this->getDocumentTemplate()->wrapScriptTags('
 				if (parent.opener && parent.opener.TYPO3 && parent.opener.TYPO3.LoginRefresh) {
 					parent.opener.TYPO3.LoginRefresh.startTask();
 					parent.close();
@@ -331,18 +338,18 @@ class LoginController
             $parts = GeneralUtility::trimExplode(',', $GLOBALS['TYPO3_CONF_VARS']['BE']['interfaces']);
             if (count($parts) > 1) {
                 // Only if more than one interface is defined we will show the selector
-                $interfaces = array(
-                    'backend' => array(
+                $interfaces = [
+                    'backend' => [
                         'label' => $this->getLanguageService()->getLL('interface.backend'),
                         'jumpScript' => BackendUtility::getModuleUrl('main'),
                         'interface' => 'backend'
-                    ),
-                    'frontend' => array(
+                    ],
+                    'frontend' => [
                         'label' => $this->getLanguageService()->getLL('interface.frontend'),
                         'jumpScript' => '../',
                         'interface' => 'frontend'
-                    )
-                );
+                    ]
+                ];
 
                 $this->view->assign('showInterfaceSelector', true);
                 $this->view->assign('interfaces', $interfaces);
@@ -363,21 +370,14 @@ class LoginController
     protected function getSystemNews()
     {
         $systemNewsTable = 'sys_news';
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable($systemNewsTable);
-        $systemNews = array();
-        $systemNewsRecords = $queryBuilder
-            ->select('title', 'content', 'crdate')
-            ->from($systemNewsTable)
-            ->orderBy('crdate', 'DESC')
-            ->execute()
-            ->fetchAll();
+        $systemNews = [];
+        $systemNewsRecords = $this->getDatabaseConnection()->exec_SELECTgetRows('title, content, crdate', $systemNewsTable, '1=1' . BackendUtility::BEenableFields($systemNewsTable) . BackendUtility::deleteClause($systemNewsTable), '', 'crdate DESC');
         foreach ($systemNewsRecords as $systemNewsRecord) {
-            $systemNews[] = array(
+            $systemNews[] = [
                 'date' => date($GLOBALS['TYPO3_CONF_VARS']['SYS']['ddmmyy'], $systemNewsRecord['crdate']),
                 'header' => $systemNewsRecord['title'],
                 'content' => $systemNewsRecord['content']
-            );
+            ];
         }
         return $systemNews;
     }
@@ -429,9 +429,9 @@ class LoginController
     {
         /** @var StandaloneView $view */
         $view = GeneralUtility::makeInstance(StandaloneView::class);
-        $view->setLayoutRootPaths(array(GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Layouts')));
-        $view->setPartialRootPaths(array(GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Partials')));
-        $view->setTemplateRootPaths(array(GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Templates')));
+        $view->setLayoutRootPaths([GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Layouts')]);
+        $view->setPartialRootPaths([GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Partials')]);
+        $view->setTemplateRootPaths([GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Templates')]);
 
         $view->getRequest()->setControllerExtensionName('Backend');
         return $view;
@@ -457,7 +457,7 @@ class LoginController
                 throw new \RuntimeException('Missing configuration for login provider "' . $identifier . '".', 1433416043);
             }
             if (!is_string($configuration['provider']) || empty($configuration['provider']) || !class_exists($configuration['provider']) || !is_subclass_of($configuration['provider'], LoginProviderInterface::class)) {
-                throw new \RuntimeException('The login provider "' . $identifier . '" defines an invalid provider. Ensure the class exists and implements the "' . LoginProviderInterface::class . '".', 1460977275);
+                throw new \RuntimeException('The login provider "' . $identifier . '" defines an invalid provider. Ensure the class exists and implements the "' . LoginProviderInterface::class . '".', 1433416043);
             }
             if (empty($configuration['label'])) {
                 throw new \RuntimeException('Missing label definition for login provider "' . $identifier . '".', 1433416044);
@@ -520,6 +520,16 @@ class LoginController
     protected function getBackendUserAuthentication()
     {
         return $GLOBALS['BE_USER'];
+    }
+
+    /**
+     * Returns the database connection
+     *
+     * @return \TYPO3\CMS\Core\Database\DatabaseConnection
+     */
+    protected function getDatabaseConnection()
+    {
+        return $GLOBALS['TYPO3_DB'];
     }
 
     /**

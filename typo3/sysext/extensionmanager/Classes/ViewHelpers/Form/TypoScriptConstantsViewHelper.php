@@ -14,6 +14,8 @@ namespace TYPO3\CMS\Extensionmanager\ViewHelpers\Form;
  * The TYPO3 project - inspiring people to share!
  */
 
+use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Fluid\ViewHelpers\FormViewHelper;
 
 /**
@@ -25,7 +27,7 @@ class TypoScriptConstantsViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\Abs
     /**
      * @var array
      */
-    public $viewHelperMapping = array(
+    public $viewHelperMapping = [
         'int' => 'renderIntegerField',
         'int+' => 'renderPositiveIntegerField',
         'integer' => 'renderIntegerField',
@@ -39,7 +41,7 @@ class TypoScriptConstantsViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\Abs
         'string' => 'renderTextField',
         'input' => 'renderTextField',  // only for backwards compatibility, many extensions depend on that
         'default' => 'renderTextField' // only for backwards compatibility, many extensions depend on that
-    );
+    ];
 
     /**
      * @var string
@@ -99,14 +101,26 @@ class TypoScriptConstantsViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\Abs
             $this->tag->addAttribute('value', $configuration->getValue());
         }
 
-        $output = '
-            <div class="form-wizards-element">
-                <input class="form-control t3js-color-input formengine-colorpickerelement t3js-color-picker" type="text"
-                  name="' . htmlspecialchars($elementName) . '" value="' . $this->tag->getAttribute('value') . '"/>
-                <script type="text/javascript">
-                    require([\'TYPO3/CMS/Backend/ColorPicker\'], function(ColorPicker){ColorPicker.initialize()});
-                </script>
-            </div>';
+        // configure colorpicker wizard
+        $params = [
+            'formName' => 'configurationform',
+            'itemName' => $elementName,
+        ];
+        $onClick =
+            'this.blur();' .
+            'vHWin=window.open(' .
+                GeneralUtility::quoteJSvalue(BackendUtility::getModuleUrl('wizard_colorpicker', ['P' => $params])) . ' + \'&P[currentValue]=\' + encodeURIComponent(document.getElementById(' . GeneralUtility::quoteJSvalue($elementId) . ').value),' .
+                '\'popUpem-' . GeneralUtility::shortmd5($elementName) . '\',' .
+                '\'height=400,width=400,status=0,menubar=0,scrollbars=1\'' .
+            ');' .
+            'vHWin.focus();' .
+            'return false;';
+
+        // wrap the field
+        $output = '<div class="form-wizards-wrap form-wizards-aside">'
+                . '<div class="form-wizards-element">' . $this->tag->render() . '</div>'
+                . '<div class="form-wizards-items"><a href="#" onClick="' . htmlspecialchars($onClick) . '" class="btn btn-default"><span class="t3-icon fa fa-eyedropper"></span></a></div>'
+                . '</div>';
 
         return $output;
     }
@@ -168,7 +182,7 @@ class TypoScriptConstantsViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\Abs
             if ($configuration->getValue() == $value) {
                 $output .= ' selected="selected"';
             }
-            $output .= '>' . htmlspecialchars($GLOBALS['LANG']->sL($label)) . '</option>';
+            $output .= '>' . $GLOBALS['LANG']->sL($label, true) . '</option>';
         }
         $this->tag->setContent($output);
         return $this->tag->render();
@@ -271,12 +285,12 @@ class TypoScriptConstantsViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\Abs
     protected function renderUserFunction(\TYPO3\CMS\Extensionmanager\Domain\Model\ConfigurationItem $configuration)
     {
         $userFunction = $configuration->getGeneric();
-        $userFunctionParams = array(
+        $userFunctionParams = [
             'fieldName' => $this->getName($configuration),
             'fieldValue' => $configuration->getValue(),
             'propertyName' => $configuration->getName()
-        );
-        return \TYPO3\CMS\Core\Utility\GeneralUtility::callUserFunction($userFunction, $userFunctionParams, $this);
+        ];
+        return \TYPO3\CMS\Core\Utility\GeneralUtility::callUserFunction($userFunction, $userFunctionParams, $this, '');
     }
 
     /**
@@ -298,7 +312,7 @@ class TypoScriptConstantsViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\Abs
      */
     protected function renderHiddenFieldForEmptyValue($configuration)
     {
-        $hiddenFieldNames = array();
+        $hiddenFieldNames = [];
         if ($this->viewHelperVariableContainer->exists(FormViewHelper::class, 'renderedHiddenFields')) {
             $hiddenFieldNames = $this->viewHelperVariableContainer->get(FormViewHelper::class, 'renderedHiddenFields');
         }

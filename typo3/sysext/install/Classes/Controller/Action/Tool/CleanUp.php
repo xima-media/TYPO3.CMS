@@ -14,7 +14,6 @@ namespace TYPO3\CMS\Install\Controller\Action\Tool;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Resource\ProcessedFileRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
@@ -33,7 +32,7 @@ class CleanUp extends Action\AbstractAction
      *
      * @var array
      */
-    protected $actionMessages = array();
+    protected $actionMessages = [];
 
     /**
      * Executes the tool
@@ -74,51 +73,51 @@ class CleanUp extends Action\AbstractAction
      */
     protected function getCleanableTableList()
     {
-        $tableCandidates = array(
-            array(
+        $tableCandidates = [
+            [
                 'name' => 'be_sessions',
                 'description' => 'Backend user sessions'
-            ),
-            array(
+            ],
+            [
                 'name' => 'cache_md5params',
                 'description' => 'Frontend redirects',
-            ),
-            array(
+            ],
+            [
                 'name' => 'fe_sessions',
                 'description' => 'Frontend user sessions',
-            ),
-            array(
+            ],
+            [
                 'name' => 'fe_session_data',
                 'description' => 'Frontend user session data',
-            ),
-            array(
+            ],
+            [
                 'name' => 'sys_history',
                 'description' => 'Tracking of database record changes through TYPO3 backend forms',
-            ),
-            array(
+            ],
+            [
                 'name' => 'sys_lockedrecords',
                 'description' => 'Record locking of backend user editing',
-            ),
-            array(
+            ],
+            [
                 'name' => 'sys_log',
                 'description' => 'General log table',
-            ),
-            array(
+            ],
+            [
                 'name' => 'sys_preview',
                 'description' => 'Workspace preview links',
-            ),
-            array(
+            ],
+            [
                 'name' => 'tx_extensionmanager_domain_model_extension',
                 'description' => 'List of TER extensions',
-            ),
-            array(
+            ],
+            [
                 'name' => 'tx_rsaauth_keys',
                 'description' => 'Login process key storage'
-            ),
-        );
+            ],
+        ];
         $database = $this->getDatabaseConnection();
         $allTables = array_keys($database->admin_get_tables());
-        $tables = array();
+        $tables = [];
         foreach ($tableCandidates as $candidate) {
             if (in_array($candidate['name'], $allTables)) {
                 $candidate['rows'] = $database->exec_SELECTcountRows('*', $candidate['name']);
@@ -135,25 +134,24 @@ class CleanUp extends Action\AbstractAction
      */
     protected function clearSelectedTables()
     {
-        $clearedTables = array();
+        $clearedTables = [];
+        $database = $this->getDatabaseConnection();
         if (isset($this->postValues['values']) && is_array($this->postValues['values'])) {
             foreach ($this->postValues['values'] as $tableName => $selected) {
                 if ($selected == 1) {
-                    GeneralUtility::makeInstance(ConnectionPool::class)
-                        ->getConnectionForTable($tableName)
-                        ->truncate($tableName);
+                    $database->exec_TRUNCATEquery($tableName);
                     $clearedTables[] = $tableName;
                 }
             }
         }
         if (!empty($clearedTables)) {
             /** @var OkStatus $message */
-            $message = GeneralUtility::makeInstance(OkStatus::class);
+            $message = $this->objectManager->get(OkStatus::class);
             $message->setTitle('Cleared tables');
             $message->setMessage('List of cleared tables: ' . implode(', ', $clearedTables));
         } else {
             /** @var InfoStatus $message */
-            $message = GeneralUtility::makeInstance(InfoStatus::class);
+            $message = $this->objectManager->get(InfoStatus::class);
             $message->setTitle('No tables selected to clear');
         }
         return $message;
@@ -167,9 +165,9 @@ class CleanUp extends Action\AbstractAction
     protected function resetBackendUserUc()
     {
         $database = $this->getDatabaseConnection();
-        $database->exec_UPDATEquery('be_users', '', array('uc' => ''));
+        $database->exec_UPDATEquery('be_users', '', ['uc' => '']);
         /** @var OkStatus $message */
-        $message = GeneralUtility::makeInstance(OkStatus::class);
+        $message = $this->objectManager->get(OkStatus::class);
         $message->setTitle('Reset all backend users preferences');
         return $message;
     }
@@ -181,8 +179,8 @@ class CleanUp extends Action\AbstractAction
      */
     protected function getTypo3TempStatistics()
     {
-        $data = array();
-        $pathTypo3Temp = PATH_site . 'typo3temp/';
+        $data = [];
+        $pathTypo3Temp= PATH_site . 'typo3temp/';
         $postValues = $this->postValues['values'];
 
         $condition = '0';
@@ -202,7 +200,7 @@ class CleanUp extends Action\AbstractAction
         $fileCounter = 0;
         $deleteCounter = 0;
         $criteriaMatch = 0;
-        $timeMap = array('day' => 1, 'week' => 7, 'month' => 30);
+        $timeMap = ['day' => 1, 'week' => 7, 'month' => 30];
         $directory = @dir($pathTypo3Temp . $subDirectory);
         if (is_object($directory)) {
             while ($entry = $directory->read()) {
@@ -251,7 +249,7 @@ class CleanUp extends Action\AbstractAction
         $data['numberOfDeletedFiles'] = $deleteCounter;
 
         if ($deleteCounter > 0) {
-            $message = GeneralUtility::makeInstance(OkStatus::class);
+            $message = $this->objectManager->get(OkStatus::class);
             $message->setTitle('Deleted ' . $deleteCounter . ' files from typo3temp/' . $subDirectory . '/');
             $this->actionMessages[] = $message;
         }
@@ -261,12 +259,12 @@ class CleanUp extends Action\AbstractAction
         $data['selectedSubDirectory'] = $subDirectory;
 
         // Set up sub directory data
-        $data['subDirectories'] = array(
-            '' => array(
+        $data['subDirectories'] = [
+            '' => [
                 'name' => '',
                 'filesNumber' => count(GeneralUtility::getFilesInDir($pathTypo3Temp)),
-            ),
-        );
+            ],
+        ];
         $directories = dir($pathTypo3Temp);
         if (is_object($directories)) {
             while ($entry = $directories->read()) {
@@ -301,11 +299,11 @@ class CleanUp extends Action\AbstractAction
         $failedDeletions = $repository->removeAll();
         if ($failedDeletions) {
             /** @var ErrorStatus $message */
-            $message = GeneralUtility::makeInstance(ErrorStatus::class);
-            $message->setTitle('Failed to delete ' . $failedDeletions . ' processed files. See TYPO3 log (by default typo3temp/var/logs/typo3_*.log)');
+            $message = $this->objectManager->get(ErrorStatus::class);
+            $message->setTitle('Failed to delete ' . $failedDeletions . ' processed files. See TYPO3 log (by default typo3temp/logs/typo3_*.log)');
         } else {
             /** @var OkStatus $message */
-            $message = GeneralUtility::makeInstance(OkStatus::class);
+            $message = $this->objectManager->get(OkStatus::class);
             $message->setTitle('Cleared processed files');
         }
 

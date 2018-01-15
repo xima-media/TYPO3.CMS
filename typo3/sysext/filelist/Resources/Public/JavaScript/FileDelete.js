@@ -28,7 +28,6 @@ define(['jquery', 'TYPO3/CMS/Backend/Modal', 'TYPO3/CMS/Backend/Severity'], func
 		}
 		var identifier = $anchorElement.data('identifier');
 		var veriCode = $anchorElement.data('veriCode');
-		var deleteType = $anchorElement.data('deleteType');
 		var deleteUrl = $anchorElement.data('deleteUrl') + '&file[delete][0][data]=' + encodeURIComponent(identifier) + '&vC=' + encodeURIComponent(veriCode);
 		if ($anchorElement.data('check')) {
 			var $modal = Modal.confirm($anchorElement.data('title'), $anchorElement.data('content'), Severity.warning, [
@@ -39,7 +38,7 @@ define(['jquery', 'TYPO3/CMS/Backend/Modal', 'TYPO3/CMS/Backend/Severity'], func
 					name: 'no'
 				},
 				{
-					text: TYPO3.lang['buttons.confirm.' + deleteType + '.yes'] || 'Yes, delete this file or folder',
+					text: TYPO3.lang['buttons.confirm.delete_file.yes'] || 'Yes, delete this file',
 					btnClass: 'btn-warning',
 					name: 'yes'
 				}

@@ -92,30 +92,36 @@ class PlainDataResolver
      * Sets whether live IDs shall be kept in the final result set.
      *
      * @param bool $keepLiveIds
+     * @return PlainDataResolver
      */
     public function setKeepLiveIds($keepLiveIds)
     {
         $this->keepLiveIds = (bool)$keepLiveIds;
+        return $this;
     }
 
     /**
      * Sets whether delete placeholders shall be kept in the final result set.
      *
      * @param bool $keepDeletePlaceholder
+     * @return PlainDataResolver
      */
     public function setKeepDeletePlaceholder($keepDeletePlaceholder)
     {
         $this->keepDeletePlaceholder = (bool)$keepDeletePlaceholder;
+        return $this;
     }
 
     /**
      * Sets whether move placeholders shall be kept in case they cannot be substituted.
      *
      * @param bool $keepMovePlaceholder
+     * @return PlainDataResolver
      */
     public function setKeepMovePlaceholder($keepMovePlaceholder)
     {
         $this->keepMovePlaceholder = (bool)$keepMovePlaceholder;
+        return $this;
     }
 
     /**
@@ -127,11 +133,21 @@ class PlainDataResolver
             return $this->resolvedIds;
         }
 
-        $ids = $this->processVersionOverlays($this->liveIds);
-        $ids = $this->processSorting($ids);
-        $ids = $this->applyLiveIds($ids);
+        $this->resolvedIds = $this->processVersionOverlays($this->liveIds);
+        if ($this->resolvedIds !== $this->liveIds) {
+            $this->resolvedIds = $this->reindex($this->resolvedIds);
+        }
 
-        $this->resolvedIds = $ids;
+        $tempIds = $this->processSorting($this->resolvedIds);
+        if ($tempIds !== $this->resolvedIds) {
+            $this->resolvedIds = $this->reindex($tempIds);
+        }
+
+        $tempIds = $this->applyLiveIds($this->resolvedIds);
+        if ($tempIds !== $this->resolvedIds) {
+            $this->resolvedIds = $this->reindex($tempIds);
+        }
+
         return $this->resolvedIds;
     }
 
@@ -140,14 +156,17 @@ class PlainDataResolver
      *
      * @param int[] $ids
      * @return int[]
+     * @internal
      */
-    protected function processVersionOverlays(array $ids)
+    public function processVersionOverlays(array $ids)
     {
         if (empty($this->workspaceId) || !$this->isWorkspaceEnabled() || empty($ids)) {
             return $ids;
         }
 
-        $ids = $this->processVersionMovePlaceholders($ids);
+        $ids = $this->reindex(
+            $this->processVersionMovePlaceholders($ids)
+        );
         $versions = $this->getDatabaseConnection()->exec_SELECTgetRows(
             'uid,t3ver_oid,t3ver_state',
             $this->tableName,
@@ -167,7 +186,6 @@ class PlainDataResolver
                     }
                 }
             }
-            $ids = $this->reindex($ids);
         }
 
         return $ids;
@@ -178,8 +196,9 @@ class PlainDataResolver
      *
      * @param int[] $ids
      * @return int[]
+     * @internal
      */
-    protected function processVersionMovePlaceholders(array $ids)
+    public function processVersionMovePlaceholders(array $ids)
     {
         // Early return on insufficient data-set
         if (empty($this->workspaceId) || !$this->isWorkspaceEnabled() || empty($ids)) {
@@ -207,7 +226,6 @@ class PlainDataResolver
                     unset($ids[$liveReferenceId]);
                 }
             }
-            $ids = $this->reindex($ids);
         }
 
         return $ids;
@@ -219,8 +237,9 @@ class PlainDataResolver
      *
      * @param int[] $ids
      * @return int[]
+     * @internal
      */
-    protected function processSorting(array $ids)
+    public function processSorting(array $ids)
     {
         // Early return on missing sorting statement or insufficient data-set
         if (empty($this->sortingStatement) || count($ids) < 2) {
@@ -238,10 +257,10 @@ class PlainDataResolver
         );
 
         if (!is_array($records)) {
-            return array();
+            return [];
         }
 
-        $ids = $this->reindex(array_keys($records));
+        $ids = array_keys($records);
         return $ids;
     }
 
@@ -252,8 +271,9 @@ class PlainDataResolver
      *
      * @param int[] $ids
      * @return int[]
+     * @internal
      */
-    protected function applyLiveIds(array $ids)
+    public function applyLiveIds(array $ids)
     {
         if (!$this->keepLiveIds || !$this->isWorkspaceEnabled() || empty($ids)) {
             return $ids;
@@ -270,7 +290,7 @@ class PlainDataResolver
         );
 
         if (!is_array($records)) {
-            return array();
+            return [];
         }
 
         foreach ($ids as $id) {
@@ -279,7 +299,6 @@ class PlainDataResolver
             }
         }
 
-        $ids = $this->reindex($ids);
         return $ids;
     }
 

@@ -14,7 +14,6 @@ namespace TYPO3\CMS\Install\Report;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Reports\ExtendedStatusProviderInterface;
 use TYPO3\CMS\Reports\StatusProviderInterface;
 
@@ -50,18 +49,21 @@ class EnvironmentStatusReport implements StatusProviderInterface, ExtendedStatus
      */
     protected function getStatusInternal($verbose)
     {
-        $statusObjects = array_merge(
-            GeneralUtility::makeInstance(\TYPO3\CMS\Install\SystemEnvironment\Check::class)->getStatus(),
-            GeneralUtility::makeInstance(\TYPO3\CMS\Install\SystemEnvironment\SetupCheck::class)->getStatus(),
-            GeneralUtility::makeInstance(\TYPO3\CMS\Install\SystemEnvironment\DatabaseCheck::class)->getStatus()
-        );
-        $reportStatusTypes = array(
-            'error' => array(),
-            'warning' => array(),
-            'ok' => array(),
-            'information' => array(),
-            'notice' => array(),
-        );
+        /** @var $statusCheck \TYPO3\CMS\Install\SystemEnvironment\Check */
+        $statusCheck = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Install\SystemEnvironment\Check::class);
+        $statusObjects = $statusCheck->getStatus();
+
+        /** @var $statusCheck \TYPO3\CMS\Install\SystemEnvironment\DatabaseCheck */
+        $databaseStatusCheck = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Install\SystemEnvironment\DatabaseCheck::class);
+        $statusObjects = array_merge($statusObjects, $databaseStatusCheck->getStatus());
+
+        $reportStatusTypes = [
+            'error' => [],
+            'warning' => [],
+            'ok' => [],
+            'information' => [],
+            'notice' => [],
+        ];
 
         /** @var $statusObject \TYPO3\CMS\Install\Status\AbstractStatus */
         foreach ($statusObjects as $statusObject) {
@@ -72,7 +74,7 @@ class EnvironmentStatusReport implements StatusProviderInterface, ExtendedStatus
             $reportStatusTypes[$severityIdentifier][] = $statusObject;
         }
 
-        $statusArray = array();
+        $statusArray = [];
         foreach ($reportStatusTypes as $type => $statusObjects) {
             $value = count($statusObjects);
             $message = '';
@@ -92,7 +94,7 @@ class EnvironmentStatusReport implements StatusProviderInterface, ExtendedStatus
                     $message = $GLOBALS['LANG']->sL($pathToXliff . ':environment.status.message.' . $type);
                 }
                 $severity = constant('\TYPO3\CMS\Reports\Status::' . strtoupper($type));
-                $statusArray[] = GeneralUtility::makeInstance(
+                $statusArray[] = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(
                     \TYPO3\CMS\Reports\Status::class,
                     $GLOBALS['LANG']->sL($pathToXliff . ':environment.status.title'),
                     sprintf($GLOBALS['LANG']->sL($pathToXliff . ':environment.status.value'), $value),

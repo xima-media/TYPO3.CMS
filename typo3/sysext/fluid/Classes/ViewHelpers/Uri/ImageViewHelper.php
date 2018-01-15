@@ -84,7 +84,7 @@ class ImageViewHelper extends AbstractViewHelper
     public function render($src = null, $image = null, $width = null, $height = null, $minWidth = null, $minHeight = null, $maxWidth = null, $maxHeight = null, $treatIdAsReference = false, $crop = null, $absolute = false)
     {
         return self::renderStatic(
-            array(
+            [
                 'src' => $src,
                 'image' => $image,
                 'width' => $width,
@@ -96,7 +96,7 @@ class ImageViewHelper extends AbstractViewHelper
                 'treatIdAsReference' => $treatIdAsReference,
                 'crop' => $crop,
                 'absolute' => $absolute,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
@@ -129,7 +129,7 @@ class ImageViewHelper extends AbstractViewHelper
                 $crop = $image instanceof FileReference ? $image->getProperty('crop') : null;
             }
 
-            $processingInstructions = array(
+            $processingInstructions = [
                 'width' => $arguments['width'],
                 'height' => $arguments['height'],
                 'minWidth' => $arguments['minWidth'],
@@ -137,7 +137,7 @@ class ImageViewHelper extends AbstractViewHelper
                 'maxWidth' => $arguments['maxWidth'],
                 'maxHeight' => $arguments['maxHeight'],
                 'crop' => $crop,
-            );
+            ];
             $processedImage = $imageService->applyProcessingInstructions($image, $processingInstructions);
             return $imageService->getImageUri($processedImage, $absolute);
         } catch (ResourceDoesNotExistException $e) {

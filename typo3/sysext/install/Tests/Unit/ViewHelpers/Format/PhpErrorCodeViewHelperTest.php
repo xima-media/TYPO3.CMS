@@ -32,7 +32,7 @@ class PhpErrorCodeViewHelperTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     protected function setUp()
     {
-        $this->viewHelper = $this->getMock(\TYPO3\CMS\Install\ViewHelpers\Format\PhpErrorCodeViewHelper::class, array('dummy'));
+        $this->viewHelper = $this->getMock(\TYPO3\CMS\Install\ViewHelpers\Format\PhpErrorCodeViewHelper::class, ['dummy']);
         /** @var RenderingContext $renderingContext */
         $renderingContext = new RenderingContextFixture();
         $this->viewHelper->setRenderingContext($renderingContext);
@@ -43,24 +43,24 @@ class PhpErrorCodeViewHelperTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function errorCodesDataProvider()
     {
-        return array(
-            array(
+        return [
+            [
                 'errorCode' => E_ERROR,
                 'expectedString' => 'E_ERROR',
-            ),
-            array(
+            ],
+            [
                 'errorCode' => E_ALL,
                 'expectedString' => 'E_ALL',
-            ),
-            array(
+            ],
+            [
                 'errorCode' => E_ERROR ^ E_WARNING ^ E_PARSE,
                 'expectedString' => 'E_ERROR | E_WARNING | E_PARSE',
-            ),
-            array(
+            ],
+            [
                 'errorCode' => E_RECOVERABLE_ERROR ^ E_USER_DEPRECATED,
                 'expectedString' => 'E_RECOVERABLE_ERROR | E_USER_DEPRECATED',
-            )
-        );
+            ]
+        ];
     }
 
     /**

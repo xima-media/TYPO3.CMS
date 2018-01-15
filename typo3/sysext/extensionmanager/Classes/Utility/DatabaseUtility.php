@@ -14,9 +14,6 @@ namespace TYPO3\CMS\Extensionmanager\Utility;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Utility\GeneralUtility;
-
 /**
  * Utility for dealing with database related operations
  */
@@ -75,7 +72,7 @@ class DatabaseUtility implements \TYPO3\CMS\Core\SingletonInterface
      */
     protected function dumpTableHeader($table, array $fieldKeyInfo, $dropTableIfExists = false)
     {
-        $lines = array();
+        $lines = [];
         $dump = '';
         // Create field definitions
         if (is_array($fieldKeyInfo['fields'])) {
@@ -116,25 +113,21 @@ class DatabaseUtility implements \TYPO3\CMS\Core\SingletonInterface
     protected function dumpTableContent($table, array $fieldStructure)
     {
         // Substitution of certain characters (borrowed from phpMySQL):
-        $search = array('\\', '\'', "\0", "\n", "\r", "\x1A");
-        $replace = array('\\\\', '\\\'', '\\0', '\\n', '\\r', '\\Z');
-        $lines = array();
+        $search = ['\\', '\'', "\0", "\n", "\r", "\x1A"];
+        $replace = ['\\\\', '\\\'', '\\0', '\\n', '\\r', '\\Z'];
+        $lines = [];
         // Select all rows from the table:
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable($table);
-        $queryBuilder->getRestrictions()
-            ->removeAll();
-        $result = $queryBuilder->select('*')
-            ->from($table)
-            ->execute();
+        $result = $GLOBALS['TYPO3_DB']->exec_SELECTquery('*', $table, '');
         // Traverse the selected rows and dump each row as a line in the file:
-        while ($row = $result->fetch()) {
-            $values = array();
+        while ($row = $GLOBALS['TYPO3_DB']->sql_fetch_assoc($result)) {
+            $values = [];
             foreach ($fieldStructure as $field => $structure) {
                 $values[] = isset($row[$field]) ? '\'' . str_replace($search, $replace, $row[$field]) . '\'' : 'NULL';
             }
             $lines[] = 'INSERT INTO ' . $table . ' VALUES (' . implode(', ', $values) . ');';
         }
+        // Free DB result:
+        $GLOBALS['TYPO3_DB']->sql_free_result($result);
         // Implode lines and return:
         return implode(LF, $lines);
     }

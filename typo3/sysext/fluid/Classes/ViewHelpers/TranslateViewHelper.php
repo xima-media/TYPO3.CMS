@@ -93,14 +93,14 @@ class TranslateViewHelper extends AbstractViewHelper
     public function render($key = null, $id = null, $default = null, $htmlEscape = null, array $arguments = null, $extensionName = null)
     {
         return static::renderStatic(
-            array(
+            [
                 'key' => $key,
                 'id' => $id,
                 'default' => $default,
                 'htmlEscape' => $htmlEscape,
                 'arguments' => $arguments,
                 'extensionName' => $extensionName,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

@@ -67,11 +67,11 @@ class HtmlentitiesDecodeViewHelper extends AbstractEncodingViewHelper
     public function render($value = null, $keepQuotes = false, $encoding = null)
     {
         return static::renderStatic(
-            array(
+            [
                 'value' => $value,
                 'keepQuotes' => $keepQuotes,
                 'encoding' => $encoding
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

@@ -43,9 +43,9 @@ class ExistsViewHelper extends AbstractViewHelper
     public function render($file)
     {
         return static::renderStatic(
-            array(
+            [
                 'file' => $file,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

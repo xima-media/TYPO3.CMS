@@ -20,8 +20,6 @@ namespace TYPO3\CMS\Extbase\Tests\Unit\Mvc\Cli;
  *                                                                        *
  * The TYPO3 project - inspiring people to share!                         *
  *                                                                        */
-use TYPO3\CMS\Extbase\Mvc\Exception\AmbiguousCommandIdentifierException;
-use TYPO3\CMS\Extbase\Mvc\Exception\NoSuchCommandException;
 
 /**
  * Test case
@@ -40,7 +38,7 @@ class CommandManagerTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
 
     protected function setUp()
     {
-        $this->commandManager = $this->getAccessibleMock(\TYPO3\CMS\Extbase\Mvc\Cli\CommandManager::class, array('getAvailableCommands'));
+        $this->commandManager = $this->getAccessibleMock(\TYPO3\CMS\Extbase\Mvc\Cli\CommandManager::class, ['getAvailableCommands']);
         $this->mockObjectManager = $this->getMock(\TYPO3\CMS\Extbase\Object\ObjectManagerInterface::class);
         $this->commandManager->_set('objectManager', $this->mockObjectManager);
     }
@@ -51,15 +49,15 @@ class CommandManagerTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function getAvailableCommandsReturnsAllAvailableCommands()
     {
         /** @var \TYPO3\CMS\Core\Tests\AccessibleObjectInterface $commandManager */
-        $commandManager = $this->getAccessibleMock(\TYPO3\CMS\Extbase\Mvc\Cli\CommandManager::class, array('dummy'));
+        $commandManager = $this->getAccessibleMock(\TYPO3\CMS\Extbase\Mvc\Cli\CommandManager::class, ['dummy']);
         $commandManager->_set('objectManager', $this->mockObjectManager);
-        $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['extbase']['commandControllers'] = array(
+        $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['extbase']['commandControllers'] = [
             \TYPO3\CMS\Extbase\Tests\Unit\Mvc\Cli\Fixture\Command\MockACommandController::class,
             \TYPO3\CMS\Extbase\Tests\Unit\Mvc\Cli\Fixture\Command\MockBCommandController::class
-        );
-        $mockCommand1 = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, array(), array(), '', false);
-        $mockCommand2 = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, array(), array(), '', false);
-        $mockCommand3 = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, array(), array(), '', false);
+        ];
+        $mockCommand1 = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, [], [], '', false);
+        $mockCommand2 = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, [], [], '', false);
+        $mockCommand3 = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, [], [], '', false);
         $this->mockObjectManager->expects($this->at(0))->method('get')->with(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, \TYPO3\CMS\Extbase\Tests\Unit\Mvc\Cli\Fixture\Command\MockACommandController::class, 'foo')->will($this->returnValue($mockCommand1));
         $this->mockObjectManager->expects($this->at(1))->method('get')->with(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, \TYPO3\CMS\Extbase\Tests\Unit\Mvc\Cli\Fixture\Command\MockACommandController::class, 'bar')->will($this->returnValue($mockCommand2));
         $this->mockObjectManager->expects($this->at(2))->method('get')->with(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, \TYPO3\CMS\Extbase\Tests\Unit\Mvc\Cli\Fixture\Command\MockBCommandController::class, 'baz')->will($this->returnValue($mockCommand3));
@@ -75,9 +73,9 @@ class CommandManagerTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function getCommandByIdentifierReturnsCommandIfIdentifierIsEqual()
     {
-        $mockCommand = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, array(), array(), '', false);
+        $mockCommand = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, [], [], '', false);
         $mockCommand->expects($this->once())->method('getCommandIdentifier')->will($this->returnValue('extensionkey:controller:command'));
-        $mockCommands = array($mockCommand);
+        $mockCommands = [$mockCommand];
         $this->commandManager->expects($this->once())->method('getAvailableCommands')->will($this->returnValue($mockCommands));
         $this->assertSame($mockCommand, $this->commandManager->getCommandByIdentifier('extensionkey:controller:command'));
     }
@@ -87,39 +85,37 @@ class CommandManagerTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function getCommandByIdentifierWorksCaseInsensitive()
     {
-        $mockCommand = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, array(), array(), '', false);
+        $mockCommand = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, [], [], '', false);
         $mockCommand->expects($this->once())->method('getCommandIdentifier')->will($this->returnValue('extensionkey:controller:command'));
-        $mockCommands = array($mockCommand);
+        $mockCommands = [$mockCommand];
         $this->commandManager->expects($this->once())->method('getAvailableCommands')->will($this->returnValue($mockCommands));
         $this->assertSame($mockCommand, $this->commandManager->getCommandByIdentifier('   ExtensionKey:conTroLler:Command  '));
     }
 
     /**
      * @test
+     * @expectedException \TYPO3\CMS\Extbase\Mvc\Exception\NoSuchCommandException
      */
     public function getCommandByIdentifierThrowsExceptionIfNoMatchingCommandWasFound()
     {
-        $this->expectException(NoSuchCommandException::class);
-        $this->expectExceptionCode(1310556663);
-        $mockCommand = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, array(), array(), '', false);
+        $mockCommand = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, [], [], '', false);
         $mockCommand->expects($this->once())->method('getCommandIdentifier')->will($this->returnValue('extensionkey:controller:command'));
-        $mockCommands = array($mockCommand);
+        $mockCommands = [$mockCommand];
         $this->commandManager->expects($this->once())->method('getAvailableCommands')->will($this->returnValue($mockCommands));
         $this->commandManager->getCommandByIdentifier('extensionkey:controller:someothercommand');
     }
 
     /**
      * @test
+     * @expectedException \TYPO3\CMS\Extbase\Mvc\Exception\AmbiguousCommandIdentifierException
      */
     public function getCommandByIdentifierThrowsExceptionIfMoreThanOneMatchingCommandWasFound()
     {
-        $this->expectException(AmbiguousCommandIdentifierException::class);
-        $this->expectExceptionCode(1310557169);
-        $mockCommand1 = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, array(), array(), '', false);
+        $mockCommand1 = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, [], [], '', false);
         $mockCommand1->expects($this->once())->method('getCommandIdentifier')->will($this->returnValue('extensionkey:controller:command'));
-        $mockCommand2 = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, array(), array(), '', false);
+        $mockCommand2 = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Command::class, [], [], '', false);
         $mockCommand2->expects($this->once())->method('getCommandIdentifier')->will($this->returnValue('otherextensionkey:controller:command'));
-        $mockCommands = array($mockCommand1, $mockCommand2);
+        $mockCommands = [$mockCommand1, $mockCommand2];
         $this->commandManager->expects($this->once())->method('getAvailableCommands')->will($this->returnValue($mockCommands));
         $this->commandManager->getCommandByIdentifier('controller:command');
     }

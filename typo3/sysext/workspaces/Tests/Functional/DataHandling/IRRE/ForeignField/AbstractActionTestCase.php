@@ -46,11 +46,11 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     /**
      * @var array
      */
-    protected $coreExtensionsToLoad = array(
+    protected $coreExtensionsToLoad = [
         'fluid',
         'version',
         'workspaces',
-    );
+    ];
 
     protected function setUp()
     {
@@ -61,10 +61,10 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
 
         $this->setUpFrontendRootPage(
             1,
-            array(
+            [
                 'typo3/sysext/core/Tests/Functional/Fixtures/Frontend/JsonRenderer.ts',
                 'typo3/sysext/core/Tests/Functional/Fixtures/Frontend/ExtbaseJsonRenderer.ts',
-            )
+            ]
         );
         $this->backendUser->workspace = self::VALUE_WorkspaceId;
     }
@@ -74,24 +74,24 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
      */
 
     /**
-     * @see DataSet/Assertion/createParentContentRecord.csv
+     * @see DataSet/createParentContentRecord.csv
      */
     public function createParentContent()
     {
-        $newTableIds = $this->actionService->createNewRecord(self::TABLE_Content, self::VALUE_PageId, array('header' => 'Testing #1'));
+        $newTableIds = $this->actionService->createNewRecord(self::TABLE_Content, self::VALUE_PageId, ['header' => 'Testing #1']);
         $this->recordIds['newContentId'] = $newTableIds[self::TABLE_Content][0];
     }
 
     /**
-     * @see DataSet/Assertion/modifyParentContentRecord.csv
+     * @see DataSet/modifyParentContentRecord.csv
      */
     public function modifyParentContent()
     {
-        $this->actionService->modifyRecord(self::TABLE_Content, self::VALUE_ContentIdLast, array('header' => 'Testing #1'));
+        $this->actionService->modifyRecord(self::TABLE_Content, self::VALUE_ContentIdLast, ['header' => 'Testing #1']);
     }
 
     /**
-     * @see DataSet/Assertion/deleteParentContentRecord.csv
+     * @see DataSet/deleteParentContentRecord.csv
      */
     public function deleteParentContent()
     {
@@ -99,7 +99,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/deleteParentContentRecordAndDiscardDeletedParentRecord.csv
+     * @see DataSet/deleteParentContentRecordAndDiscardDeletedParentRecord.csv
      */
     public function deleteParentContentAndDiscardDeletedParent()
     {
@@ -109,7 +109,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/copyParentContentRecord.csv
+     * @see DataSet/copyParentContentRecord.csv
      */
     public function copyParentContent()
     {
@@ -175,7 +175,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/changeParentContentRecordSorting.csv
+     * @see DataSet/changeParentContentRecordSorting.csv
      */
     public function changeParentContentSorting()
     {
@@ -183,7 +183,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/moveParentContentRecordToDifferentPage.csv
+     * @see DataSet/moveParentContentRecordToDifferentPage.csv
      */
     public function moveParentContentToDifferentPage()
     {
@@ -191,7 +191,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/moveParentContentRecordToDifferentPageAndChangeSorting.csv
+     * @see DataSet/moveParentContentRecordToDifferentPageAndChangeSorting.csv
      */
     public function moveParentContentToDifferentPageAndChangeSorting()
     {
@@ -204,15 +204,15 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
      */
 
     /**
-     * @see DataSet/Assertion/modifyPageRecord.csv
+     * @see DataSet/modifyPageRecord.csv
      */
     public function modifyPage()
     {
-        $this->actionService->modifyRecord(self::TABLE_Page, self::VALUE_PageId, array('title' => 'Testing #1'));
+        $this->actionService->modifyRecord(self::TABLE_Page, self::VALUE_PageId, ['title' => 'Testing #1']);
     }
 
     /**
-     * @see DataSet/Assertion/deletePageRecord.csv
+     * @see DataSet/deletePageRecord.csv
      */
     public function deletePage()
     {
@@ -220,7 +220,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/copyPageRecord.csv
+     * @see DataSet/copyPageRecord.csv
      */
     public function copyPage()
     {
@@ -232,13 +232,13 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
 
     /**
      * @test
-     * @see DataSet/Assertion/copyPageWHotelBeforeParentContent.csv
+     * @see DataSet/copyPageWHotelBeforeParentContent.csv
      */
     public function copyPageWithHotelBeforeParentContent()
     {
         // Ensure hotels get processed first
         $GLOBALS['TCA'] = array_merge(
-            array(self::TABLE_Hotel => $GLOBALS['TCA'][self::TABLE_Hotel]),
+            [self::TABLE_Hotel => $GLOBALS['TCA'][self::TABLE_Hotel]],
             $GLOBALS['TCA']
         );
 
@@ -253,33 +253,33 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
      */
 
     /**
-     * @see DataSet/Assertion/createParentContentRecordWithHotelAndOfferChildRecords.csv
+     * @see DataSet/createParentContentRecordWithHotelAndOfferChildRecords.csv
      */
     public function createParentContentWithHotelAndOfferChildren()
     {
         $newTableIds = $this->actionService->createNewRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'),
-                self::TABLE_Hotel => array('title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'),
-                self::TABLE_Offer => array('title' => 'Offer #1'),
-            )
+            [
+                self::TABLE_Content => ['header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'],
+                self::TABLE_Hotel => ['title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'],
+                self::TABLE_Offer => ['title' => 'Offer #1'],
+            ]
         );
         $this->recordIds['newContentId'] = $newTableIds[self::TABLE_Content][0];
     }
 
     /**
-     * @see DataSet/Assertion/createAndCopyParentContentRecordWithHotelAndOfferChildRecords.csv
+     * @see DataSet/createAndCopyParentContentRecordWithHotelAndOfferChildRecords.csv
      */
     public function createAndCopyParentContentWithHotelAndOfferChildren()
     {
         $newTableIds = $this->actionService->createNewRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'),
-                self::TABLE_Hotel => array('title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'),
-                self::TABLE_Offer => array('title' => 'Offer #1'),
-            )
+            [
+                self::TABLE_Content => ['header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'],
+                self::TABLE_Hotel => ['title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'],
+                self::TABLE_Offer => ['title' => 'Offer #1'],
+            ]
         );
         $this->recordIds['newContentId'] = $newTableIds[self::TABLE_Content][0];
         $this->recordIds['newHotelId'] = $newTableIds[self::TABLE_Hotel][0];
@@ -289,17 +289,17 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/createAndCopyParentContentRecordWithHotelAndOfferChildRecordsAndDiscardCopiedParentRecord.csv
+     * @see DataSet/createAndCopyParentContentRecordWithHotelAndOfferChildRecordsAndDiscardCopiedParentRecord.csv
      */
     public function createAndCopyParentContentWithHotelAndOfferChildrenAndDiscardCopiedParent()
     {
         $newTableIds = $this->actionService->createNewRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'),
-                self::TABLE_Hotel => array('title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'),
-                self::TABLE_Offer => array('title' => 'Offer #1'),
-            )
+            [
+                self::TABLE_Content => ['header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'],
+                self::TABLE_Hotel => ['title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'],
+                self::TABLE_Offer => ['title' => 'Offer #1'],
+            ]
         );
         $this->recordIds['newContentId'] = $newTableIds['tt_content'][0];
         $copiedTableIds = $this->actionService->copyRecord(self::TABLE_Content, $this->recordIds['newContentId'], self::VALUE_PageId);
@@ -309,17 +309,17 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/createAndLocalizeParentContentRecordWithHotelAndOfferChildRecords.csv
+     * @see DataSet/createAndLocalizeParentContentRecordWithHotelAndOfferChildRecords.csv
      */
     public function createAndLocalizeParentContentWithHotelAndOfferChildren()
     {
         $newTableIds = $this->actionService->createNewRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'),
-                self::TABLE_Hotel => array('title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'),
-                self::TABLE_Offer => array('title' => 'Offer #1'),
-            )
+            [
+                self::TABLE_Content => ['header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'],
+                self::TABLE_Hotel => ['title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'],
+                self::TABLE_Offer => ['title' => 'Offer #1'],
+            ]
         );
         $this->recordIds['newContentId'] = $newTableIds[self::TABLE_Content][0];
         $this->recordIds['newHotelId'] = $newTableIds[self::TABLE_Hotel][0];
@@ -328,18 +328,18 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/createAndLocalizeParentContentRecordWithHotelAndOfferChildRecords.csv
+     * @see DataSet/createAndLocalizeParentContentRecordWithHotelAndOfferChildRecords.csv
      */
     public function createAndLocalizeParentContentWithHotelAndOfferChildrenWithoutSortByConfiguration()
     {
         unset($GLOBALS['TCA'][self::TABLE_Hotel]['ctrl']['sortby']);
         $newTableIds = $this->actionService->createNewRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'),
-                self::TABLE_Hotel => array('title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'),
-                self::TABLE_Offer => array('title' => 'Offer #1'),
-            )
+            [
+                self::TABLE_Content => ['header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'],
+                self::TABLE_Hotel => ['title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'],
+                self::TABLE_Offer => ['title' => 'Offer #1'],
+            ]
         );
         $this->recordIds['newContentId'] = $newTableIds[self::TABLE_Content][0];
         $this->recordIds['newHotelId'] = $newTableIds[self::TABLE_Hotel][0];
@@ -348,17 +348,17 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/createNLocalizeParentContentNHotelNOfferChildrenNDiscardCreatedParent.csv
+     * @see DataSet/createNLocalizeParentContentNHotelNOfferChildrenNDiscardCreatedParent.csv
      */
     public function createAndLocalizeParentContentWithHotelAndOfferChildrenAndDiscardCreatedParent()
     {
         $newTableIds = $this->actionService->createNewRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'),
-                self::TABLE_Hotel => array('title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'),
-                self::TABLE_Offer => array('title' => 'Offer #1'),
-            )
+            [
+                self::TABLE_Content => ['header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'],
+                self::TABLE_Hotel => ['title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'],
+                self::TABLE_Offer => ['title' => 'Offer #1'],
+            ]
         );
         $this->recordIds['newContentId'] = $newTableIds[self::TABLE_Content][0];
         $this->recordIds['versionedNewContentId'] = $this->actionService->getDataHandler()->getAutoVersionId(self::TABLE_Content, $this->recordIds['newContentId']);
@@ -368,17 +368,17 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/createAndLocalizeParentContentRecordWithHotelAndOfferChildRecordsAndDiscardLocalizedParentRecord.csv
+     * @see DataSet/createAndLocalizeParentContentRecordWithHotelAndOfferChildRecordsAndDiscardLocalizedParentRecord.csv
      */
     public function createAndLocalizeParentContentWithHotelAndOfferChildrenAndDiscardLocalizedParent()
     {
         $newTableIds = $this->actionService->createNewRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'),
-                self::TABLE_Hotel => array('title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'),
-                self::TABLE_Offer => array('title' => 'Offer #1'),
-            )
+            [
+                self::TABLE_Content => ['header' => 'Testing #1', self::FIELD_ContentHotel => '__nextUid'],
+                self::TABLE_Hotel => ['title' => 'Hotel #1', self::FIELD_HotelOffer => '__nextUid'],
+                self::TABLE_Offer => ['title' => 'Offer #1'],
+            ]
         );
         $this->recordIds['newContentId'] = $newTableIds[self::TABLE_Content][0];
         $localizedTableIds = $this->actionService->localizeRecord(self::TABLE_Content, $this->recordIds['newContentId'], self::VALUE_LanguageId);
@@ -388,97 +388,97 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/modifyOnlyHotelChildRecord.csv
+     * @see DataSet/modifyOnlyHotelChildRecord.csv
      */
     public function modifyOnlyHotelChild()
     {
-        $this->actionService->modifyRecord(self::TABLE_Hotel, 4, array('title' => 'Testing #1'));
+        $this->actionService->modifyRecord(self::TABLE_Hotel, 4, ['title' => 'Testing #1']);
     }
 
     /**
-     * @see DataSet/Assertion/modifyParentRecordAndChangeHotelChildRecordsSorting.csv
+     * @see DataSet/modifyParentRecordAndChangeHotelChildRecordsSorting.csv
      */
     public function modifyParentAndChangeHotelChildrenSorting()
     {
-        $this->actionService->modifyRecord(self::TABLE_Content, self::VALUE_ContentIdFirst, array(self::FIELD_ContentHotel => '4,3'));
+        $this->actionService->modifyRecord(self::TABLE_Content, self::VALUE_ContentIdFirst, [self::FIELD_ContentHotel => '4,3']);
     }
 
     /**
-     * @see DataSet/Assertion/modifyParentRecordWithHotelChildRecord.csv
+     * @see DataSet/modifyParentRecordWithHotelChildRecord.csv
      */
     public function modifyParentWithHotelChild()
     {
         $this->actionService->modifyRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('uid' => self::VALUE_ContentIdFirst, self::FIELD_ContentHotel => '3,4'),
-                self::TABLE_Hotel => array('uid' => 4, 'title' => 'Testing #1'),
-            )
+            [
+                self::TABLE_Content => ['uid' => self::VALUE_ContentIdFirst, self::FIELD_ContentHotel => '3,4'],
+                self::TABLE_Hotel => ['uid' => 4, 'title' => 'Testing #1'],
+            ]
         );
     }
 
     /**
-     * @see DataSet/Assertion/modifyParentRecordWithHotelChildRecordAndDiscardModifiedParentRecord.csv
+     * @see DataSet/modifyParentRecordWithHotelChildRecordAndDiscardModifiedParentRecord.csv
      */
     public function modifyParentWithHotelChildAndDiscardModifiedParent()
     {
         $this->actionService->modifyRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('uid' => self::VALUE_ContentIdFirst, self::FIELD_ContentHotel => '3,4'),
-                self::TABLE_Hotel => array('uid' => 4, 'title' => 'Testing #1'),
-            )
+            [
+                self::TABLE_Content => ['uid' => self::VALUE_ContentIdFirst, self::FIELD_ContentHotel => '3,4'],
+                self::TABLE_Hotel => ['uid' => 4, 'title' => 'Testing #1'],
+            ]
         );
         $modifiedContentId = $this->actionService->getDataHandler()->getAutoVersionId(self::TABLE_Content, self::VALUE_ContentIdFirst);
         $this->actionService->clearWorkspaceRecord(self::TABLE_Content, $modifiedContentId);
     }
 
     /**
-     * @see DataSet/Assertion/modifyParentRecordWithHotelChildRecordAndDiscardAllModifiedRecords.csv
+     * @see DataSet/modifyParentRecordWithHotelChildRecordAndDiscardAllModifiedRecords.csv
      */
     public function modifyParentWithHotelChildAndDiscardAll()
     {
         $this->actionService->modifyRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('uid' => self::VALUE_ContentIdFirst, self::FIELD_ContentHotel => '3,4'),
-                self::TABLE_Hotel => array('uid' => 4, 'title' => 'Testing #1'),
-            )
+            [
+                self::TABLE_Content => ['uid' => self::VALUE_ContentIdFirst, self::FIELD_ContentHotel => '3,4'],
+                self::TABLE_Hotel => ['uid' => 4, 'title' => 'Testing #1'],
+            ]
         );
         $modifiedContentId = $this->actionService->getDataHandler()->getAutoVersionId(self::TABLE_Content, self::VALUE_ContentIdFirst);
         $modifiedHotelId = $this->actionService->getDataHandler()->getAutoVersionId(self::TABLE_Hotel, 4);
         $this->actionService->clearWorkspaceRecords(
-                array(
-                    self::TABLE_Content => array($modifiedContentId),
-                    self::TABLE_Hotel => array($modifiedHotelId),
-                )
+                [
+                    self::TABLE_Content => [$modifiedContentId],
+                    self::TABLE_Hotel => [$modifiedHotelId],
+                ]
         );
     }
 
     /**
-     * @see DataSet/Assertion/modifyParentRecordAndAddHotelChildRecord.csv
+     * @see DataSet/modifyParentRecordAndAddHotelChildRecord.csv
      */
     public function modifyParentAndAddHotelChild()
     {
         $this->actionService->modifyRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('uid' => self::VALUE_ContentIdLast, self::FIELD_ContentHotel => '5,__nextUid'),
-                self::TABLE_Hotel => array('uid' => '__NEW', 'title' => 'Hotel #2'),
-            )
+            [
+                self::TABLE_Content => ['uid' => self::VALUE_ContentIdLast, self::FIELD_ContentHotel => '5,__nextUid'],
+                self::TABLE_Hotel => ['uid' => '__NEW', 'title' => 'Hotel #2'],
+            ]
         );
     }
 
     /**
-     * @see DataSet/Assertion/modifyParentRecordAndDeleteHotelChildRecord.csv
+     * @see DataSet/modifyParentRecordAndDeleteHotelChildRecord.csv
      */
     public function modifyParentAndDeleteHotelChild()
     {
         $this->actionService->modifyRecord(
             self::TABLE_Content,
             self::VALUE_ContentIdFirst,
-            array(self::FIELD_ContentHotel => '3'),
-            array(self::TABLE_Hotel => array(4))
+            [self::FIELD_ContentHotel => '3'],
+            [self::TABLE_Hotel => [4]]
         );
     }
 
@@ -489,26 +489,26 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     {
         $this->actionService->modifyRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('uid' => self::VALUE_ContentIdFirst, 'header' => 'Testing #1', self::FIELD_ContentHotel => '3,4'),
-                self::TABLE_Hotel => array('uid' => 4, 'title' => 'Testing #1'),
-            )
+            [
+                self::TABLE_Content => ['uid' => self::VALUE_ContentIdFirst, 'header' => 'Testing #1', self::FIELD_ContentHotel => '3,4'],
+                self::TABLE_Hotel => ['uid' => 4, 'title' => 'Testing #1'],
+            ]
         );
         $this->recordIds['versionedContentId'] = $this->actionService->getDataHandler()->getAutoVersionId(self::TABLE_Content, self::VALUE_ContentIdFirst);
         $this->recordIds['versionedHotelIdFirst'] = $this->actionService->getDataHandler()->getAutoVersionId(self::TABLE_Hotel, 3);
         $this->recordIds['versionedHotelIdSecond'] = $this->actionService->getDataHandler()->getAutoVersionId(self::TABLE_Hotel, 4);
         $this->actionService->clearWorkspaceRecords(
-            array(
-                self::TABLE_Content => array($this->recordIds['versionedContentId']),
-                self::TABLE_Hotel => array($this->recordIds['versionedHotelIdSecond']),
-            )
+            [
+                self::TABLE_Content => [$this->recordIds['versionedContentId']],
+                self::TABLE_Hotel => [$this->recordIds['versionedHotelIdSecond']],
+            ]
         );
         $this->actionService->modifyRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('uid' => self::VALUE_ContentIdFirst, 'header' => 'Testing #2', self::FIELD_ContentHotel => '3,4'),
-                self::TABLE_Hotel => array('uid' => 4, 'title' => 'Testing #2'),
-            )
+            [
+                self::TABLE_Content => ['uid' => self::VALUE_ContentIdFirst, 'header' => 'Testing #2', self::FIELD_ContentHotel => '3,4'],
+                self::TABLE_Hotel => ['uid' => 4, 'title' => 'Testing #2'],
+            ]
         );
     }
 }

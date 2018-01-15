@@ -50,8 +50,7 @@ class DriverRegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function registerDriverClassThrowsExceptionIfClassDoesNotExist()
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionCode(1314979197);
+        $this->setExpectedException('InvalidArgumentException', '', 1314979197);
         $this->subject->registerDriverClass($this->getUniqueId());
     }
 
@@ -60,8 +59,7 @@ class DriverRegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function registerDriverClassThrowsExceptionIfShortnameIsAlreadyTakenByAnotherDriverClass()
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionCode(1314979451);
+        $this->setExpectedException('InvalidArgumentException', '', 1314979451);
         $className = get_class($this->getMockForAbstractClass(\TYPO3\CMS\Core\Resource\Driver\AbstractDriver::class));
         $className2 = get_class($this->getMockForAbstractClass(\TYPO3\CMS\Core\Resource\Driver\DriverInterface::class));
         $this->subject->registerDriverClass($className, 'foobar');
@@ -73,8 +71,7 @@ class DriverRegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function getDriverClassThrowsExceptionIfClassIsNotRegistered()
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionCode(1314085990);
+        $this->setExpectedException('InvalidArgumentException', '', 1314085990);
         $this->subject->getDriverClass($this->getUniqueId());
     }
 
@@ -95,12 +92,12 @@ class DriverRegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     {
         $className = get_class($this->getMockForAbstractClass(\TYPO3\CMS\Core\Resource\Driver\AbstractDriver::class));
         $shortName = $this->getUniqueId();
-        $GLOBALS['TYPO3_CONF_VARS']['SYS']['fal']['registeredDrivers'] = array(
-            $shortName => array(
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['fal']['registeredDrivers'] = [
+            $shortName => [
                 'class' => $className
-            )
-        );
-        $this->initializeSubject();
+            ]
+        ];
+        $this->initializesubject();
         $this->assertEquals($className, $this->subject->getDriverClass($shortName));
     }
 
@@ -111,12 +108,12 @@ class DriverRegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     {
         $className = get_class($this->getMockForAbstractClass(\TYPO3\CMS\Core\Resource\Driver\AbstractDriver::class));
         $shortName = $this->getUniqueId();
-        $GLOBALS['TYPO3_CONF_VARS']['SYS']['fal']['registeredDrivers'] = array(
-            $shortName => array(
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['fal']['registeredDrivers'] = [
+            $shortName => [
                 'class' => $className
-            )
-        );
-        $this->initializeSubject();
+            ]
+        ];
+        $this->initializesubject();
         $this->assertTrue($this->subject->driverExists($shortName));
         $this->assertFalse($this->subject->driverExists($this->getUniqueId()));
     }
@@ -126,9 +123,9 @@ class DriverRegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function driverExistsReturnsFalseIfDriverDoesNotExist()
     {
-        $GLOBALS['TYPO3_CONF_VARS']['SYS']['fal']['registeredDrivers'] = array(
-        );
-        $this->initializeSubject();
+        $GLOBALS['TYPO3_CONF_VARS']['SYS']['fal']['registeredDrivers'] = [
+        ];
+        $this->initializesubject();
         $this->assertFalse($this->subject->driverExists($this->getUniqueId()));
     }
 }

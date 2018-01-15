@@ -30,7 +30,7 @@ class DatabaseData extends AbstractStepAction
      */
     public function execute()
     {
-        $result = array();
+        $result = [];
 
         /** @var ConfigurationManager $configurationManager */
         $configurationManager = GeneralUtility::makeInstance(ConfigurationManager::class);
@@ -63,13 +63,13 @@ class DatabaseData extends AbstractStepAction
         }
 
         // Insert admin user
-        $adminUserFields = array(
+        $adminUserFields = [
             'username' => $username,
             'password' => $this->getHashedPassword($password),
             'admin' => 1,
             'tstamp' => $GLOBALS['EXEC_TIME'],
             'crdate' => $GLOBALS['EXEC_TIME']
-        );
+        ];
         if (false === $this->getDatabaseConnection()->exec_INSERTquery('be_users', $adminUserFields)) {
             $errorStatus = GeneralUtility::makeInstance(ErrorStatus::class);
             $errorStatus->setTitle('Administrator account not created!');
@@ -79,7 +79,7 @@ class DatabaseData extends AbstractStepAction
             );
             $result[] = $errorStatus;
             return $result;
-        };
+        }
 
         // Set password as install tool password
         $configurationManager->setLocalConfigurationValueByPath('BE/installToolPassword', $this->getHashedPassword($password));
@@ -124,7 +124,7 @@ class DatabaseData extends AbstractStepAction
      */
     protected function importDatabaseData()
     {
-        $result = array();
+        $result = [];
         // Will load ext_localconf and ext_tables. This is pretty safe here since we are
         // in first install (database empty), so it is very likely that no extension is loaded
         // that could trigger a fatal at this point.
@@ -146,7 +146,7 @@ class DatabaseData extends AbstractStepAction
         $difference = $schemaMigrationService->getDatabaseExtra($fieldDefinitionsFile, $fieldDefinitionsDatabase);
         $updateStatements = $schemaMigrationService->getUpdateSuggestions($difference);
 
-        foreach (array('add', 'change', 'create_table') as $action) {
+        foreach (['add', 'change', 'create_table'] as $action) {
             $updateStatus = $schemaMigrationService->performUpdateQueries($updateStatements[$action], $updateStatements[$action]);
             if ($updateStatus !== true) {
                 foreach ($updateStatus as $statementIdentifier => $errorMessage) {

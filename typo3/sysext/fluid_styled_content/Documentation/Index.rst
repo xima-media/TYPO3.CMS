@@ -1,4 +1,4 @@
-﻿.. include:: Includes.txt
+﻿﻿.. include:: Includes.txt
 
 
 .. _start:
@@ -23,7 +23,7 @@ Content Elements based on Fluid
       frontend, content, fluid
 
 :Copyright:
-      2015-2016
+      2015-2018
 
 :Author:
       TYPO3 CMS Core Development Team

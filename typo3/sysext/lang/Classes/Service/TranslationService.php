@@ -14,16 +14,10 @@ namespace TYPO3\CMS\Lang\Service;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\SingletonInterface;
-use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
-use TYPO3\CMS\Extensionmanager\Exception\ExtensionManagerException;
-use TYPO3\CMS\Extensionmanager\Utility\Repository\Helper;
-
 /**
  * Translation service
  */
-class TranslationService implements SingletonInterface
+class TranslationService implements \TYPO3\CMS\Core\SingletonInterface
 {
     /**
      * Status codes for AJAX response
@@ -53,7 +47,7 @@ class TranslationService implements SingletonInterface
     /**
      * @param \TYPO3\CMS\Lang\Service\TerService $terService
      */
-    public function injectTerService(TerService $terService)
+    public function injectTerService(\TYPO3\CMS\Lang\Service\TerService $terService)
     {
         $this->terService = $terService;
     }
@@ -61,7 +55,7 @@ class TranslationService implements SingletonInterface
     /**
      * @param \TYPO3\CMS\Extbase\SignalSlot\Dispatcher $signalSlotDispatcher
      */
-    public function injectSignalSlotDispatcher(Dispatcher $signalSlotDispatcher)
+    public function injectSignalSlotDispatcher(\TYPO3\CMS\Extbase\SignalSlot\Dispatcher $signalSlotDispatcher)
     {
         $this->signalSlotDispatcher = $signalSlotDispatcher;
     }
@@ -69,11 +63,11 @@ class TranslationService implements SingletonInterface
     /**
      * @param \TYPO3\CMS\Extensionmanager\Utility\Repository\Helper $helper The helper
      */
-    public function injectRepositoryHelper(Helper $helper)
+    public function injectRepositoryHelper(\TYPO3\CMS\Extensionmanager\Utility\Repository\Helper $helper)
     {
         try {
             $this->mirrorUrl = $helper->getMirrors(false)->getMirrorUrl();
-        } catch (ExtensionManagerException $e) {
+        } catch (\TYPO3\CMS\Extensionmanager\Exception\ExtensionManagerException $e) {
             $this->mirrorUrl = '';
         }
     }
@@ -88,21 +82,20 @@ class TranslationService implements SingletonInterface
     public function updateTranslation($extensionKey, $locales)
     {
         if (is_string($locales)) {
-            $locales = GeneralUtility::trimExplode(',', $locales);
+            $locales = \TYPO3\CMS\Core\Utility\GeneralUtility::trimExplode(',', $locales);
         }
         $locales = array_flip((array) $locales);
         foreach ($locales as $locale => $key) {
             $state = static::TRANSLATION_INVALID;
-            $error = '';
             try {
                 $state = $this->updateTranslationForExtension($extensionKey, $locale);
             } catch (\Exception $exception) {
                 $error = $exception->getMessage();
             }
-            $locales[$locale] = array(
+            $locales[$locale] = [
                 'state'  => $state,
                 'error'  => $error,
-            );
+            ];
         }
         return $locales;
     }
@@ -146,10 +139,10 @@ class TranslationService implements SingletonInterface
         $this->signalSlotDispatcher->dispatch(
             __CLASS__,
             'postProcessMirrorUrl',
-            array(
+            [
                 'extensionKey' => $extensionKey,
                 'mirrorUrl' => &$this->mirrorUrl,
-            )
+            ]
         );
 
         return $this->mirrorUrl;

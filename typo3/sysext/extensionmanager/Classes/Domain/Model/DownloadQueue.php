@@ -26,21 +26,21 @@ class DownloadQueue implements \TYPO3\CMS\Core\SingletonInterface
      *
      * @var Extension[string][string]
      */
-    protected $extensionStorage = array();
+    protected $extensionStorage = [];
 
     /**
      * Storage for extensions to be installed
      *
      * @var array
      */
-    protected $extensionInstallStorage = array();
+    protected $extensionInstallStorage = [];
 
     /**
      * Storage for extensions to be copied
      *
      * @var array
      */
-    protected $extensionCopyStorage = array();
+    protected $extensionCopyStorage = [];
 
     /**
      * @var \TYPO3\CMS\Extensionmanager\Utility\ListUtility
@@ -67,11 +67,11 @@ class DownloadQueue implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function addExtensionToQueue(\TYPO3\CMS\Extensionmanager\Domain\Model\Extension $extension, $stack = 'download')
     {
-        if (!is_string($stack) || !in_array($stack, array('download', 'update'))) {
+        if (!is_string($stack) || !in_array($stack, ['download', 'update'])) {
             throw new ExtensionManagerException('Stack has to be either "download" or "update"', 1342432103);
         }
         if (!isset($this->extensionStorage[$stack])) {
-            $this->extensionStorage[$stack] = array();
+            $this->extensionStorage[$stack] = [];
         }
         if (array_key_exists($extension->getExtensionKey(), $this->extensionStorage[$stack])) {
             if ($this->extensionStorage[$stack][$extension->getExtensionKey()] !== $extension) {
@@ -103,7 +103,7 @@ class DownloadQueue implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function removeExtensionFromQueue(\TYPO3\CMS\Extensionmanager\Domain\Model\Extension $extension, $stack = 'download')
     {
-        if (!is_string($stack) || !in_array($stack, array('download', 'update'))) {
+        if (!is_string($stack) || !in_array($stack, ['download', 'update'])) {
             throw new ExtensionManagerException('Stack has to be either "download" or "update"', 1342432104);
         }
         if (array_key_exists($stack, $this->extensionStorage) && is_array($this->extensionStorage[$stack])) {
@@ -180,5 +180,80 @@ class DownloadQueue implements \TYPO3\CMS\Core\SingletonInterface
     public function getExtensionCopyStorage()
     {
         return $this->extensionCopyStorage;
+    }
+
+    /**
+     * Return whether the queue contains extensions or not
+     *
+     * @param string $stack
+     * @return bool
+     */
+    public function isQueueEmpty($stack = 'download')
+    {
+        return empty($this->extensionStorage[$stack]);
+    }
+
+    /**
+     * Return whether the copy queue contains extensions or not
+     *
+     * @return bool
+     */
+    public function isCopyQueueEmpty()
+    {
+        return empty($this->extensionCopyStorage);
+    }
+
+    /**
+     * Return whether the install queue contains extensions or not
+     *
+     * @return bool
+     */
+    public function isInstallQueueEmpty()
+    {
+        return empty($this->extensionInstallStorage);
+    }
+
+    /**
+     * Resets the extension queue and returns old extensions
+     *
+     * @param string|null $stack if null, all stacks are reset
+     * @return array
+     */
+    public function resetExtensionQueue($stack = null)
+    {
+        $storage = [];
+        if ($stack === null) {
+            $storage = $this->extensionStorage;
+            $this->extensionStorage = [];
+        } elseif (isset($this->extensionStorage[$stack])) {
+            $storage = $this->extensionStorage[$stack];
+            $this->extensionStorage[$stack] = [];
+        }
+
+        return $storage;
+    }
+
+    /**
+     * Resets the copy queue and returns the old extensions
+     * @return array
+     */
+    public function resetExtensionCopyStorage()
+    {
+        $storage = $this->extensionCopyStorage;
+        $this->extensionCopyStorage = [];
+
+        return $storage;
+    }
+
+    /**
+     * Resets the install queue and returns the old extensions
+     * @return array
+     */
+    public function resetExtensionInstallStorage()
+    {
+        $storage = $this->extensionInstallStorage;
+        $this->extensionInstallStorage = [];
+
+        return $storage;
     }
 }

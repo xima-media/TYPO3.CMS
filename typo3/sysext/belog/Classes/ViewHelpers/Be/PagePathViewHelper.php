@@ -33,10 +33,10 @@ class PagePathViewHelper extends AbstractBackendViewHelper
     public function render($pid, $titleLimit = 20)
     {
         return static::renderStatic(
-            array(
+            [
                 'pid' => $pid,
                 'titleLimit' => $titleLimit
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

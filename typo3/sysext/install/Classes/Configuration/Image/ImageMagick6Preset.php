@@ -34,16 +34,17 @@ class ImageMagick6Preset extends AbstractImagePreset implements Configuration\Pr
     /**
      * @var array Configuration values handled by this preset
      */
-    protected $configurationValues = array(
-        'GFX/processor_enabled' => true,
-        // processor_path and processor_path_lzw are determined and set by path lookup methods
-        'GFX/processor_path' => '',
-        'GFX/processor_path_lzw' => '',
-        'GFX/processor' => 'ImageMagick',
-        'GFX/processor_effects' => 1,
-        'GFX/processor_allowTemporaryMasksAsPng' => false,
-        'GFX/processor_colorspace' => 'sRGB',
-    );
+    protected $configurationValues = [
+        'GFX/image_processing' => 1,
+        'GFX/im' => 1,
+        // im_path and im_path_lzw are determined and set by path lookup methods
+        'GFX/im_path' => '',
+        'GFX/im_path_lzw' => '',
+        'GFX/im_version_5' => 'im6',
+        'GFX/im_v5effects' => 1,
+        'GFX/im_mask_temp_ext_gif' => 1,
+        'GFX/colorspace' => 'sRGB',
+    ];
 
     /**
      * Find executable in path, wrapper for specific ImageMagick/GraphicsMagick find methods.

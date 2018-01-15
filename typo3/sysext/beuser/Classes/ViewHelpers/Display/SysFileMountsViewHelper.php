@@ -41,9 +41,9 @@ class SysFileMountsViewHelper extends AbstractViewHelper
     public function render($uids = '')
     {
         return static::renderStatic(
-            array(
+            [
                 'uids' => $uids,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

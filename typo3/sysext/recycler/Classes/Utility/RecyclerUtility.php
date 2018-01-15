@@ -15,7 +15,6 @@ namespace TYPO3\CMS\Recycler\Utility;
  */
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
@@ -84,23 +83,15 @@ class RecyclerUtility
         if ($uid === 0) {
             return $output;
         }
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
-        $queryBuilder->getRestrictions()->removeAll();
-
-        $clause = trim($clause);
+        $databaseConnection = static::getDatabaseConnection();
+        $clause = trim($clause) !== '' ? ' AND ' . $clause : '';
         $loopCheck = 100;
         while ($loopCheck > 0) {
             $loopCheck--;
-
-            $queryBuilder
-                ->select('uid', 'pid', 'title', 'deleted', 't3ver_oid', 't3ver_wsid')
-                ->from('pages')
-                ->where($queryBuilder->expr()->eq('uid', (int)$uid));
-            if (!empty($clause)) {
-                $queryBuilder->andWhere($clause);
-            }
-            $row = $queryBuilder->execute()->fetch();
-            if ($row !== false) {
+            $res = $databaseConnection->exec_SELECTquery('uid,pid,title,deleted,t3ver_oid,t3ver_wsid', 'pages', 'uid=' . $uid . $clause);
+            if ($res !== false) {
+                $row = $databaseConnection->sql_fetch_assoc($res);
+                $databaseConnection->sql_free_result($res);
                 BackendUtility::workspaceOL('pages', $row);
                 if (is_array($row)) {
                     BackendUtility::fixVersioningPid('pages', $row);
@@ -120,7 +111,7 @@ class RecyclerUtility
             }
         }
         if ($fullTitleLimit) {
-            return array($output, $fullOutput);
+            return [$output, $fullOutput];
         } else {
             return $output;
         }
@@ -142,30 +133,6 @@ class RecyclerUtility
     }
 
     /**
-     * Check if parent record is deleted
-     *
-     * @param int $pid
-     * @return bool
-     */
-    public static function isParentPageDeleted($pid)
-    {
-        if ((int)$pid === 0) {
-            return false;
-        }
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
-        $queryBuilder->getRestrictions()->removeAll();
-
-        $deleted = $queryBuilder
-            ->select('deleted')
-            ->from('pages')
-            ->where($queryBuilder->expr()->eq('uid', (int)$pid))
-            ->execute()
-            ->fetchColumn();
-
-        return (bool)$deleted;
-    }
-
-    /**
      * Get pid of uid
      *
      * @param int $uid
@@ -174,17 +141,13 @@ class RecyclerUtility
      */
     public static function getPidOfUid($uid, $table)
     {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable($table);
-        $queryBuilder->getRestrictions()->removeAll();
-
-        $pid = $queryBuilder
-            ->select('pid')
-            ->from($table)
-            ->where($queryBuilder->expr()->eq('uid', (int)$uid))
-            ->execute()
-            ->fetchColumn();
-
-        return (int)$pid;
+        $db = static::getDatabaseConnection();
+        $res = $db->exec_SELECTquery('pid', $table, 'uid=' . (int)$uid);
+        if ($res !== false) {
+            $record = $db->sql_fetch_assoc($res);
+            return $record['pid'];
+        }
+        return 0;
     }
 
     /**
@@ -200,6 +163,51 @@ class RecyclerUtility
             $TCA = $GLOBALS['TCA'][$tableName];
         }
         return $TCA;
+    }
+
+    /**
+     * Gets the current backend charset.
+     *
+     * @return string The current backend charset
+     */
+    public static function getCurrentCharset()
+    {
+        $lang = static::getLanguageService();
+        return $lang->csConvObj->parse_charset($lang->charSet);
+    }
+
+    /**
+     * Determines whether the current charset is not UTF-8
+     *
+     * @return bool Whether the current charset is not UTF-8
+     */
+    public static function isNotUtf8Charset()
+    {
+        return self::getCurrentCharset() !== 'utf-8';
+    }
+
+    /**
+     * Gets an UTF-8 encoded string (only if the current charset is not UTF-8!).
+     *
+     * @param string $string String to be converted to UTF-8 if required
+     * @return string UTF-8 encoded string
+     */
+    public static function getUtf8String($string)
+    {
+        if (self::isNotUtf8Charset()) {
+            $string = static::getLanguageService()->csConvObj->utf8_encode($string, self::getCurrentCharset());
+        }
+        return $string;
+    }
+
+    /**
+     * Returns an instance of DatabaseConnection
+     *
+     * @return \TYPO3\CMS\Core\Database\DatabaseConnection
+     */
+    protected static function getDatabaseConnection()
+    {
+        return $GLOBALS['TYPO3_DB'];
     }
 
     /**

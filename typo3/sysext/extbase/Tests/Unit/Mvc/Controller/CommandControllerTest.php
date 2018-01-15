@@ -13,7 +13,6 @@ namespace TYPO3\CMS\Extbase\Tests\Unit\Mvc\Controller;
  *
  * The TYPO3 project - inspiring people to share!
  */
-use TYPO3\CMS\Extbase\Mvc\Exception\StopActionException;
 
 /**
  * Test case
@@ -32,7 +31,7 @@ class CommandControllerTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
 
     protected function setUp()
     {
-        $this->commandController = $this->getAccessibleMock(\TYPO3\CMS\Extbase\Mvc\Controller\CommandController::class, array('dummyCommand'));
+        $this->commandController = $this->getAccessibleMock(\TYPO3\CMS\Extbase\Mvc\Controller\CommandController::class, ['dummyCommand']);
         $this->mockConsoleOutput = $this->getMockBuilder(\TYPO3\CMS\Extbase\Mvc\Cli\ConsoleOutput::class)->disableOriginalConstructor()->getMock();
         $this->commandController->_set('output', $this->mockConsoleOutput);
     }
@@ -51,17 +50,16 @@ class CommandControllerTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function outputReplacesArgumentsInGivenString()
     {
-        $this->mockConsoleOutput->expects($this->once())->method('output')->with('%2$s %1$s', array('text', 'some'));
-        $this->commandController->_call('output', '%2$s %1$s', array('text', 'some'));
+        $this->mockConsoleOutput->expects($this->once())->method('output')->with('%2$s %1$s', ['text', 'some']);
+        $this->commandController->_call('output', '%2$s %1$s', ['text', 'some']);
     }
 
     /**
      * @test
+     * @expectedException \TYPO3\CMS\Extbase\Mvc\Exception\StopActionException
      */
     public function quitThrowsStopActionException()
     {
-        $this->expectException(StopActionException::class);
-        // @TODO expectExceptionCode is 0
         $mockResponse = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Response::class);
         $this->commandController->_set('response', $mockResponse);
         $this->commandController->_call('quit');
@@ -69,11 +67,10 @@ class CommandControllerTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
 
     /**
      * @test
+     * @expectedException \TYPO3\CMS\Extbase\Mvc\Exception\StopActionException
      */
     public function quitSetsResponseExitCode()
     {
-        $this->expectException(StopActionException::class);
-        // @TODO expectExceptionCode is 0
         $mockResponse = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Cli\Response::class);
         $mockResponse->expects($this->once())->method('setExitCode')->with(123);
         $this->commandController->_set('response', $mockResponse);
@@ -97,8 +94,8 @@ class CommandControllerTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
                         }
                     }
                 ));
-        $GLOBALS['BE_USER'] = $mockedUserAuthentication;
-        $this->commandController->_set('arguments', array());
+        $this->commandController->_set('userAuthentication', $mockedUserAuthentication);
+        $this->commandController->_set('arguments', []);
         $this->commandController->_set('commandMethodName', 'dummyCommand');
         $this->commandController->_set('requestAdminPermissions', true);
         $this->commandController->_call('callCommandMethod');

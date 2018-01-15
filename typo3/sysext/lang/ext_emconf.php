@@ -1,5 +1,5 @@
 <?php
-$EM_CONF[$_EXTKEY] = array(
+$EM_CONF[$_EXTKEY] = [
     'title' => 'System language labels',
     'description' => 'Contains all the core language labels in a set of files mostly of the "locallang" format. This extension is always required in a TYPO3 install.',
     'category' => 'be',
@@ -10,13 +10,13 @@ $EM_CONF[$_EXTKEY] = array(
     'author' => 'Kasper Skaarhoj',
     'author_email' => 'kasperYYYY@typo3.com',
     'author_company' => 'Curby Soft Multimedia',
-    'version' => '8.2.0',
-    'constraints' => array(
-        'depends' => array(
-            'typo3' => '8.2.0-8.2.99',
-            'extensionmanager' => '8.2.0-8.2.99',
-        ),
-        'conflicts' => array(),
-        'suggests' => array(),
-    ),
-);
+    'version' => '7.6.24',
+    'constraints' => [
+        'depends' => [
+            'typo3' => '7.6.0-7.6.24',
+            'extensionmanager' => '7.6.0-7.6.24',
+        ],
+        'conflicts' => [],
+        'suggests' => [],
+    ],
+];

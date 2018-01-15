@@ -62,7 +62,7 @@ class LocalPreviewHelper
         $sourceFile = $task->getSourceFile();
 
         // Merge custom configuration with default configuration
-        $configuration = array_merge(array('width' => 64, 'height' => 64), $task->getConfiguration());
+        $configuration = array_merge(['width' => 64, 'height' => 64], $task->getConfiguration());
         $configuration['width'] = MathUtility::forceIntegerInRange($configuration['width'], 1);
         $configuration['height'] = MathUtility::forceIntegerInRange($configuration['height'], 1);
 
@@ -93,15 +93,14 @@ class LocalPreviewHelper
      * @param File $file The source file
      * @param array $configuration Processing configuration
      * @param string $targetFilePath Output file path
-     * @return array|NULL
+     * @return array
      */
     protected function generatePreviewFromFile(File $file, array $configuration, $targetFilePath)
     {
-        $originalFileName = $file->getForLocalProcessing(false);
-
         // Check file extension
-        if ($file->getType() != File::FILETYPE_IMAGE &&
-            !GeneralUtility::inList($GLOBALS['TYPO3_CONF_VARS']['GFX']['imagefile_ext'], $file->getExtension())) {
+        if ($file->getType() !== File::FILETYPE_IMAGE
+            && !GeneralUtility::inList($GLOBALS['TYPO3_CONF_VARS']['GFX']['imagefile_ext'], $file->getExtension())
+        ) {
             // Create a default image
             $graphicalFunctions = GeneralUtility::makeInstance(GraphicalFunctions::class);
             $graphicalFunctions->getTemporaryImageWithText(
@@ -110,21 +109,24 @@ class LocalPreviewHelper
                 'No ext!',
                 $file->getName()
             );
-            $result = array(
+            return [
                 'filePath' => $targetFilePath,
-            );
-        } elseif ($file->getExtension() === 'svg') {
+            ];
+        }
+
+        $originalFileName = $file->getForLocalProcessing(false);
+        if ($file->getExtension() === 'svg') {
             /** @var $gifBuilder \TYPO3\CMS\Frontend\Imaging\GifBuilder */
             $gifBuilder = GeneralUtility::makeInstance(\TYPO3\CMS\Frontend\Imaging\GifBuilder::class);
             $gifBuilder->init();
             $gifBuilder->absPrefix = PATH_site;
             $info = $gifBuilder->getImageDimensions($originalFileName);
-            $newInfo = $gifBuilder->getImageScale($info, $configuration['width'], $configuration['height'], array());
-            $result = array(
+            $newInfo = $gifBuilder->getImageScale($info, $configuration['width'], $configuration['height'], []);
+            $result = [
                 'width' => $newInfo[0],
                 'height' => $newInfo[1],
                 'filePath' => '' // no file = use original
-            );
+            ];
         } else {
             // Create the temporary file
             if ($GLOBALS['TYPO3_CONF_VARS']['GFX']['processor_enabled']) {
@@ -145,9 +147,9 @@ class LocalPreviewHelper
                     );
                 }
             }
-            $result = array(
+            $result = [
                 'filePath' => $targetFilePath,
-            );
+            ];
         }
 
         return $result;

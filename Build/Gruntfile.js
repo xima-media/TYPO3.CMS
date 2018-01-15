@@ -33,54 +33,30 @@ module.exports = function(grunt) {
 			less      : '<%= paths.resources %>Public/Less/',
 			root      : '../',
 			sysext    : '<%= paths.root %>typo3/sysext/',
-			form      : '<%= paths.sysext %>form/Resources/',
-			frontend  : '<%= paths.sysext %>frontend/Resources/',
+			t3skin    : '<%= paths.sysext %>t3skin/Resources/',
 			install   : '<%= paths.sysext %>install/Resources/',
-			linkvalidator : '<%= paths.sysext %>linkvalidator/Resources/',
 			backend   : '<%= paths.sysext %>backend/Resources/',
-			workspaces: '<%= paths.sysext %>workspaces/Resources/',
 			core      : '<%= paths.sysext %>core/Resources/',
 			flags     : 'bower_components/region-flags/svg/',
-			t3icons   : 'bower_components/wmdbsystems-typo3-icons/dist/'
+			t3icons   : 'bower_components/typo3-icons/dist/'
 		},
 		less: {
-			options: {
-				banner: '<%= banner %>',
-				outputSourceFiles: true
-			},
-			backend: {
+			t3skin: {
+				options: {
+					banner: '<%= banner %>',
+					outputSourceFiles: true
+				},
 				files: {
-					"<%= paths.backend %>Public/Css/backend.css": "<%= paths.less %>backend.less"
+					"<%= paths.t3skin %>Public/Css/backend.css": "<%= paths.less %>backend.less"
 				}
 			},
-			core: {
+			InstallTool: {
+				options: {
+					banner: '<%= banner %>',
+					outputSourceFiles: true
+				},
 				files: {
-					"<%= paths.core %>Public/Css/errorpage.css": "<%= paths.less %>errorpage.less"
-				}
-			},
-			form: {
-				files: {
-					"<%= paths.form %>Public/Css/form.css": "<%= paths.less %>form.less"
-				}
-			},
-			frontend: {
-				files: {
-					"<%= paths.frontend %>Public/Css/adminpanel.css": "<%= paths.less %>adminpanel.less"
-				}
-			},
-			install: {
-				files: {
-					"<%= paths.install %>Public/Css/install.css": "<%= paths.less %>install.less"
-				}
-			},
-			linkvalidator: {
-				files: {
-					"<%= paths.linkvalidator %>Public/Css/linkvalidator.css": "<%= paths.less %>linkvalidator.less"
-				}
-			},
-			workspaces: {
-				files: {
-					"<%= paths.workspaces %>Public/Css/preview.css": "<%= paths.workspaces %>Private/Less/preview.less"
+					"<%= paths.install %>Public/Css/InstallTool.css": "<%= paths.less %>InstallTool.less"
 				}
 			}
 		},
@@ -92,37 +68,19 @@ module.exports = function(grunt) {
 						browsers: [
 							'Last 2 versions',
 							'Firefox ESR',
-							'IE 11'
+							'IE 9'
 						]
 					})
 				]
 			},
-			backend: {
-				src: '<%= paths.backend %>Public/Css/*.css'
+			t3skin: {
+				src: '<%= paths.t3skin %>Public/Css/*.css'
 			},
-			core: {
-				src: '<%= paths.core %>Public/Css/*.css'
-			},
-			form: {
-				src: '<%= paths.form %>Public/Css/*.css'
-			},
-			frontend: {
-				src: '<%= paths.frontend %>Public/Css/*.css'
-			},
-			install: {
-				src: '<%= paths.install %>Public/Css/*.css'
-			},
-			linkvalidator: {
-				src: '<%= paths.linkvalidator %>Public/Css/*.css'
-			},
-			workspaces: {
-				src: '<%= paths.workspaces %>Public/Css/*.css'
+			InstallTool: {
+				src: '<%= paths.install %>Public/Css/InstallTool.css'
 			}
 		},
 		watch: {
-			options: {
-				livereload: true
-			},
 			less: {
 				files: '<%= paths.less %>**/*.less',
 				tasks: 'css'
@@ -144,6 +102,7 @@ module.exports = function(grunt) {
 			module_icons: {
 				files: [
 					{ dest: '<%= paths.sysext %>about/Resources/Public/Icons/module-about.svg', src: '<%= paths.t3icons %>module/module-about.svg' },
+					{ dest: '<%= paths.sysext %>aboutmodules/Resources/Public/Icons/module-aboutmodules.svg', src: '<%= paths.t3icons %>module/module-aboutmodules.svg' },
 					{ dest: '<%= paths.sysext %>belog/Resources/Public/Icons/module-belog.svg', src: '<%= paths.t3icons %>module/module-belog.svg' },
 					{ dest: '<%= paths.sysext %>beuser/Resources/Public/Icons/module-beuser.svg', src: '<%= paths.t3icons %>module/module-beuser.svg' },
 					{ dest: '<%= paths.sysext %>lowlevel/Resources/Public/Icons/module-config.svg', src: '<%= paths.t3icons %>module/module-config.svg' },
@@ -180,24 +139,12 @@ module.exports = function(grunt) {
 				runBower: false,
 				srcPrefix: "bower_components/"
 			},
-			glob: {
-				files: {
-					// When using glob patterns, destinations are *always* folder names
-					// into which matching files will be copied
-					// Also note that subdirectories are **not** maintained
-					// if a destination is specified
-					// For example, one of the files copied here is
-					// 'lodash/dist/lodash.js' -> 'public/js/libs/lodash/lodash.js'
-					'<%= paths.sysext %>core/Resources/Public/Images/colorpicker': 'jquery-minicolors/*.png'
-				}
-			},
 			all: {
 				options: {
 					destPrefix: "<%= paths.core %>Public/JavaScript/Contrib"
 				},
 				files: {
 					'nprogress.js': 'nprogress/nprogress.js',
-					'jquery.matchHeight-min.js': 'matchHeight/jquery.matchHeight-min.js',
 					'jquery.dataTables.js': 'datatables/media/js/jquery.dataTables.min.js',
 					'require.js': 'requirejs/require.js',
 					'moment.js': 'moment/min/moment-with-locales.min.js',
@@ -206,19 +153,17 @@ module.exports = function(grunt) {
 					'imagesloaded.pkgd.min.js': 'imagesloaded/imagesloaded.pkgd.min.js',
 					'bootstrap-datetimepicker.js': 'eonasdan-bootstrap-datetimepicker/build/js/bootstrap-datetimepicker.min.js',
 					'autosize.js': 'autosize/dist/autosize.min.js',
+					'placeholders.min.js': 'Placeholders.js/dist/placeholders.min.js',
 					'taboverride.min.js': 'taboverride/build/output/taboverride.min.js',
 					'bootstrap-slider.min.js': 'seiyria-bootstrap-slider/dist/bootstrap-slider.min.js',
-					'jquery.minicolors.js': 'jquery-minicolors/jquery.minicolors.min.js',
-					/* disabled until autocomplete groupBy is fixed by the author
-						see https://github.com/devbridge/jQuery-Autocomplete/pull/387
+					/* disabled until autocomplete formatGroup is fixed to pass on the index too
 					'jquery.autocomplete.js': 'devbridge-autocomplete/src/jquery.autocomplete.js',
-					 */
-
+					*/
 					/**
 					 * copy needed parts of jquery
 					 */
-					'jquery/jquery-2.2.3.js': 'jquery/dist/jquery.js',
-					'jquery/jquery-2.2.3.min.js': 'jquery/dist/jquery.min.js',
+					'jquery/jquery-2.1.4.js': 'jquery/dist/jquery.js',
+					'jquery/jquery-2.1.4.min.js': 'jquery/dist/jquery.min.js',
 					/**
 					 * copy needed parts of jquery-ui
 					 */

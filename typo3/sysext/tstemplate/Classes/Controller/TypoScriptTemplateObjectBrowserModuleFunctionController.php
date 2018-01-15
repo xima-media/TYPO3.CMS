@@ -16,7 +16,6 @@ namespace TYPO3\CMS\Tstemplate\Controller;
 
 use TYPO3\CMS\Backend\Module\AbstractFunctionModule;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Charset\CharsetConverter;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Exception;
 use TYPO3\CMS\Core\Imaging\Icon;
@@ -25,6 +24,7 @@ use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\TypoScript\ExtendedTemplateService;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Fluid\View\StandaloneView;
 use TYPO3\CMS\Fluid\ViewHelpers\Be\InfoboxViewHelper;
 use TYPO3\CMS\Frontend\Page\PageRepository;
@@ -61,31 +61,29 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
     public function modMenu()
     {
         $lang = $this->getLanguageService();
-        /** @var CharsetConverter $charsetConverter */
-        $charsetConverter = GeneralUtility::makeInstance(CharsetConverter::class);
         $lang->includeLLFile('EXT:tstemplate/Resources/Private/Language/locallang_objbrowser.xlf');
-        $modMenu = array(
-            'ts_browser_type' => array(
+        $modMenu = [
+            'ts_browser_type' => [
                 'const' => $lang->getLL('constants'),
                 'setup' => $lang->getLL('setup')
-            ),
-            'ts_browser_toplevel_setup' => array(
-                '0' => $charsetConverter->conv_case('utf-8', $lang->getLL('all'), 'toUpper')
-            ),
-            'ts_browser_toplevel_const' => array(
-                '0' => $charsetConverter->conv_case('utf-8', $lang->getLL('all'), 'toUpper')
-            ),
-            'ts_browser_const' => array(
+            ],
+            'ts_browser_toplevel_setup' => [
+                '0' => $lang->csConvObj->conv_case($lang->charSet, $lang->getLL('all'), 'toUpper')
+            ],
+            'ts_browser_toplevel_const' => [
+                '0' => $lang->csConvObj->conv_case($lang->charSet, $lang->getLL('all'), 'toUpper')
+            ],
+            'ts_browser_const' => [
                 '0' => $lang->getLL('plainSubstitution'),
                 'subst' => $lang->getLL('substitutedGreen'),
                 'const' => $lang->getLL('unsubstitutedGreen')
-            ),
+            ],
             'ts_browser_regexsearch' => '1',
             'ts_browser_fixedLgd' => '1',
             'ts_browser_showComments' => '1',
             'ts_browser_alphaSort' => '1'
-        );
-        foreach (array('setup', 'const') as $bType) {
+        ];
+        foreach (['setup', 'const'] as $bType) {
             $addKey = GeneralUtility::_GET('addKey');
             // If any plus-signs were clicked, it's registered.
             if (is_array($addKey)) {
@@ -103,6 +101,77 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
             }
         }
         return $modMenu;
+    }
+
+    /**
+     * Verify TS objects
+     *
+     * @param array $propertyArray
+     * @param string $parentType
+     * @param string $parentValue
+     * @return array|NULL
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function verify_TSobjects($propertyArray, $parentType, $parentValue)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        $TSobjTable = [
+            'PAGE' => [
+                'prop' => [
+                    'typeNum' => 'int',
+                    '1,2,3' => 'COBJ',
+                    'bodyTag' => 'string'
+                ]
+            ],
+            'TEXT' => [
+                'prop' => [
+                    'value' => 'string'
+                ]
+            ],
+            'HTML' => [
+                'prop' => [
+                    'value' => 'stdWrap'
+                ]
+            ],
+            'stdWrap' => [
+                'prop' => [
+                    'field' => 'string',
+                    'current' => 'boolean'
+                ]
+            ]
+        ];
+        $TSobjDataTypes = [
+            'COBJ' => 'TEXT,CONTENT',
+            'PAGE' => 'PAGE',
+            'stdWrap' => ''
+        ];
+        if ($parentType) {
+            if (isset($TSobjDataTypes[$parentType]) && (!$TSobjDataTypes[$parentType] || GeneralUtility::inlist($TSobjDataTypes[$parentType], $parentValue))) {
+                $ObjectKind = $parentValue;
+            } else {
+                // Object kind is "" if it should be known.
+                $ObjectKind = '';
+            }
+        } else {
+            // If parentType is not given, then it can be anything. Free.
+            $ObjectKind = $parentValue;
+        }
+        if ($ObjectKind && is_array($TSobjTable[$ObjectKind])) {
+            $result = [];
+            if (is_array($propertyArray)) {
+                foreach ($propertyArray as $key => $val) {
+                    if (MathUtility::canBeInterpretedAsInteger($key)) {
+                        // If num-arrays
+                        $result[$key] = $TSobjTable[$ObjectKind]['prop']['1,2,3'];
+                    } else {
+                        // standard
+                        $result[$key] = $TSobjTable[$ObjectKind]['prop'][$key];
+                    }
+                }
+            }
+            return $result;
+        }
+        return null;
     }
 
     /**
@@ -145,8 +214,6 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
         $lang = $this->getLanguageService();
         $POST = GeneralUtility::_POST();
         $documentTemplate = $this->getDocumentTemplate();
-        /** @var CharsetConverter $charsetConverter */
-        $charsetConverter = GeneralUtility::makeInstance(CharsetConverter::class);
 
         // Checking for more than one template an if, set a menu...
         $manyTemplatesMenu = $this->pObj->templateMenu();
@@ -164,7 +231,7 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
             $content = ' ' . $iconFactory->getIconForRecord('sys_template', $tplRow, Icon::SIZE_SMALL)->render() . ' <strong>'
                 . $this->pObj->linkWrapTemplateTitle($tplRow['title'], ($bType == 'setup' ? 'config' : 'constants')) . '</strong>'
                 . (trim($tplRow['sitetitle']) ? htmlspecialchars(' (' . $tplRow['sitetitle'] . ')') : '');
-            $theOutput .= '<h3>' . htmlspecialchars($lang->getLL('currentTemplate')) . '</h3>';
+            $theOutput .= '<h3>' . $lang->getLL('currentTemplate', true) . '</h3>';
             $theOutput .= '<div>';
             $theOutput .= $content;
             $theOutput .= '</div>';
@@ -211,13 +278,14 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
                 if ($line) {
                     $saveId = $tplRow['_ORIG_uid'] ? $tplRow['_ORIG_uid'] : $tplRow['uid'];
                     // Set the data to be saved
-                    $recData = array();
+                    $recData = [];
                     $field = $bType == 'setup' ? 'config' : 'constants';
                     $recData['sys_template'][$saveId][$field] = $tplRow[$field] . $line;
                     // Create new  tce-object
                     $tce = GeneralUtility::makeInstance(DataHandler::class);
+                    $tce->stripslashes_values = false;
                     // Initialize
-                    $tce->start($recData, array());
+                    $tce->start($recData, []);
                     // Saved the stuff
                     $tce->process_datamap();
                     // Clear the cache (note: currently only admin-users can clear the cache in tce_main.php)
@@ -280,7 +348,7 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
                 $out .= '	<input class="form-control" type="text" name="data[' . htmlspecialchars($this->pObj->sObj) . '][value]" value="' . htmlspecialchars($theSetupValue) . '"' . $documentTemplate->formWidth(40) . ' />';
                 $out .= '	<input class="btn btn-default" type="submit" name="update_value" value="' . $lang->getLL('updateButton') . '" />';
                 $out .= '</div>';
-                $theOutput .= '<h3>' . htmlspecialchars($lang->getLL('editProperty')) . '</h3>';
+                $theOutput .= '<h3>' . $lang->getLL('editProperty', true) . '</h3>';
                 $theOutput .= $out;
                 // Property
                 $out = '<div class="form-group">';
@@ -291,20 +359,20 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
                 $out .= '	<input class="btn btn-default" type="submit" name="add_property" value="' . $lang->getLL('addButton') . '" />';
                 $out .= '</div>';
                 $theOutput .= '<div style="padding-top: 20px;"></div>';
-                $theOutput .= '<h3>' . htmlspecialchars($lang->getLL('addProperty')) . '</h3>';
+                $theOutput .= '<h3>' . $lang->getLL('addProperty', true) . '</h3>';
                 $theOutput .= $out;
                 // clear
                 $out = '<div class="form-group">';
                 $out .= '	<div class="checkbox">';
                 $out .= '		<label>';
-                $out .= '			' . htmlspecialchars($this->pObj->sObj) . ' ' . $charsetConverter->conv_case('utf-8', $lang->getLL('clear'), 'toUpper');
+                $out .= '			' . htmlspecialchars($this->pObj->sObj) . ' ' . $lang->csConvObj->conv_case($lang->charSet, $lang->getLL('clear'), 'toUpper');
                 $out .= '			<input type="checkbox" name="data[' . htmlspecialchars($this->pObj->sObj) . '][clearValue]" value="1" />';
                 $out .= '		</label>';
                 $out .= '		<input class="btn btn-default" type="submit" name="clear_object" value="' . $lang->getLL('clearButton') . '" />';
                 $out .= '	</div>';
                 $out .= '</div>';
                 $theOutput .='<div style="padding-top: 20px;"></div>';
-                $theOutput .= '<h3>' . htmlspecialchars($lang->getLL('clearObject')) . '</h3>';
+                $theOutput .= '<h3>' . $lang->getLL('clearObject', true) . '</h3>';
                 $theOutput .= $out;
                 $theOutput .= '<div style="padding-top: 10px;"></div>';
                 // Inline Form Area End
@@ -317,9 +385,9 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
             }
             // Links:
             $out = '';
-            $urlParameters = array(
+            $urlParameters = [
                 'id' => $this->pObj->id
-            );
+            ];
             $aHref = BackendUtility::getModuleUrl('web_ts', $urlParameters);
             if (!$this->pObj->MOD_SETTINGS['ts_browser_TLKeys_' . $bType][$this->pObj->sObj]) {
                 if (!empty($theSetup)) {
@@ -336,7 +404,7 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
             // back
             $out = $lang->getLL('back');
             $out = '<a href="' . htmlspecialchars($aHref) . '" class="btn btn-default"><strong><i class="fa fa-chevron-left"></i>&nbsp;' . $out . '</strong></a>';
-            $theOutput .= '<div><hr style="margin-top: 5px; margin-bottom: 5px;" />'  . $out . '</div>';
+            $theOutput .= '<div><hr style="margin-top: 5px; margin-bottom: 5px;" />' . $out . '</div>';
         } else {
             $templateService->tsbrowser_depthKeys = $this->pObj->MOD_SETTINGS['tsbrowser_depthKeys_' . $bType];
             if (GeneralUtility::_POST('search') && GeneralUtility::_POST('search_field')) {
@@ -348,7 +416,7 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
                             $theSetup,
                             '',
                             $searchString,
-                            array()
+                            []
                         );
                 } catch (Exception $e) {
                     $this->addFlashMessage(
@@ -396,14 +464,14 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
             list($theSetup, $theSetupValue) = $templateService->ext_getSetup($theSetup, $this->pObj->MOD_SETTINGS['ts_browser_toplevel_' . $bType] ? $this->pObj->MOD_SETTINGS['ts_browser_toplevel_' . $bType] : '');
             $tree = $templateService->ext_getObjTree($theSetup, $theKey, '', '', $theSetupValue, $this->pObj->MOD_SETTINGS['ts_browser_alphaSort']);
             $tree = $templateService->substituteCMarkers($tree);
-            $urlParameters = array(
+            $urlParameters = [
                 'id' => $this->pObj->id
-            );
+            ];
             $aHref = BackendUtility::getModuleUrl('web_ts', $urlParameters);
             // Parser Errors:
             $pEkey = $bType == 'setup' ? 'config' : 'constants';
             if (!empty($templateService->parserErrors[$pEkey])) {
-                $errMsg = array();
+                $errMsg = [];
                 foreach ($templateService->parserErrors[$pEkey] as $inf) {
                     $errorLink = ' <a href="' . htmlspecialchars(($aHref . '&SET[function]=TYPO3\\CMS\\Tstemplate\\Controller\\TemplateAnalyzerModuleFunctionController&template=all&SET[ts_analyzer_checkLinenum]=1#line-' . $inf[2])) . '" class="text-warning">' . $lang->getLL('errorShowDetails') . '</a>';
                     $errMsg[] = $lang->getLL('severity.' . $inf[1]) . ':&nbsp;' . $inf[0] . $errorLink;
@@ -414,11 +482,11 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
                 $message = '<p>' . implode($errMsg, '<br />') . '</p>';
                 $view = GeneralUtility::makeInstance(StandaloneView::class);
                 $view->setTemplatePathAndFilename(GeneralUtility::getFileAbsFileName('EXT:tstemplate/Resources/Private/Templates/InfoBox.html'));
-                $view->assignMultiple(array(
+                $view->assignMultiple([
                     'title' => $title,
                     'message' => $message,
                     'state' => InfoboxViewHelper::STATE_WARNING
-                ));
+                ]);
                 $theOutput .= $view->render();
             }
 
@@ -428,17 +496,13 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
                 $remove = '';
             }
 
-            if ($theKey) {
-                $label = $theKey;
-            } else {
-                $label = $charsetConverter->conv_case('utf-8', $lang->getLL($bType === 'setup' ? 'setupRoot' : 'constantRoot'), 'toUpper');
-            }
+            $label = $theKey ? $theKey : ($bType == 'setup' ? $lang->csConvObj->conv_case($lang->charSet, $lang->getLL('setupRoot'), 'toUpper') : $lang->csConvObj->conv_case($lang->charSet, $lang->getLL('constantRoot'), 'toUpper'));
 
             $theOutput .= '<div class="panel panel-space panel-default">';
             $theOutput .= '<div class="panel-heading">';
             $theOutput .= '<strong>' . $label . ' ' . $remove . '</strong>';
             $theOutput .= '</div>';
-            $theOutput .= '<div class="panel-body">' . $tree  .  '</div>';
+            $theOutput .= '<div class="panel-body">' . $tree . '</div>';
             $theOutput .= '</div>';
 
             // second row options
@@ -458,11 +522,11 @@ class TypoScriptTemplateObjectBrowserModuleFunctionController extends AbstractFu
 
             //start section displayoptions
             $theOutput .= '<div>';
-            $theOutput .= '<h2>' . htmlspecialchars($lang->getLL('displayOptions')) . '</h2>';
+            $theOutput .= '<h2>' . $lang->getLL('displayOptions', true) . '</h2>';
             $theOutput .= $menu;
             // Conditions:
             if (is_array($templateService->sections) && !empty($templateService->sections)) {
-                $theOutput .= '<h2>' . htmlspecialchars($lang->getLL('conditions')) . '</h2>';
+                $theOutput .= '<h2>' . $lang->getLL('conditions', true) . '</h2>';
                 $out = '';
                 foreach ($templateService->sections as $key => $val) {
                     $out .= '<div class="checkbox"><label for="check' . $key . '">';

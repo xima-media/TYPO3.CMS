@@ -90,6 +90,10 @@ class CliRequestHandler implements RequestHandlerInterface
             $exitCode = $e->getCode();
         }
 
+        if ($exitCode > 0 && 0 === $exitCode % 256) {
+            $exitCode = 1;
+        }
+
         exit($exitCode);
     }
 
@@ -155,7 +159,7 @@ class CliRequestHandler implements RequestHandlerInterface
         $GLOBALS['temp_cliScriptPath'] = array_shift($_SERVER['argv']);
         $GLOBALS['temp_cliKey'] = array_shift($_SERVER['argv']);
         array_unshift($_SERVER['argv'], $GLOBALS['temp_cliScriptPath']);
-        return array($commandLineScript, $commandLineName);
+        return [$commandLineScript, $commandLineName];
     }
 
     /**

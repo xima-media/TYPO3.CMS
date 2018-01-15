@@ -1,5 +1,5 @@
 <?php
-$EM_CONF[$_EXTKEY] = array(
+$EM_CONF[$_EXTKEY] = [
     'title' => 'Frontend Login for Website Users',
     'description' => 'A template-based plugin to log in Website Users in the Frontend',
     'category' => 'plugin',
@@ -10,12 +10,12 @@ $EM_CONF[$_EXTKEY] = array(
     'uploadfolder' => 1,
     'createDirs' => '',
     'clearCacheOnLoad' => 1,
-    'version' => '8.2.0',
-    'constraints' => array(
-        'depends' => array(
-            'typo3' => '8.2.0-8.2.99',
-        ),
-        'conflicts' => array(),
-        'suggests' => array(),
-    ),
-);
+    'version' => '7.6.24',
+    'constraints' => [
+        'depends' => [
+            'typo3' => '7.6.0-7.6.24',
+        ],
+        'conflicts' => [],
+        'suggests' => [],
+    ],
+];

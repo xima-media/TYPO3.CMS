@@ -76,13 +76,28 @@ define(['jquery',
 	 * @param {int} severity use constants from Severity.*
 	 * @returns {String}
 	 * @private
-	 * @deprecated
 	 */
 	Modal.getSeverityClass = function(severity) {
-		if (console) {
-			console.warn('Modal.getSeverityClass() is deprecated and will be removed with TYPO3 v9, please use Severity.getCssClass()');
+		var severityClass;
+		switch (severity) {
+			case Severity.notice:
+				severityClass = 'notice';
+				break;
+			case Severity.ok:
+				severityClass = 'success';
+				break;
+			case Severity.warning:
+				severityClass = 'warning';
+				break;
+			case Severity.error:
+				severityClass = 'danger';
+				break;
+			case Severity.info:
+			default:
+				severityClass = 'info';
+				break;
 		}
-		return Severity.getCssClass(severity);
+		return severityClass;
 	};
 
 	/**
@@ -93,7 +108,7 @@ define(['jquery',
 	 * - confirm.button.ok
 	 *
 	 * @param {String} title the title for the confirm modal
-	 * @param {*} content the content for the conform modal, e.g. the main question
+	 * @param {String} content the content for the conform modal, e.g. the main question
 	 * @param {int} [severity=Severity.warning] severity default Severity.warning
 	 * @param {array} [buttons] an array with buttons, default no buttons
 	 * @param {array} [additionalCssClasses=''] additional css classes to add to the modal
@@ -109,7 +124,7 @@ define(['jquery',
 				},
 				{
 					text: $(this).data('button-ok-text') || TYPO3.lang['button.ok'] || 'OK',
-					btnClass: 'btn-' + Severity.getCssClass(severity),
+					btnClass: 'btn-' + Modal.getSeverityClass(severity),
 					name: 'ok'
 				}
 			];
@@ -154,7 +169,7 @@ define(['jquery',
 	 * - button.clicked
 	 *
 	 * @param {String} title the title for the confirm modal
-	 * @param {*} content the content for the conform modal, e.g. the main question
+	 * @param {String} content the content for the conform modal, e.g. the main question
 	 * @param {int} severity default Severity.info
 	 * @param {array} buttons an array with buttons, default no buttons
 	 * @param {array} additionalCssClasses additional css classes to add to the modal
@@ -188,7 +203,7 @@ define(['jquery',
 			currentModal.find('.modal-body').html(content);
 		}
 
-		currentModal.addClass('t3-modal-' + Severity.getCssClass(severity));
+		currentModal.addClass('t3-modal-' + Modal.getSeverityClass(severity));
 		if (buttons.length > 0) {
 			for (i = 0; i<buttons.length; i++) {
 				var button = buttons[i];
@@ -228,7 +243,6 @@ define(['jquery',
 				Modal.instances.splice(lastIndex, 1);
 				Modal.currentModal = Modal.instances[lastIndex-1];
 			}
-			currentModal.trigger('modal-destroyed');
 			$(this).remove();
 			// Keep class modal-open on body tag as long as open modals exist
 			if (Modal.instances.length > 0) {
@@ -305,7 +319,7 @@ define(['jquery',
 				},
 				{
 					text: $element.data('button-ok-text') || 'OK',
-					btnClass: 'btn-' + Severity.getCssClass(severity),
+					btnClass: 'btn-' + Modal.getSeverityClass(severity),
 					trigger: function() {
 						Modal.currentModal.trigger('modal-dismiss');
 						evt.target.ownerDocument.location.href = $element.data('href') || $element.attr('href');

@@ -14,14 +14,12 @@ namespace TYPO3\CMS\Core\Utility;
  * The TYPO3 project - inspiring people to share!
  */
 
-use GuzzleHttp\Exception\RequestException;
-use TYPO3\CMS\Core\Charset\CharsetConverter;
 use TYPO3\CMS\Core\Core\ApplicationContext;
 use TYPO3\CMS\Core\Core\ClassLoadingInformation;
-use TYPO3\CMS\Core\Crypto\Random;
-use TYPO3\CMS\Core\Http\RequestFactory;
+use TYPO3\CMS\Core\Imaging\GraphicalFunctions;
 use TYPO3\CMS\Core\Service\OpcodeCacheService;
 use TYPO3\CMS\Core\SingletonInterface;
+use TYPO3\CMS\Frontend\Page\PageRepository;
 
 /**
  * The legendary "t3lib_div" class - Miscellaneous functions for general purpose.
@@ -61,21 +59,21 @@ class GeneralUtility
      *
      * @var array<\TYPO3\CMS\Core\SingletonInterface>
      */
-    protected static $singletonInstances = array();
+    protected static $singletonInstances = [];
 
     /**
      * Instances returned by makeInstance, using the class names as array keys
      *
      * @var array<array><object>
      */
-    protected static $nonSingletonInstances = array();
+    protected static $nonSingletonInstances = [];
 
     /**
      * Cache for makeInstance with given class name and final class names to reduce number of self::getClassName() calls
      *
      * @var array Given class name => final class name
      */
-    protected static $finalClassNameCache = array();
+    protected static $finalClassNameCache = [];
 
     /**
      * The application context
@@ -89,7 +87,7 @@ class GeneralUtility
      *
      * @var array<string>
      */
-    protected static $idnaStringCache = array();
+    protected static $idnaStringCache = [];
 
     /**
      * IDNA converter
@@ -103,13 +101,13 @@ class GeneralUtility
      * NOTICE: This is a duplicate of the SAME array in SystemEnvironmentBuilder
      * @var array
      */
-    protected static $supportedCgiServerApis = array(
+    protected static $supportedCgiServerApis = [
         'fpm-fcgi',
         'cgi',
         'isapi',
         'cgi-fcgi',
         'srv', // HHVM with fastcgi
-    );
+    ];
 
     /**
      * @var array
@@ -165,8 +163,8 @@ class GeneralUtility
      */
     public static function _GPmerged($parameter)
     {
-        $postParameter = isset($_POST[$parameter]) && is_array($_POST[$parameter]) ? $_POST[$parameter] : array();
-        $getParameter = isset($_GET[$parameter]) && is_array($_GET[$parameter]) ? $_GET[$parameter] : array();
+        $postParameter = isset($_POST[$parameter]) && is_array($_POST[$parameter]) ? $_POST[$parameter] : [];
+        $getParameter = isset($_GET[$parameter]) && is_array($_GET[$parameter]) ? $_GET[$parameter] : [];
         $mergedParameters = $getParameter;
         ArrayUtility::mergeRecursiveWithOverrule($mergedParameters, $postParameter);
         return $mergedParameters;
@@ -221,7 +219,7 @@ class GeneralUtility
         if ($key != '') {
             if (strpos($key, '|') !== false) {
                 $pieces = explode('|', $key);
-                $newGet = array();
+                $newGet = [];
                 $pointer = &$newGet;
                 foreach ($pieces as $piece) {
                     $pointer = &$pointer[$piece];
@@ -249,7 +247,6 @@ class GeneralUtility
      *
      * @param string $string Input string
      * @return string Input string with potential XSS code removed
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
      */
     public static function removeXSS($string)
     {
@@ -261,6 +258,62 @@ class GeneralUtility
      * IMAGE FUNCTIONS
      *
      *************************/
+    /**
+     * Compressing a GIF file if not already LZW compressed.
+     * This function is a workaround for the fact that ImageMagick and/or GD does not compress GIF-files to their minimun size (that is RLE or no compression used)
+     *
+     * The function takes a file-reference, $theFile, and saves it again through GD or ImageMagick in order to compress the file
+     * GIF:
+     * If $type is not set, the compression is done with ImageMagick (provided that $GLOBALS['TYPO3_CONF_VARS']['GFX']['im_path_lzw'] is pointing to the path of a lzw-enabled version of 'convert') else with GD (should be RLE-enabled!)
+     * If $type is set to either 'IM' or 'GD' the compression is done with ImageMagick and GD respectively
+     * PNG:
+     * No changes.
+     *
+     * $theFile is expected to be a valid GIF-file!
+     * The function returns a code for the operation.
+     *
+     * @param string $theFile Filepath
+     * @param string $type See description of function
+     * @return string Returns "GD" if GD was used, otherwise "IM" if ImageMagick was used. If nothing done at all, it returns empty string.
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8. Use \TYPO3\CMS\Core\Imaging\GraphicalFunctions::gifCompress() instead.
+     */
+    public static function gif_compress($theFile, $type)
+    {
+        static::logDeprecatedFunction();
+        $returnCode = GraphicalFunctions::gifCompress($theFile, $type);
+        return $returnCode;
+    }
+
+    /**
+     * Converts a png file to gif.
+     * This converts a png file to gif IF the FLAG $GLOBALS['TYPO3_CONF_VARS']['FE']['png_to_gif'] is set TRUE.
+     *
+     * @param string $theFile The filename with path
+     * @return string New filename
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8. Use \TYPO3\CMS\Core\Imaging\GraphicalFunctions::pngToGifByImagemagick() instead.
+     */
+    public static function png_to_gif_by_imagemagick($theFile)
+    {
+        static::logDeprecatedFunction();
+        $newFile = GraphicalFunctions::pngToGifByImagemagick($theFile);
+        return $newFile;
+    }
+
+    /**
+     * Returns filename of the png/gif version of the input file (which can be png or gif).
+     * If input file type does not match the wanted output type a conversion is made and temp-filename returned.
+     *
+     * @param string $theFile Filepath of image file
+     * @param bool $output_png If set, then input file is converted to PNG, otherwise to GIF
+     * @return string If the new image file exists, its filepath is returned
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8. Use \TYPO3\CMS\Core\Imaging\GraphicalFunctions::readPngGif() instead.
+     */
+    public static function read_png_gif($theFile, $output_png = false)
+    {
+        static::logDeprecatedFunction();
+        $newFile = GraphicalFunctions::readPngGif($theFile, $output_png);
+        return $newFile;
+    }
 
     /*************************
      *
@@ -277,9 +330,16 @@ class GeneralUtility
      */
     public static function fixed_lgd_cs($string, $chars, $appendString = '...')
     {
-        /** @var CharsetConverter $charsetConverter */
-        $charsetConverter = self::makeInstance(\TYPO3\CMS\Core\Charset\CharsetConverter::class);
-        return $charsetConverter->crop('utf-8', $string, $chars, $appendString);
+        if (is_object($GLOBALS['LANG'])) {
+            return $GLOBALS['LANG']->csConvObj->crop($GLOBALS['LANG']->charSet, $string, $chars, $appendString);
+        } elseif (is_object($GLOBALS['TSFE']) && is_object($GLOBALS['TSFE']->csConvObj)) {
+            $charSet = $GLOBALS['TSFE']->renderCharset != '' ? $GLOBALS['TSFE']->renderCharset : $GLOBALS['TSFE']->defaultCharSet;
+            return $GLOBALS['TSFE']->csConvObj->crop($charSet, $string, $chars, $appendString);
+        } else {
+            // This case should not happen
+            $csConvObj = self::makeInstance(\TYPO3\CMS\Core\Charset\CharsetConverter::class);
+            return $csConvObj->crop('utf-8', $string, $chars, $appendString);
+        }
     }
 
     /**
@@ -670,7 +730,7 @@ class GeneralUtility
     public static function expandList($list)
     {
         $items = explode(',', $list);
-        $list = array();
+        $list = [];
         foreach ($items as $item) {
             $range = explode('-', $item);
             if (isset($range[1])) {
@@ -696,11 +756,9 @@ class GeneralUtility
      * @param string $verNumberStr Minimum branch number required (format x.y / e.g. "4.0" NOT "4.0.0"!)
      * @return bool Returns TRUE if this setup is compatible with the provided version number
      * @todo Still needs a function to convert versions to branches
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
      */
     public static function compat_version($verNumberStr)
     {
-        static::logDeprecatedFunction();
         return VersionNumberUtility::convertVersionNumberToInteger(TYPO3_branch) >= VersionNumberUtility::convertVersionNumberToInteger($verNumberStr);
     }
 
@@ -786,7 +844,7 @@ class GeneralUtility
      */
     public static function split_fileref($fileNameWithPath)
     {
-        $reg = array();
+        $reg = [];
         if (preg_match('/(.*\\/)(.*)$/', $fileNameWithPath, $reg)) {
             $info['path'] = $reg[1];
             $info['file'] = $reg[2];
@@ -830,6 +888,42 @@ class GeneralUtility
     }
 
     /**
+     * Modifies a HTML Hex color by adding/subtracting $R,$G and $B integers
+     *
+     * @param string $color A hexadecimal color code, #xxxxxx
+     * @param int $R Offset value 0-255
+     * @param int $G Offset value 0-255
+     * @param int $B Offset value 0-255
+     * @return string A hexadecimal color code, #xxxxxx, modified according to input vars
+     * @see modifyHTMLColorAll()
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public static function modifyHTMLColor($color, $R, $G, $B)
+    {
+        self::logDeprecatedFunction();
+        // This takes a hex-color (# included!) and adds $R, $G and $B to the HTML-color (format: #xxxxxx) and returns the new color
+        $nR = MathUtility::forceIntegerInRange(hexdec(substr($color, 1, 2)) + $R, 0, 255);
+        $nG = MathUtility::forceIntegerInRange(hexdec(substr($color, 3, 2)) + $G, 0, 255);
+        $nB = MathUtility::forceIntegerInRange(hexdec(substr($color, 5, 2)) + $B, 0, 255);
+        return '#' . substr(('0' . dechex($nR)), -2) . substr(('0' . dechex($nG)), -2) . substr(('0' . dechex($nB)), -2);
+    }
+
+    /**
+     * Modifies a HTML Hex color by adding/subtracting $all integer from all R/G/B channels
+     *
+     * @param string $color A hexadecimal color code, #xxxxxx
+     * @param int $all Offset value 0-255 for all three channels.
+     * @return string A hexadecimal color code, #xxxxxx, modified according to input vars
+     * @see modifyHTMLColor()
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public static function modifyHTMLColorAll($color, $all)
+    {
+        self::logDeprecatedFunction();
+        return self::modifyHTMLColor($color, $all, $all, $all);
+    }
+
+    /**
      * Returns TRUE if the first part of $str matches the string $partStr
      *
      * @param string $str Full string to check
@@ -851,10 +945,10 @@ class GeneralUtility
      */
     public static function formatSize($sizeInBytes, $labels = '', $base = 0)
     {
-        $defaultFormats = array(
-            'iec' => array('base' => 1024, 'labels' => array(' ', ' Ki', ' Mi', ' Gi', ' Ti', ' Pi', ' Ei', ' Zi', ' Yi')),
-            'si' => array('base' => 1000, 'labels' => array(' ', ' k', ' M', ' G', ' T', ' P', ' E', ' Z', ' Y')),
-        );
+        $defaultFormats = [
+            'iec' => ['base' => 1024, 'labels' => [' ', ' Ki', ' Mi', ' Gi', ' Ti', ' Pi', ' Ei', ' Zi', ' Yi']],
+            'si' => ['base' => 1000, 'labels' => [' ', ' k', ' M', ' G', ' T', ' P', ' E', ' Z', ' Y']],
+        ];
         // Set labels and base:
         if (empty($labels)) {
             $labels = 'iec';
@@ -895,11 +989,9 @@ class GeneralUtility
      *
      * @param string $microtime Microtime
      * @return int Microtime input string converted to an integer (milliseconds)
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
      */
     public static function convertMicrotime($microtime)
     {
-        static::logDeprecatedFunction();
         $parts = explode(' ', $microtime);
         return round(($parts[0] + $parts[1]) * 1000);
     }
@@ -914,12 +1006,12 @@ class GeneralUtility
      */
     public static function splitCalc($string, $operators)
     {
-        $res = array();
+        $res = [];
         $sign = '+';
         while ($string) {
             $valueLen = strcspn($string, $operators);
             $value = substr($string, 0, $valueLen);
-            $res[] = array($sign, trim($value));
+            $res[] = [$sign, trim($value)];
             $sign = substr($string, $valueLen, 1);
             $string = substr($string, $valueLen + 1);
         }
@@ -934,11 +1026,10 @@ class GeneralUtility
      *
      * @param string $str String which contains eg. "&amp;amp;" which should stay "&amp;". Or "&amp;#1234;" to "&#1234;". Or "&amp;#x1b;" to "&#x1b;
      * @return string Converted result.
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
+     *
      */
     public static function deHSCentities($str)
     {
-        static::logDeprecatedFunction();
         return preg_replace('/&amp;([#[:alnum:]]*;)/', '&\\1', $str);
     }
 
@@ -949,11 +1040,9 @@ class GeneralUtility
      * @param bool $extended If set, also backslashes are escaped.
      * @param string $char The character to escape, default is ' (single-quote)
      * @return string Processed input string
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
      */
     public static function slashJS($string, $extended = false, $char = '\'')
     {
-        static::logDeprecatedFunction();
         if ($extended) {
             $string = str_replace('\\', '\\\\', $string);
         }
@@ -966,11 +1055,9 @@ class GeneralUtility
      *
      * @param string $str String to raw-url-encode with spaces preserved
      * @return string Rawurlencoded result of input string, but with all %20 (space chars) converted to real spaces.
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9, implement directly via PHP instead
      */
     public static function rawUrlEncodeJS($str)
     {
-        static::logDeprecatedFunction();
         return str_replace('%20', ' ', rawurlencode($str));
     }
 
@@ -980,11 +1067,9 @@ class GeneralUtility
      *
      * @param string $str Input string
      * @return string Output string
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9, use the PHP methods directly instead
      */
     public static function rawUrlEncodeFP($str)
     {
-        static::logDeprecatedFunction();
         return str_replace('%2F', '/', rawurlencode($str));
     }
 
@@ -1020,9 +1105,64 @@ class GeneralUtility
         $domain = substr($email, $atPosition + 1);
         $user = substr($email, 0, $atPosition);
         if (!preg_match('/^[a-z0-9.\\-]*$/i', $domain)) {
-            $domain = self::idnaEncode($domain);
+            try {
+                $domain = self::idnaEncode($domain);
+            } catch (\InvalidArgumentException $exception) {
+                return false;
+            }
         }
         return filter_var($user . '@' . $domain, FILTER_VALIDATE_EMAIL) !== false;
+    }
+
+    /**
+     * Checks if current e-mail sending method does not accept recipient/sender name
+     * in a call to PHP mail() function. Windows version of mail() and mini_sendmail
+     * program are known not to process such input correctly and they cause SMTP
+     * errors. This function will return TRUE if current mail sending method has
+     * problem with recipient name in recipient/sender argument for mail().
+     *
+     * @todo 4.3 should have additional configuration variable, which is combined
+     *   by || with the rest in this function.
+     *
+     * @return bool TRUE if mail() does not accept recipient name
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public static function isBrokenEmailEnvironment()
+    {
+        self::logDeprecatedFunction();
+        return TYPO3_OS == 'WIN' || false !== strpos(ini_get('sendmail_path'), 'mini_sendmail');
+    }
+
+    /**
+     * Changes from/to arguments for mail() function to work in any environment.
+     *
+     * @param string $address Address to adjust
+     * @return string Adjusted address
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public static function normalizeMailAddress($address)
+    {
+        self::logDeprecatedFunction();
+        if (self::isBrokenEmailEnvironment() && false !== ($pos1 = strrpos($address, '<'))) {
+            $pos2 = strpos($address, '>', $pos1);
+            $address = substr($address, $pos1 + 1, ($pos2 ? $pos2 : strlen($address)) - $pos1 - 1);
+        }
+        return $address;
+    }
+
+    /**
+     * Formats a string for output between <textarea>-tags
+     * All content outputted in a textarea form should be passed through this function
+     * Not only is the content htmlspecialchar'ed on output but there is also a single newline added in the top. The newline is necessary because browsers will ignore the first newline after <textarea> if that is the first character. Therefore better set it!
+     *
+     * @param string $content Input string to be formatted.
+     * @return string Formatted for <textarea>-tags
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public static function formatForTextarea($content)
+    {
+        self::logDeprecatedFunction();
+        return LF . htmlspecialchars($content);
     }
 
     /**
@@ -1056,14 +1196,111 @@ class GeneralUtility
     /**
      * Returns a string of highly randomized bytes (over the full 8-bit range).
      *
-     * @param int $bytesToReturn Number of bytes to return
+     * Note: Returned values are not guaranteed to be crypto-safe,
+     * most likely they are not, depending on the used retrieval method.
+     *
+     * @param int $bytesToReturn Number of characters (bytes) to return
      * @return string Random Bytes
-     * @deprecated since TYPO3 CMS 8, this method will be removed in TYPO3 CMS 9. Use \TYPO3\CMS\Core\Crypto\Random->generateRandomBytes() instead
+     * @see http://bugs.php.net/bug.php?id=52523
+     * @see http://www.php-security.org/2010/05/09/mops-submission-04-generating-unpredictable-session-ids-and-hashes/index.html
      */
     public static function generateRandomBytes($bytesToReturn)
     {
-        self::logDeprecatedFunction();
-        return self::makeInstance(Random::class)->generateRandomBytes($bytesToReturn);
+        // Cache 4k of the generated bytestream.
+        static $bytes = '';
+        $bytesToGenerate = max(4096, $bytesToReturn);
+        // if we have not enough random bytes cached, we generate new ones
+        if (!isset($bytes[$bytesToReturn - 1])) {
+            if (TYPO3_OS === 'WIN') {
+                // Openssl seems to be deadly slow on Windows, so try to use mcrypt
+                $bytes .= self::generateRandomBytesMcrypt($bytesToGenerate);
+            } else {
+                // Try to use native PHP functions first, precedence has openssl
+                $bytes .= self::generateRandomBytesOpenSsl($bytesToGenerate);
+                if (!isset($bytes[$bytesToReturn - 1])) {
+                    $bytes .= self::generateRandomBytesMcrypt($bytesToGenerate);
+                }
+                // If openssl and mcrypt failed, try /dev/urandom
+                if (!isset($bytes[$bytesToReturn - 1])) {
+                    $bytes .= self::generateRandomBytesUrandom($bytesToGenerate);
+                }
+            }
+            // Fall back if other random byte generation failed until now
+            if (!isset($bytes[$bytesToReturn - 1])) {
+                $bytes .= self::generateRandomBytesFallback($bytesToReturn);
+            }
+        }
+        // get first $bytesToReturn and remove it from the byte cache
+        $output = substr($bytes, 0, $bytesToReturn);
+        $bytes = substr($bytes, $bytesToReturn);
+        return $output;
+    }
+
+    /**
+     * Generate random bytes using openssl if available
+     *
+     * @param string $bytesToGenerate
+     * @return string
+     */
+    protected static function generateRandomBytesOpenSsl($bytesToGenerate)
+    {
+        if (!function_exists('openssl_random_pseudo_bytes')) {
+            return '';
+        }
+        $isStrong = null;
+        return (string)openssl_random_pseudo_bytes($bytesToGenerate, $isStrong);
+    }
+
+    /**
+     * Generate random bytes using mcrypt if available
+     *
+     * @param $bytesToGenerate
+     * @return string
+     */
+    protected static function generateRandomBytesMcrypt($bytesToGenerate)
+    {
+        if (!function_exists('mcrypt_create_iv')) {
+            return '';
+        }
+        return (string)(@mcrypt_create_iv($bytesToGenerate, MCRYPT_DEV_URANDOM));
+    }
+
+    /**
+     * Read random bytes from /dev/urandom if it is accessible
+     *
+     * @param $bytesToGenerate
+     * @return string
+     */
+    protected static function generateRandomBytesUrandom($bytesToGenerate)
+    {
+        $bytes = '';
+        $fh = @fopen('/dev/urandom', 'rb');
+        if ($fh) {
+            // PHP only performs buffered reads, so in reality it will always read
+            // at least 4096 bytes. Thus, it costs nothing extra to read and store
+            // that much so as to speed any additional invocations.
+            $bytes = fread($fh, $bytesToGenerate);
+            fclose($fh);
+        }
+        return $bytes;
+    }
+
+    /**
+     * Generate pseudo random bytes as last resort
+     *
+     * @param $bytesToReturn
+     * @return string
+     */
+    protected static function generateRandomBytesFallback($bytesToReturn)
+    {
+        $bytes = '';
+        // We initialize with somewhat random.
+        $randomState = $GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey'] . base_convert(memory_get_usage() % pow(10, 6), 10, 2) . microtime() . StringUtility::getUniqueId() . getmypid();
+        while (!isset($bytes[$bytesToReturn - 1])) {
+            $randomState = sha1(microtime() . mt_rand() . $randomState);
+            $bytes .= sha1(mt_rand() . $randomState, true);
+        }
+        return $bytes;
     }
 
     /**
@@ -1078,7 +1315,7 @@ class GeneralUtility
             return self::$idnaStringCache[$value];
         } else {
             if (!self::$idnaConverter) {
-                self::$idnaConverter = new \idna_convert(array('idn_version' => 2008));
+                self::$idnaConverter = new \idna_convert(['idn_version' => 2008]);
             }
             self::$idnaStringCache[$value] = self::$idnaConverter->encode($value);
             return self::$idnaStringCache[$value];
@@ -1090,12 +1327,10 @@ class GeneralUtility
      *
      * @param int $count Number of hex characters to return
      * @return string Random Bytes
-     * @deprecated since TYPO3 CMS 8, this method will be removed in TYPO3 CMS 9. Use \TYPO3\CMS\Core\Crypto\Random::generateRandomHexString() instead
      */
     public static function getRandomHexString($count)
     {
-        self::logDeprecatedFunction();
-        return self::makeInstance(Random::class)->generateRandomHexString($count);
+        return substr(bin2hex(self::generateRandomBytes((int)(($count + 1) / 2))), 0, $count);
     }
 
     /**
@@ -1107,7 +1342,8 @@ class GeneralUtility
      */
     public static function underscoredToUpperCamelCase($string)
     {
-        return str_replace(' ', '', ucwords(str_replace('_', ' ', strtolower($string))));
+        $upperCamelCase = str_replace(' ', '', ucwords(str_replace('_', ' ', self::strtolower($string))));
+        return $upperCamelCase;
     }
 
     /**
@@ -1119,7 +1355,9 @@ class GeneralUtility
      */
     public static function underscoredToLowerCamelCase($string)
     {
-        return lcfirst(str_replace(' ', '', ucwords(str_replace('_', ' ', strtolower($string)))));
+        $upperCamelCase = str_replace(' ', '', ucwords(str_replace('_', ' ', self::strtolower($string))));
+        $lowerCamelCase = self::lcfirst($upperCamelCase);
+        return $lowerCamelCase;
     }
 
     /**
@@ -1140,12 +1378,10 @@ class GeneralUtility
      *
      * @param string $string The string to be used to lowercase the first character
      * @return string The string with the first character as lowercase
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
      */
     public static function lcfirst($string)
     {
-        static::logDeprecatedFunction();
-        return lcfirst($string);
+        return self::strtolower($string[0]) . substr($string, 1);
     }
 
     /**
@@ -1191,7 +1427,11 @@ class GeneralUtility
             return false;
         }
         if (isset($parsedUrl['host']) && !preg_match('/^[a-z0-9.\\-]*$/i', $parsedUrl['host'])) {
-            $parsedUrl['host'] = self::idnaEncode($parsedUrl['host']);
+            try {
+                $parsedUrl['host'] = self::idnaEncode($parsedUrl['host']);
+            } catch (\InvalidArgumentException $exception) {
+                return false;
+            }
         }
         return filter_var(HttpUtility::buildUrl($parsedUrl), FILTER_VALIDATE_URL) !== false;
     }
@@ -1201,6 +1441,34 @@ class GeneralUtility
      * ARRAY FUNCTIONS
      *
      *************************/
+    /**
+     * Check if an string item exists in an array.
+     * Please note that the order of function parameters is reverse compared to the PHP function in_array()!!!
+     *
+     * Comparison to PHP in_array():
+     * -> $array = array(0, 1, 2, 3);
+     * -> variant_a := \TYPO3\CMS\Core\Utility\ArrayUtility::inArray($array, $needle)
+     * -> variant_b := in_array($needle, $array)
+     * -> variant_c := in_array($needle, $array, TRUE)
+     * +---------+-----------+-----------+-----------+
+     * | $needle | variant_a | variant_b | variant_c |
+     * +---------+-----------+-----------+-----------+
+     * | '1a'	| FALSE	 | TRUE	  | FALSE	 |
+     * | ''	  | FALSE	 | TRUE	  | FALSE	 |
+     * | '0'	 | TRUE	  | TRUE	  | FALSE	 |
+     * | 0	   | TRUE	  | TRUE	  | TRUE	  |
+     * +---------+-----------+-----------+-----------+
+     *
+     * @param array $in_array One-dimensional array of items
+     * @param string $item Item to check for
+     * @return bool TRUE if $item is in the one-dimensional array $in_array
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8  - use ArrayUtility::inArray() instead
+     */
+    public static function inArray(array $in_array, $item)
+    {
+        static::logDeprecatedFunction();
+        return ArrayUtility::inArray($in_array, $item);
+    }
 
     /**
      * Explodes a $string delimited by $delim and casts each item in the array to (int).
@@ -1255,12 +1523,12 @@ class GeneralUtility
         if ($count === 2) {
             $position = strrpos($string, strrev($delimiter));
             if ($position !== false) {
-                return array(substr($string, 0, $position), substr($string, $position + strlen($delimiter)));
+                return [substr($string, 0, $position), substr($string, $position + strlen($delimiter))];
             } else {
-                return array($string);
+                return [$string];
             }
         } elseif ($count <= 1) {
-            return array($string);
+            return [$string];
         } else {
             $explodedValues = explode($delimiter, strrev($string), $count);
             $explodedValues = array_map('strrev', $explodedValues);
@@ -1284,7 +1552,7 @@ class GeneralUtility
     {
         $result = explode($delim, $string);
         if ($removeEmptyValues) {
-            $temp = array();
+            $temp = [];
             foreach ($result as $value) {
                 if (trim($value) !== '') {
                     $temp[] = $value;
@@ -1300,6 +1568,50 @@ class GeneralUtility
         }
         $result = array_map('trim', $result);
         return $result;
+    }
+
+    /**
+     * Removes the value $cmpValue from the $array if found there. Returns the modified array
+     *
+     * @param array $array Array containing the values
+     * @param string $cmpValue Value to search for and if found remove array entry where found.
+     * @return array Output array with entries removed if search string is found
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8  - use ArrayUtility::removeArrayEntryByValue() instead
+     */
+    public static function removeArrayEntryByValue(array $array, $cmpValue)
+    {
+        static::logDeprecatedFunction();
+        return ArrayUtility::removeArrayEntryByValue($array, $cmpValue);
+    }
+
+    /**
+     * Filters an array to reduce its elements to match the condition.
+     * The values in $keepItems can be optionally evaluated by a custom callback function.
+     *
+     * Example (arguments used to call this function):
+     * $array = array(
+     * array('aa' => array('first', 'second'),
+     * array('bb' => array('third', 'fourth'),
+     * array('cc' => array('fifth', 'sixth'),
+     * );
+     * $keepItems = array('third');
+     * $getValueFunc = function($value) { return $value[0]; }
+     *
+     * Returns:
+     * array(
+     * array('bb' => array('third', 'fourth'),
+     * )
+     *
+     * @param array $array The initial array to be filtered/reduced
+     * @param mixed $keepItems The items which are allowed/kept in the array - accepts array or csv string
+     * @param string $getValueFunc (optional) Callback function used to get the value to keep
+     * @return array The filtered/reduced array with the kept items
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8  - use ArrayUtility::keepItemsInArray() instead
+     */
+    public static function keepItemsInArray(array $array, $keepItems, $getValueFunc = null)
+    {
+        static::logDeprecatedFunction();
+        return ArrayUtility::keepItemsInArray($array, $keepItems, $getValueFunc);
     }
 
     /**
@@ -1338,7 +1650,7 @@ class GeneralUtility
      */
     public static function explodeUrl2Array($string, $multidim = false)
     {
-        $output = array();
+        $output = [];
         if ($multidim) {
             parse_str($string, $output);
         } else {
@@ -1365,7 +1677,7 @@ class GeneralUtility
     public static function compileSelectedGetVarsFromArray($varList, array $getArray, $GPvarAlt = true)
     {
         $keys = self::trimExplode(',', $varList, true);
-        $outArr = array();
+        $outArr = [];
         foreach ($keys as $v) {
             if (isset($getArray[$v])) {
                 $outArr[$v] = $getArray[$v];
@@ -1374,6 +1686,115 @@ class GeneralUtility
             }
         }
         return $outArr;
+    }
+
+    /**
+     * AddSlash array
+     * This function traverses a multidimensional array and adds slashes to the values.
+     * NOTE that the input array is and argument by reference.!!
+     * Twin-function to stripSlashesOnArray
+     *
+     * @param array $theArray Multidimensional input array, (REFERENCE!)
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     * @return array
+     */
+    public static function addSlashesOnArray(array &$theArray)
+    {
+        self::logDeprecatedFunction();
+        foreach ($theArray as &$value) {
+            if (is_array($value)) {
+                self::addSlashesOnArray($value);
+            } else {
+                $value = addslashes($value);
+            }
+        }
+        unset($value);
+        reset($theArray);
+    }
+
+    /**
+     * StripSlash array
+     * This function traverses a multidimensional array and strips slashes to the values.
+     * NOTE that the input array is and argument by reference.!!
+     * Twin-function to addSlashesOnArray
+     *
+     * @param array $theArray Multidimensional input array, (REFERENCE!)
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     * @return array
+     */
+    public static function stripSlashesOnArray(array &$theArray)
+    {
+        foreach ($theArray as &$value) {
+            if (is_array($value)) {
+                self::stripSlashesOnArray($value);
+            } else {
+                $value = stripslashes($value);
+            }
+        }
+        unset($value);
+        reset($theArray);
+    }
+
+    /**
+     * Either slashes ($cmd=add) or strips ($cmd=strip) array $arr depending on $cmd
+     *
+     * @param array $arr Multidimensional input array
+     * @param string $cmd "add" or "strip", depending on usage you wish.
+     * @return array
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public static function slashArray(array $arr, $cmd)
+    {
+        self::logDeprecatedFunction();
+        if ($cmd == 'strip') {
+            self::stripSlashesOnArray($arr);
+        }
+        if ($cmd == 'add') {
+            self::addSlashesOnArray($arr);
+        }
+        return $arr;
+    }
+
+    /**
+     * Rename Array keys with a given mapping table
+     *
+     * @param array	$array Array by reference which should be remapped
+     * @param array	$mappingTable Array with remap information, array/$oldKey => $newKey)
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8  - use ArrayUtility::remapArrayKeys() instead
+     */
+    public static function remapArrayKeys(&$array, $mappingTable)
+    {
+        static::logDeprecatedFunction();
+        ArrayUtility::remapArrayKeys($array, $mappingTable);
+    }
+
+    /**
+     * An array_merge function where the keys are NOT renumbered as they happen to be with the real php-array_merge function. It is "binary safe" in the sense that integer keys are overridden as well.
+     *
+     * @param array $arr1 First array
+     * @param array $arr2 Second array
+     * @return array Merged result.
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8  - native php '+' operator instead
+     */
+    public static function array_merge(array $arr1, array $arr2)
+    {
+        static::logDeprecatedFunction();
+        return $arr2 + $arr1;
+    }
+
+    /**
+     * Filters keys off from first array that also exist in second array. Comparison is done by keys.
+     * This method is a recursive version of php array_diff_assoc()
+     *
+     * @param array $array1 Source array
+     * @param array $array2 Reduce source array by this array
+     * @return array Source array reduced by keys also present in second array
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8  - use ArrayUtility::arrayDiffAssocRecursive() instead
+     */
+    public static function arrayDiffAssocRecursive(array $array1, array $array2)
+    {
+        static::logDeprecatedFunction();
+        return ArrayUtility::arrayDiffAssocRecursive($array1, $array2);
     }
 
     /**
@@ -1386,7 +1807,7 @@ class GeneralUtility
      */
     public static function csvValues(array $row, $delim = ',', $quote = '"')
     {
-        $out = array();
+        $out = [];
         foreach ($row as $value) {
             $out[] = str_replace($quote, $quote . $quote, $value);
         }
@@ -1403,7 +1824,7 @@ class GeneralUtility
      */
     public static function removeDotsFromTS(array $ts)
     {
-        $out = array();
+        $out = [];
         foreach ($ts as $key => $value) {
             if (is_array($value)) {
                 $key = rtrim($key, '.');
@@ -1413,6 +1834,19 @@ class GeneralUtility
             }
         }
         return $out;
+    }
+
+    /**
+     * Sorts an array by key recursive - uses natural sort order (aAbB-zZ)
+     *
+     * @param array $array array to be sorted recursively, passed by reference
+     * @return bool TRUE if param is an array
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8  - use ArrayUtility::naturalKeySortRecursive() instead
+     */
+    public static function naturalKeySortRecursive(&$array)
+    {
+        static::logDeprecatedFunction();
+        return ArrayUtility::naturalKeySortRecursive($array);
     }
 
     /*************************
@@ -1434,7 +1868,7 @@ class GeneralUtility
         // Attribute name is stored here
         $name = '';
         $valuemode = false;
-        $attributes = array();
+        $attributes = [];
         foreach ($components as $key => $val) {
             // Only if $name is set (if there is an attribute, that waits for a value), that valuemode is enabled. This ensures that the attribute is assigned it's value
             if ($val != '=') {
@@ -1469,7 +1903,7 @@ class GeneralUtility
         $tag_tmp = trim(preg_replace('/^<[^[:space:]]*/', '', trim($tag)));
         // Removes any > in the end of the string
         $tag_tmp = trim(rtrim($tag_tmp, '>'));
-        $value = array();
+        $value = [];
         // Compared with empty string instead , 030102
         while ($tag_tmp !== '') {
             $firstChar = $tag_tmp[0];
@@ -1503,7 +1937,7 @@ class GeneralUtility
     public static function implodeAttributes(array $arr, $xhtmlSafe = false, $dontOmitBlankAttribs = false)
     {
         if ($xhtmlSafe) {
-            $newArr = array();
+            $newArr = [];
             foreach ($arr as $p => $v) {
                 if (!isset($newArr[strtolower($p)])) {
                     $newArr[strtolower($p)] = htmlspecialchars($v);
@@ -1511,7 +1945,7 @@ class GeneralUtility
             }
             $arr = $newArr;
         }
-        $list = array();
+        $list = [];
         foreach ($arr as $p => $v) {
             if ((string)$v !== '' || $dontOmitBlankAttribs) {
                 $list[] = $p . '="' . $v . '"';
@@ -1526,30 +1960,28 @@ class GeneralUtility
      * This is nice for indenting JS code with PHP code on the same level.
      *
      * @param string $string JavaScript code
-     * @param null $_ unused, will be removed in TYPO3 CMS 9
+     * @param bool $linebreak Wrap script element in line breaks? Default is TRUE.
      * @return string The wrapped JS code, ready to put into a XHTML page
      */
-    public static function wrapJS($string, $_ = null)
+    public static function wrapJS($string, $linebreak = true)
     {
-        if ($_ !== null) {
-            self::deprecationLog('Parameter 2 of GeneralUtility::wrapJS is obsolete and can be omitted.');
-        }
-
         if (trim($string)) {
+            // <script wrapped in nl?
+            $cr = $linebreak ? LF : '';
             // remove nl from the beginning
-            $string = ltrim($string, LF);
+            $string = preg_replace('/^\\n+/', '', $string);
             // re-ident to one tab using the first line as reference
-            $match = array();
+            $match = [];
             if (preg_match('/^(\\t+)/', $string, $match)) {
                 $string = str_replace($match[1], TAB, $string);
             }
-            return '<script type="text/javascript">
+            $string = $cr . '<script type="text/javascript">
 /*<![CDATA[*/
 ' . $string . '
 /*]]>*/
-</script>';
+</script>' . $cr;
         }
-        return '';
+        return trim($string);
     }
 
     /**
@@ -1560,13 +1992,13 @@ class GeneralUtility
      * @param array $parserOptions Options that will be passed to PHP's xml_parser_set_option()
      * @return mixed The array with the parsed structure unless the XML parser returns with an error in which case the error message string is returned.
      */
-    public static function xml2tree($string, $depth = 999, $parserOptions = array())
+    public static function xml2tree($string, $depth = 999, $parserOptions = [])
     {
         // Disables the functionality to allow external entities to be loaded when parsing the XML, must be kept
         $previousValueOfEntityLoader = libxml_disable_entity_loader(true);
         $parser = xml_parser_create();
-        $vals = array();
-        $index = array();
+        $vals = [];
+        $index = [];
         xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, 0);
         xml_parser_set_option($parser, XML_OPTION_SKIP_WHITE, 0);
         foreach ($parserOptions as $option => $value) {
@@ -1578,10 +2010,10 @@ class GeneralUtility
             return 'Line ' . xml_get_current_line_number($parser) . ': ' . xml_error_string(xml_get_error_code($parser));
         }
         xml_parser_free($parser);
-        $stack = array(array());
+        $stack = [[]];
         $stacktop = 0;
         $startPoint = 0;
-        $tagi = array();
+        $tagi = [];
         foreach ($vals as $key => $val) {
             $type = $val['type'];
             // open tag:
@@ -1590,7 +2022,7 @@ class GeneralUtility
                 if ($depth == $stacktop) {
                     $startPoint = $key;
                 }
-                $tagi = array('tag' => $val['tag']);
+                $tagi = ['tag' => $val['tag']];
                 if (isset($val['attributes'])) {
                     $tagi['attrs'] = $val['attributes'];
                 }
@@ -1632,11 +2064,9 @@ class GeneralUtility
      * @param string $charset Forced charset to prologue
      * @return string An XML string made from the input content in the array.
      * @see xml2array(),array2xml()
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9.
      */
-    public static function array2xml_cs(array $array, $docTag = 'phparray', array $options = array(), $charset = '')
+    public static function array2xml_cs(array $array, $docTag = 'phparray', array $options = [], $charset = '')
     {
-        static::logDeprecatedFunction();
         // Set default charset unless explicitly specified
         $charset = $charset ?: 'utf-8';
         // Return XML:
@@ -1644,6 +2074,8 @@ class GeneralUtility
     }
 
     /**
+     * Deprecated to call directly (unless you are aware of using XML prologues)! Use "array2xml_cs" instead (which adds an XML-prologue)
+     *
      * Converts a PHP array into an XML string.
      * The XML output is optimized for readability since associative keys are used as tag names.
      * This also means that only alphanumeric characters are allowed in the tag names AND only keys NOT starting with numbers (so watch your usage of keys!). However there are options you can set to avoid this problem.
@@ -1663,7 +2095,7 @@ class GeneralUtility
      * @return string An XML string made from the input content in the array.
      * @see xml2array()
      */
-    public static function array2xml(array $array, $NSprefix = '', $level = 0, $docTag = 'phparray', $spaceInd = 0, array $options = array(), array $stackData = array())
+    public static function array2xml(array $array, $NSprefix = '', $level = 0, $docTag = 'phparray', $spaceInd = 0, array $options = [], array $stackData = [])
     {
         // The list of byte values which will trigger binary-safe storage. If any value has one of these char values in it, it will be encoded in base64
         $binaryChars = chr(0) . chr(1) . chr(2) . chr(3) . chr(4) . chr(5) . chr(6) . chr(7) . chr(8) . chr(11) . chr(12) . chr(14) . chr(15) . chr(16) . chr(17) . chr(18) . chr(19) . chr(20) . chr(21) . chr(22) . chr(23) . chr(24) . chr(25) . chr(26) . chr(27) . chr(28) . chr(29) . chr(30) . chr(31);
@@ -1724,11 +2156,11 @@ class GeneralUtility
                 if (empty($v)) {
                     $content = '';
                 } else {
-                    $content = $nl . self::array2xml($v, $NSprefix, ($level + 1), '', $spaceInd, $subOptions, array(
+                    $content = $nl . self::array2xml($v, $NSprefix, ($level + 1), '', $spaceInd, $subOptions, [
                             'parentTagName' => $tagName,
                             'grandParentTagName' => $stackData['parentTagName'],
                             'path' => ($clearStackPath ? '' : $stackData['path'] . '/' . $tagName)
-                        )) . ($spaceInd >= 0 ? str_pad('', ($level + 1) * $indentN, $indentChar) : '');
+                        ]) . ($spaceInd >= 0 ? str_pad('', ($level + 1) * $indentN, $indentChar) : '');
                 }
                 // Do not set "type = array". Makes prettier XML but means that empty arrays are not restored with xml2array
                 if ((int)$options['disableTypeAttrib'] != 2) {
@@ -1782,13 +2214,19 @@ class GeneralUtility
      */
     public static function xml2array($string, $NSprefix = '', $reportDocTag = false)
     {
-        static $firstLevelCache = array();
+        static $firstLevelCache = [];
         $identifier = md5($string . $NSprefix . ($reportDocTag ? '1' : '0'));
         // Look up in first level cache
         if (!empty($firstLevelCache[$identifier])) {
             $array = $firstLevelCache[$identifier];
         } else {
-            $array = self::xml2arrayProcess($string, $NSprefix, $reportDocTag);
+            // Look up in second level cache
+            // @todo: Is this cache really required? It basically substitutes a little cpu work with a db query?
+            $array = PageRepository::getHash($identifier, 0);
+            if (!is_array($array)) {
+                $array = self::xml2arrayProcess(trim($string), $NSprefix, $reportDocTag);
+                PageRepository::storeHash($identifier, $array, 'ident_xml2array');
+            }
             // Store content in first level cache
             $firstLevelCache[$identifier] = $array;
         }
@@ -1811,12 +2249,12 @@ class GeneralUtility
         $previousValueOfEntityLoader = libxml_disable_entity_loader(true);
         // Create parser:
         $parser = xml_parser_create();
-        $vals = array();
-        $index = array();
+        $vals = [];
+        $index = [];
         xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, 0);
         xml_parser_set_option($parser, XML_OPTION_SKIP_WHITE, 0);
         // Default output charset is UTF-8, only ASCII, ISO-8859-1 and UTF-8 are supported!!!
-        $match = array();
+        $match = [];
         preg_match('/^[[:space:]]*<\\?xml[^>]*encoding[[:space:]]*=[[:space:]]*"([^"]*)"/', substr($string, 0, 200), $match);
         $theCharset = $match[1] ?: 'utf-8';
         // us-ascii / utf-8 / iso-8859-1
@@ -1830,9 +2268,9 @@ class GeneralUtility
         }
         xml_parser_free($parser);
         // Init vars:
-        $stack = array(array());
+        $stack = [[]];
         $stacktop = 0;
-        $current = array();
+        $current = [];
         $tagName = '';
         $documentTag = '';
         // Traverse the parsed XML structure:
@@ -1857,9 +2295,9 @@ class GeneralUtility
                 case 'open':
                     // If open tag it means there is an array stored in sub-elements. Therefore increase the stackpointer and reset the accumulation array:
                     // Setting blank place holder
-                    $current[$tagName] = array();
+                    $current[$tagName] = [];
                     $stack[$stacktop++] = $current;
-                    $current = array();
+                    $current = [];
                     break;
                 case 'close':
                     // If the tag is "close" then it is an array which is closing and we decrease the stack pointer.
@@ -1893,7 +2331,7 @@ class GeneralUtility
                                 break;
                             case 'array':
                                 // MUST be an empty array since it is processed as a value; Empty arrays would end up here because they would have no tags inside...
-                                $current[$tagName] = array();
+                                $current[$tagName] = [];
                                 break;
                         }
                     }
@@ -1956,12 +2394,10 @@ class GeneralUtility
      *
      * @param string $xmlData XML data
      * @return array Attributes of the xml prologue (header)
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9.
      */
     public static function xmlGetHeaderAttribs($xmlData)
     {
-        self::logDeprecatedFunction();
-        $match = array();
+        $match = [];
         if (preg_match('/^\\s*<\\?xml([^>]*)\\?\\>/', $xmlData, $match)) {
             return self::get_tag_attributes($match[1]);
         }
@@ -1980,16 +2416,16 @@ class GeneralUtility
             $fakeThis = false;
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_div.php']['minifyJavaScript'] as $hookMethod) {
                 try {
-                    $parameters = array('script' => $script);
+                    $parameters = ['script' => $script];
                     $script = static::callUserFunction($hookMethod, $parameters, $fakeThis);
                 } catch (\Exception $e) {
                     $errorMessage = 'Error minifying java script: ' . $e->getMessage();
                     $error .= $errorMessage;
-                    static::devLog($errorMessage, \TYPO3\CMS\Core\Utility\GeneralUtility::class, 2, array(
+                    static::devLog($errorMessage, \TYPO3\CMS\Core\Utility\GeneralUtility::class, 2, [
                         'JavaScript' => $script,
                         'Stack trace' => $e->getTrace(),
                         'hook' => $hookMethod
-                    ));
+                    ]);
                 }
             }
         }
@@ -2003,7 +2439,7 @@ class GeneralUtility
      *************************/
     /**
      * Reads the file or url $url and returns the content
-     * If you are having trouble with proxies when reading URLs you can configure your way out of that with settings within $GLOBALS['TYPO3_CONF_VARS']['HTTP'].
+     * If you are having trouble with proxys when reading URLs you can configure your way out of that with settings like $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlUse'] etc.
      *
      * @param string $url File/URL to read
      * @param int $includeHeader Whether the HTTP header should be fetched or not. 0=disable, 1=fetch header+content, 2=fetch header only
@@ -2011,75 +2447,205 @@ class GeneralUtility
      * @param array $report Error code/message and, if $includeHeader is 1, response meta data (HTTP status and content type)
      * @return mixed The content from the resource given as input. FALSE if an error has occurred.
      */
-    public static function getUrl($url, $includeHeader = 0, $requestHeaders = null, &$report = null)
+    public static function getUrl($url, $includeHeader = 0, $requestHeaders = false, &$report = null)
     {
+        $content = false;
         if (isset($report)) {
             $report['error'] = 0;
             $report['message'] = '';
         }
-        // Looks like it's an external file, use Guzzle by default
-        if (preg_match('/^(?:http|ftp)s?|s(?:ftp|cp):/', $url)) {
-            /** @var RequestFactory $requestFactory */
-            $requestFactory = static::makeInstance(RequestFactory::class);
-            if (is_array($requestHeaders)) {
-                $configuration = ['headers' => $requestHeaders];
-            } else {
-                $configuration = [];
+        // Use cURL for: http, https, ftp, ftps, sftp and scp
+        if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['curlUse'] == '1' && preg_match('/^(?:http|ftp)s?|s(?:ftp|cp):/', $url)) {
+            if (isset($report)) {
+                $report['lib'] = 'cURL';
             }
-
-            try {
+            // External URL without error checking.
+            if (!function_exists('curl_init') || !($ch = curl_init())) {
                 if (isset($report)) {
-                    $report['lib'] = 'GuzzleHttp';
-                }
-                $response = $requestFactory->request($url, 'GET', $configuration);
-            } catch (RequestException $exception) {
-                if (isset($report)) {
-                    $report['error'] = $exception->getHandlerContext()['errno'];
-                    $report['message'] = $exception->getMessage();
-                    $report['exception'] = $exception;
+                    $report['error'] = -1;
+                    $report['message'] = 'Couldn\'t initialize cURL.';
                 }
                 return false;
             }
 
-            $content = '';
+            $followLocationSucceeded = @curl_setopt($ch, CURLOPT_FOLLOWLOCATION, 1);
 
-            // Add the headers to the output
-            $includeHeader = (int)$includeHeader;
-            if ($includeHeader) {
-                $parsedURL = parse_url($url);
-                $method = $includeHeader === 2 ? 'HEAD' : 'GET';
-                $content = $method . ' ' . (isset($parsedURL['path']) ? $parsedURL['path'] : '/')
-                    . ($parsedURL['query'] ? '?' . $parsedURL['query'] : '') . ' HTTP/1.0' . CRLF
-                    . 'Host: ' . $parsedURL['host'] . CRLF
-                    . 'Connection: close' . CRLF;
-                if (is_array($requestHeaders)) {
-                    $content .= implode(CRLF, $requestHeaders) . CRLF;
-                }
-                foreach ($response->getHeaders() as $headerName => $headerValues) {
-                    $content .= $headerName . ': ' . implode(', ', $headerValues) . CRLF;
-                }
-                // Headers are separated from the body with two CRLFs
-                $content .= CRLF;
+            $curlIncludeHeaders = !$followLocationSucceeded || $includeHeader;
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_HEADER, $curlIncludeHeaders ? 1 : 0);
+            curl_setopt($ch, CURLOPT_NOBODY, $includeHeader == 2 ? 1 : 0);
+            curl_setopt($ch, CURLOPT_HTTPGET, $includeHeader == 2 ? 'HEAD' : 'GET');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+            curl_setopt($ch, CURLOPT_FAILONERROR, 1);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, max(0, (int)$GLOBALS['TYPO3_CONF_VARS']['SYS']['curlTimeout']));
+
+            if (is_array($requestHeaders)) {
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $requestHeaders);
             }
-            // If not just headers are requested, add the body
-            if ($includeHeader !== 2) {
-                $content .= $response->getBody()->getContents();
+            // (Proxy support implemented by Arco <arco@appeltaart.mine.nu>)
+            if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyServer']) {
+                curl_setopt($ch, CURLOPT_PROXY, $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyServer']);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, (bool)$GLOBALS['TYPO3_CONF_VARS']['HTTP']['ssl_verify_host']);
+                curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, (bool)$GLOBALS['TYPO3_CONF_VARS']['HTTP']['ssl_verify_peer']);
+                if ($GLOBALS['TYPO3_CONF_VARS']['HTTP']['ssl_verify_peer']) {
+                    if ($GLOBALS['TYPO3_CONF_VARS']['HTTP']['ssl_cafile']) {
+                        curl_setopt($ch, CURLOPT_CAINFO, $GLOBALS['TYPO3_CONF_VARS']['HTTP']['ssl_cafile']);
+                    }
+                    if ($GLOBALS['TYPO3_CONF_VARS']['HTTP']['ssl_capath']) {
+                        curl_setopt($ch, CURLOPT_CAPATH, $GLOBALS['TYPO3_CONF_VARS']['HTTP']['ssl_capath']);
+                    }
+                }
+                if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyNTLM']) {
+                    curl_setopt($ch, CURLOPT_PROXYAUTH, CURLAUTH_NTLM);
+                }
+                if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyTunnel']) {
+                    curl_setopt($ch, CURLOPT_HTTPPROXYTUNNEL, $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyTunnel']);
+                }
+                if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyUserPass']) {
+                    curl_setopt($ch, CURLOPT_PROXYUSERPWD, $GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyUserPass']);
+                }
             }
+            $content = curl_exec($ch);
+            $curlInfo = curl_getinfo($ch);
+
+            // Remove additional proxy header block, when proxy is used for https request and CURL_HEADER is enabled.
+            // Most HTTPS proxies add a second header before the actual server headers in their response, as a
+            // response to the CONNECT message sent by the client to the proxy. cURL does not strip this since 2005,
+            // so there are two headers arriving here, of which the first is not of interest to us—therefore, we can
+            // safely strip it.
+            // Detecting two linebreaks followed by a "HTTP/" (as done here) is the only reliable way to detect the
+            // proxy headers, as the relevant RFCs do not specify the exact status code (it might be any of 2xx) or
+            // the status message. Therefore, we check if there is a second HTTP headers block and then strip the
+            // first one.
+            if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['curlProxyServer']
+                && $curlIncludeHeaders
+                && preg_match('/^https:/', $url)
+                && strpos($content, "\r\n\r\nHTTP/") !== false
+            ) {
+                $content = self::stripHttpHeaders($content);
+            }
+
+            if (!$followLocationSucceeded) {
+                // Check if we need to do redirects
+                if ($curlInfo['http_code'] >= 300 && $curlInfo['http_code'] < 400) {
+                    $locationUrl = $curlInfo['redirect_url'];
+                    if (!$locationUrl) {
+                        // Some curllib versions do not return redirect_url. Examine headers.
+                        $locationUrl = self::getRedirectUrlFromHttpHeaders($content);
+                    }
+                    if ($locationUrl) {
+                        $content = self::getUrl($locationUrl, $includeHeader, $requestHeaders, $report);
+                        $followLocationSucceeded = true;
+                    } else {
+                        // Failure: we got a redirection status code but not the URL to redirect to.
+                        $content = false;
+                    }
+                }
+                if ($content && !$includeHeader) {
+                    $content = self::stripHttpHeaders($content);
+                }
+            }
+
             if (isset($report)) {
-                $report['lib'] = 'http';
-                if ($response->getStatusCode() >= 300 && $response->getStatusCode() < 400) {
-                    $report['http_code'] = $response->getStatusCode();
-                    $report['content_type'] = $response->getHeader('Content-type');
-                    $report['error'] = $response->getStatusCode();
-                    $report['message'] = $response->getReasonPhrase();
-                } elseif (!empty($content)) {
-                    $report['error'] = $response->getStatusCode();
-                    $report['message'] = $response->getReasonPhrase();
-                } elseif ($includeHeader) {
+                if (!$followLocationSucceeded && $curlInfo['http_code'] >= 300 && $curlInfo['http_code'] < 400) {
+                    $report['http_code'] = $curlInfo['http_code'];
+                    $report['content_type'] = $curlInfo['content_type'];
+                    $report['error'] = CURLE_GOT_NOTHING;
+                    $report['message'] = 'Expected "Location" header but got nothing.';
+                } else {
+                    if ($content === false) {
+                        $report['error'] = curl_errno($ch);
+                        $report['message'] = curl_error($ch);
+                    }
                     // Set only for $includeHeader to work exactly like PHP variant
-                    $report['http_code'] = $response->getStatusCode();
-                    $report['content_type'] = $response->getHeader('Content-type');
+                    if ($includeHeader) {
+                        $report['http_code'] = $curlInfo['http_code'];
+                        $report['content_type'] = $curlInfo['content_type'];
+                    }
                 }
+            }
+            curl_close($ch);
+        } elseif ($includeHeader) {
+            if (isset($report)) {
+                $report['lib'] = 'socket';
+            }
+            $parsedURL = parse_url($url);
+            if (!preg_match('/^https?/', $parsedURL['scheme'])) {
+                if (isset($report)) {
+                    $report['error'] = -1;
+                    $report['message'] = 'Reading headers is not allowed for this protocol.';
+                }
+                return false;
+            }
+            $port = (int)$parsedURL['port'];
+            if ($port < 1) {
+                if ($parsedURL['scheme'] == 'http') {
+                    $port = $port > 0 ? $port : 80;
+                    $scheme = '';
+                } else {
+                    $port = $port > 0 ? $port : 443;
+                    $scheme = 'ssl://';
+                }
+            }
+            $errno = 0;
+            $fp = @fsockopen(($scheme . $parsedURL['host']), $port, $errno, $errstr, 2.0);
+            if (!$fp || $errno > 0) {
+                if (isset($report)) {
+                    $report['error'] = $errno ?: -1;
+                    $report['message'] = $errno ? ($errstr ?: 'Socket error.') : 'Socket initialization error.';
+                }
+                return false;
+            }
+            $method = $includeHeader == 2 ? 'HEAD' : 'GET';
+            $msg = $method . ' ' . (isset($parsedURL['path']) ? $parsedURL['path'] : '/')
+                   . ($parsedURL['query'] ? '?' . $parsedURL['query'] : '') . ' HTTP/1.0' . CRLF
+                   . 'Host: ' . $parsedURL['host'] . CRLF
+                   . 'Connection: close' . CRLF;
+            if (is_array($requestHeaders)) {
+                $msg .= implode(CRLF, $requestHeaders) . CRLF;
+            }
+            $msg .= CRLF;
+            fwrite($fp, $msg);
+            while (!feof($fp)) {
+                $line = fgets($fp, 2048);
+                if (isset($report)) {
+                    if (preg_match('|^HTTP/\\d\\.\\d +(\\d+)|', $line, $status)) {
+                        $report['http_code'] = $status[1];
+                    } elseif (preg_match('/^Content-Type: *(.*)/i', $line, $type)) {
+                        $report['content_type'] = $type[1];
+                    }
+                }
+                $content .= $line;
+                if (trim($line) === '') {
+                    // Stop at the first empty line (= end of header)
+                    break;
+                }
+            }
+            if ($includeHeader != 2) {
+                $content .= stream_get_contents($fp);
+            }
+            fclose($fp);
+        } elseif (is_array($requestHeaders)) {
+            if (isset($report)) {
+                $report['lib'] = 'file/context';
+            }
+            $parsedURL = parse_url($url);
+            if (!preg_match('/^https?/', $parsedURL['scheme'])) {
+                if (isset($report)) {
+                    $report['error'] = -1;
+                    $report['message'] = 'Sending request headers is not allowed for this protocol.';
+                }
+                return false;
+            }
+            $ctx = stream_context_get_default([
+                'http' => [
+                    'header' => implode(CRLF, $requestHeaders)
+                ]
+            ]);
+            $content = @file_get_contents($url, false, $ctx);
+            if ($content === false && isset($report)) {
+                $report['error'] = -1;
+                $report['message'] = 'Couldn\'t get URL: ' . (isset($http_response_header) ? implode(LF, $http_response_header) : $url);
             }
         } else {
             if (isset($report)) {
@@ -2088,8 +2654,49 @@ class GeneralUtility
             $content = @file_get_contents($url);
             if ($content === false && isset($report)) {
                 $report['error'] = -1;
-                $report['message'] = 'Couldn\'t get URL: ' . $url;
+                $report['message'] = 'Couldn\'t get URL: ' . (isset($http_response_header) ? implode(LF, $http_response_header) : $url);
             }
+        }
+        return $content;
+    }
+
+    /**
+     * Parses HTTP headers and returns the content of the "Location" header
+     * or the empty string if no such header found.
+     *
+     * @param string $content
+     * @return string
+     */
+    protected static function getRedirectUrlFromHttpHeaders($content)
+    {
+        $result = '';
+        $headers = explode("\r\n", $content);
+        foreach ($headers as $header) {
+            if ($header == '') {
+                break;
+            }
+            if (preg_match('/^\s*Location\s*:/i', $header)) {
+                list(, $result) = self::trimExplode(':', $header, false, 2);
+                if ($result) {
+                    $result = self::locationHeaderUrl($result);
+                }
+                break;
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * Strips HTTP headers from the content.
+     *
+     * @param string $content
+     * @return string
+     */
+    protected static function stripHttpHeaders($content)
+    {
+        $headersEndPos = strpos($content, "\r\n\r\n");
+        if ($headersEndPos) {
+            $content = substr($content, $headersEndPos + 4);
         }
         return $content;
     }
@@ -2137,7 +2744,7 @@ class GeneralUtility
         $result = false;
         // Make path absolute
         if (!static::isAbsPath($path)) {
-            $path = static::getFileAbsFileName($path);
+            $path = static::getFileAbsFileName($path, false);
         }
         if (static::isAllowedAbsPath($path)) {
             if (@is_file($path)) {
@@ -2168,20 +2775,22 @@ class GeneralUtility
             // Call recursive if recursive flag if set and $path is directory
             if ($recursive && @is_dir($path)) {
                 $handle = opendir($path);
-                while (($file = readdir($handle)) !== false) {
-                    $recursionResult = null;
-                    if ($file !== '.' && $file !== '..') {
-                        if (@is_file(($path . '/' . $file))) {
-                            $recursionResult = static::fixPermissions($path . '/' . $file);
-                        } elseif (@is_dir(($path . '/' . $file))) {
-                            $recursionResult = static::fixPermissions($path . '/' . $file, true);
-                        }
-                        if (isset($recursionResult) && !$recursionResult) {
-                            $result = false;
+                if (is_resource($handle)) {
+                    while (($file = readdir($handle)) !== false) {
+                        $recursionResult = null;
+                        if ($file !== '.' && $file !== '..') {
+                            if (@is_file(($path . '/' . $file))) {
+                                $recursionResult = static::fixPermissions($path . '/' . $file);
+                            } elseif (@is_dir(($path . '/' . $file))) {
+                                $recursionResult = static::fixPermissions($path . '/' . $file, true);
+                            }
+                            if (isset($recursionResult) && !$recursionResult) {
+                                $result = false;
+                            }
                         }
                     }
+                    closedir($handle);
                 }
-                closedir($handle);
             }
         }
         return $result;
@@ -2219,13 +2828,13 @@ class GeneralUtility
         // Checking if the "subdir" is found:
         $subdir = substr($fI['dirname'], strlen($dirName));
         if ($subdir) {
-            if (preg_match('#^(?:[[:alnum:]_]+/)+$#', $subdir)) {
+            if (preg_match('/^[[:alnum:]_]+\\/$/', $subdir) || preg_match('/^[[:alnum:]_]+\\/[[:alnum:]_]+\\/$/', $subdir)) {
                 $dirName .= $subdir;
                 if (!@is_dir($dirName)) {
                     static::mkdir_deep(PATH_site . 'typo3temp/', $subdir);
                 }
             } else {
-                return 'Subdir, "' . $subdir . '", was NOT on the form "[[:alnum:]_]/+"';
+                return 'Subdir, "' . $subdir . '", was NOT on the form "[[:alnum:]_]/" or  "[[:alnum:]_]/[[:alnum:]_]/"';
             }
         }
         // Checking dir-name again (sub-dir might have been created):
@@ -2281,7 +2890,7 @@ class GeneralUtility
         }
         // Ensure there is only one slash
         $fullPath = rtrim($directory, '/') . '/' . ltrim($deepDirectory, '/');
-        if ($fullPath !== '' && !is_dir($fullPath)) {
+        if ($fullPath !== '/' && !is_dir($fullPath)) {
             $firstCreatedPath = static::createDirectoryPath($fullPath);
             if ($firstCreatedPath !== '') {
                 static::fixPermissions($firstCreatedPath, true);
@@ -2356,10 +2965,6 @@ class GeneralUtility
             clearstatcache();
         } elseif (is_link($path)) {
             $OK = @unlink($path);
-            if (!$OK && TYPO3_OS === 'WIN') {
-                // Try to delete dead folder links on Windows systems
-                $OK = @rmdir($path);
-            }
             clearstatcache();
         }
         return $OK;
@@ -2383,7 +2988,7 @@ class GeneralUtility
             $temporaryDirectory = rtrim($directory, '/') . '.' . StringUtility::getUniqueId('remove') . '/';
             if (rename($directory, $temporaryDirectory)) {
                 if ($flushOpcodeCache) {
-                    GeneralUtility::makeInstance(OpcodeCacheService::class)->clearAllActive($directory);
+                    self::makeInstance(OpcodeCacheService::class)->clearAllActive($directory);
                 }
                 if ($keepOriginalDirectory) {
                     static::mkdir($directory);
@@ -2408,7 +3013,7 @@ class GeneralUtility
         if ($path) {
             if (is_dir($path)) {
                 $dir = scandir($path);
-                $dirs = array();
+                $dirs = [];
                 foreach ($dir as $entry) {
                     if (is_dir($path . '/' . $entry) && $entry != '..' && $entry != '.') {
                         $dirs[] = $entry;
@@ -2438,7 +3043,7 @@ class GeneralUtility
         $excludePattern = (string)$excludePattern;
         $path = rtrim($path, '/');
         if (!@is_dir($path)) {
-            return array();
+            return [];
         }
 
         $rawFileList = scandir($path);
@@ -2448,7 +3053,7 @@ class GeneralUtility
 
         $pathPrefix = $path . '/';
         $extensionList = ',' . $extensionList . ',';
-        $files = array();
+        $files = [];
         foreach ($rawFileList as $entry) {
             $completePathToEntry = $pathPrefix . $entry;
             if (!@is_file($completePathToEntry)) {
@@ -2475,7 +3080,7 @@ class GeneralUtility
         }
 
         $valuePathPrefix = $prependPath ? $pathPrefix : '';
-        $foundFiles = array();
+        $foundFiles = [];
         foreach ($files as $key => $value) {
             // Don't change this ever - extensions may depend on the fact that the hash is an md5 of the path! (import/export extension)
             $foundFiles[md5($pathPrefix . ${$valueName})] = $valuePathPrefix . ${$valueName};
@@ -2540,7 +3145,7 @@ class GeneralUtility
      */
     public static function fixWindowsFilePath($theFile)
     {
-        return str_replace(array('\\', '//'), '/', $theFile);
+        return str_replace(['\\', '//'], '/', $theFile);
     }
 
     /**
@@ -2556,7 +3161,7 @@ class GeneralUtility
             return $pathStr;
         }
         $parts = explode('/', $pathStr);
-        $output = array();
+        $output = [];
         $c = 0;
         foreach ($parts as $part) {
             if ($part === '..') {
@@ -2582,6 +3187,7 @@ class GeneralUtility
      *
      * @param string $path URL / path to prepend full URL addressing to.
      * @return string
+     * @throws \InvalidArgumentException
      */
     public static function locationHeaderUrl($path)
     {
@@ -2592,6 +3198,10 @@ class GeneralUtility
         } elseif (!$uI['scheme']) {
             // No scheme either
             $path = self::getIndpEnv('TYPO3_REQUEST_DIR') . $path;
+        }
+        // Can be removed once minimum PHP requirement is at least 5.5.22 or 5.6.6
+        if (strpbrk($path, "\r\n") !== false) {
+            throw new \InvalidArgumentException('HTTP header injection attempt in "' . $path . '"', 1448194036);
         }
         return $path;
     }
@@ -2623,7 +3233,7 @@ class GeneralUtility
      */
     public static function getBytesFromSizeMeasurement($measurement)
     {
-        $bytes = doubleval($measurement);
+        $bytes = floatval($measurement);
         if (stripos($measurement, 'G')) {
             $bytes *= 1024 * 1024 * 1024;
         } elseif (stripos($measurement, 'M')) {
@@ -2638,11 +3248,9 @@ class GeneralUtility
      * Retrieves the maximum path length that is valid in the current environment.
      *
      * @return int The maximum available path length
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
      */
     public static function getMaximumPathLength()
     {
-        static::logDeprecatedFunction();
         return PHP_MAXPATHLEN;
     }
 
@@ -2713,6 +3321,22 @@ class GeneralUtility
      * SYSTEM INFORMATION
      *
      *************************/
+    /**
+     * Returns the HOST+DIR-PATH of the current script (The URL, but without 'http://' and without script-filename)
+     *
+     * @return string
+     * @deprecated since TYPO3 CMS 7, will be removed in CMS 8, use GeneralUtility::getIndpEnv* instead
+     */
+    public static function getThisUrl()
+    {
+        self::logDeprecatedFunction();
+        // Url of this script
+        $p = parse_url(self::getIndpEnv('TYPO3_REQUEST_SCRIPT'));
+        $dir = self::dirname($p['path']) . '/';
+        // Strip file
+        $url = str_replace('//', '/', $p['host'] . ($p['port'] ? ':' . $p['port'] : '') . $dir);
+        return $url;
+    }
 
     /**
      * Returns the link-url to the current script.
@@ -2722,7 +3346,7 @@ class GeneralUtility
      * @param array $getParams Array of GET parameters to include
      * @return string
      */
-    public static function linkThisScript(array $getParams = array())
+    public static function linkThisScript(array $getParams = [])
     {
         $parts = self::getIndpEnv('SCRIPT_NAME');
         $params = self::_GET();
@@ -2745,10 +3369,10 @@ class GeneralUtility
      * @param array $getParams Array of key/value pairs for get parameters to add/overrule with. Can be multidimensional.
      * @return string Output URL with added getParams.
      */
-    public static function linkThisUrl($url, array $getParams = array())
+    public static function linkThisUrl($url, array $getParams = [])
     {
         $parts = parse_url($url);
-        $getP = array();
+        $getP = [];
         if ($parts['query']) {
             parse_str($parts['query'], $getP);
         }
@@ -2951,7 +3575,7 @@ class GeneralUtility
                 $SFN = self::getIndpEnv('SCRIPT_FILENAME');
                 $SN_A = explode('/', strrev(self::getIndpEnv('SCRIPT_NAME')));
                 $SFN_A = explode('/', strrev($SFN));
-                $acc = array();
+                $acc = [];
                 foreach ($SN_A as $kk => $vv) {
                     if ((string)$SFN_A[$kk] === (string)$vv) {
                         $acc[] = $vv;
@@ -3020,9 +3644,9 @@ class GeneralUtility
                 }
                 break;
             case '_ARRAY':
-                $out = array();
+                $out = [];
                 // Here, list ALL possible keys to this function for debug display.
-                $envTestVars = array(
+                $envTestVars = [
                     'HTTP_HOST',
                     'TYPO3_HOST_ONLY',
                     'TYPO3_PORT',
@@ -3045,7 +3669,7 @@ class GeneralUtility
                     'REMOTE_HOST',
                     'HTTP_USER_AGENT',
                     'HTTP_ACCEPT_LANGUAGE'
-                );
+                ];
                 foreach ($envTestVars as $v) {
                     $out[$v] = self::getIndpEnv($v);
                 }
@@ -3129,7 +3753,7 @@ class GeneralUtility
      */
     protected static function isInternalRequestType()
     {
-        return (!defined('TYPO3_REQUESTTYPE') || (defined('TYPO3_REQUESTTYPE') && TYPO3_REQUESTTYPE & (TYPO3_REQUESTTYPE_INSTALL | TYPO3_REQUESTTYPE_CLI)));
+        return !defined('TYPO3_REQUESTTYPE') || (defined('TYPO3_REQUESTTYPE') && TYPO3_REQUESTTYPE & (TYPO3_REQUESTTYPE_INSTALL | TYPO3_REQUESTTYPE_CLI));
     }
 
     /**
@@ -3153,7 +3777,7 @@ class GeneralUtility
         if (!$useragent) {
             $useragent = self::getIndpEnv('HTTP_USER_AGENT');
         }
-        $bInfo = array();
+        $bInfo = [];
         // Which browser?
         if (strpos($useragent, 'Konqueror') !== false) {
             $bInfo['BROWSER'] = 'konqu';
@@ -3170,29 +3794,29 @@ class GeneralUtility
             // Browser version
             switch ($bInfo['BROWSER']) {
                 case 'net':
-                    $bInfo['VERSION'] = doubleval(substr($useragent, 8));
+                    $bInfo['VERSION'] = floatval(substr($useragent, 8));
                     if (strpos($useragent, 'Netscape6/') !== false) {
-                        $bInfo['VERSION'] = doubleval(substr(strstr($useragent, 'Netscape6/'), 10));
+                        $bInfo['VERSION'] = floatval(substr(strstr($useragent, 'Netscape6/'), 10));
                     }
                     // Will we ever know if this was a typo or intention...?! :-(
                     if (strpos($useragent, 'Netscape/6') !== false) {
-                        $bInfo['VERSION'] = doubleval(substr(strstr($useragent, 'Netscape/6'), 10));
+                        $bInfo['VERSION'] = floatval(substr(strstr($useragent, 'Netscape/6'), 10));
                     }
                     if (strpos($useragent, 'Netscape/7') !== false) {
-                        $bInfo['VERSION'] = doubleval(substr(strstr($useragent, 'Netscape/7'), 9));
+                        $bInfo['VERSION'] = floatval(substr(strstr($useragent, 'Netscape/7'), 9));
                     }
                     break;
                 case 'msie':
                     $tmp = strstr($useragent, 'MSIE');
-                    $bInfo['VERSION'] = doubleval(preg_replace('/^[^0-9]*/', '', substr($tmp, 4)));
+                    $bInfo['VERSION'] = floatval(preg_replace('/^[^0-9]*/', '', substr($tmp, 4)));
                     break;
                 case 'opera':
                     $tmp = strstr($useragent, 'Opera');
-                    $bInfo['VERSION'] = doubleval(preg_replace('/^[^0-9]*/', '', substr($tmp, 5)));
+                    $bInfo['VERSION'] = floatval(preg_replace('/^[^0-9]*/', '', substr($tmp, 5)));
                     break;
                 case 'konqu':
                     $tmp = strstr($useragent, 'Konqueror/');
-                    $bInfo['VERSION'] = doubleval(substr($tmp, 10));
+                    $bInfo['VERSION'] = floatval(substr($tmp, 10));
                     break;
             }
             // Client system
@@ -3217,7 +3841,8 @@ class GeneralUtility
     {
         $host = '';
         // If not called from the command-line, resolve on getIndpEnv()
-        if ($requestHost && !(TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_CLI)) {
+        // Note that TYPO3_REQUESTTYPE is not used here as it may not yet be defined
+        if ($requestHost && (!defined('TYPO3_cliMode') || !TYPO3_cliMode)) {
             $host = self::getIndpEnv('HTTP_HOST');
         }
         if (!$host) {
@@ -3257,20 +3882,18 @@ class GeneralUtility
      * \TYPO3\CMS\Core\Utility\GeneralUtility::validPathStr().
      *
      * @param string $filename The input filename/filepath to evaluate
-     * @param bool $_ - obsolete, will be removed in TYPO3 CMS 9
-     * @param bool $_2 - obsolete, will be removed in TYPO3 CMS 9
+     * @param bool $onlyRelative If $onlyRelative is set (which it is by default), then only return values relative to the current PATH_site is accepted.
+     * @param bool $relToTYPO3_mainDir If $relToTYPO3_mainDir is set, then relative paths are relative to PATH_typo3 constant - otherwise (default) they are relative to PATH_site
      * @return string Returns the absolute filename of $filename if valid, otherwise blank string.
      */
-    public static function getFileAbsFileName($filename, $_ = null, $_2 = null)
+    public static function getFileAbsFileName($filename, $onlyRelative = true, $relToTYPO3_mainDir = false)
     {
         if ((string)$filename === '') {
             return '';
         }
-        if ($_ !== null) {
-            self::deprecationLog('Parameter 2 of GeneralUtility::getFileAbsFileName is obsolete and can be omitted.');
-        }
-        if ($_2 !== null) {
-            self::deprecationLog('Parameter 3 of GeneralUtility::getFileAbsFileName is obsolete and can be omitted.');
+        $relPathPrefix = PATH_site;
+        if ($relToTYPO3_mainDir) {
+            $relPathPrefix = PATH_typo3;
         }
 
         // Extension
@@ -3281,18 +3904,17 @@ class GeneralUtility
                 $filename = ExtensionManagementUtility::extPath($extKey) . $local;
             }
         } elseif (!static::isAbsPath($filename)) {
-            // is relative. Prepended with PATH_site
-            $filename = PATH_site . $filename;
-        } elseif (!static::isFirstPartOfStr($filename, PATH_site)) {
+            // relative. Prepended with $relPathPrefix
+            $filename = $relPathPrefix . $filename;
+        } elseif ($onlyRelative && !static::isFirstPartOfStr($filename, $relPathPrefix)) {
             // absolute, but set to blank if not allowed
             $filename = '';
         }
         if ((string)$filename !== '' && static::validPathStr($filename)) {
             // checks backpath.
             return $filename;
-        } else {
-            return '';
         }
+        return '';
     }
 
     /**
@@ -3305,12 +3927,11 @@ class GeneralUtility
      * @param string $theFile File path to evaluate
      * @return bool TRUE, $theFile is allowed path string, FALSE otherwise
      * @see http://php.net/manual/en/security.filesystem.nullbytes.php
-     * @todo Possible improvement: Should it rawurldecode the string first to check if any of these characters is encoded?
      */
     public static function validPathStr($theFile)
     {
         return strpos($theFile, '//') === false && strpos($theFile, '\\') === false
-            && !preg_match('#(?:^\\.\\.|/\\.\\./|[[:cntrl:]])#u', $theFile);
+            && preg_match('#(?:^\\.\\.|/\\.\\./|[[:cntrl:]])#u', $theFile) === 0;
     }
 
     /**
@@ -3390,17 +4011,14 @@ class GeneralUtility
      * Checks if a given string is a valid frame URL to be loaded in the
      * backend.
      *
-     * If the given url is empty or considered to be harmless, it is returned
-     * as is, else the event is logged and an empty string is returned.
-     *
      * @param string $url potential URL to check
-     * @return string $url or empty string
+     * @return string either $url if $url is considered to be harmless, or an
      */
     public static function sanitizeLocalUrl($url = '')
     {
         $sanitizedUrl = '';
-        if (!empty($url)) {
-            $decodedUrl = rawurldecode($url);
+        $decodedUrl = rawurldecode($url);
+        if (!empty($url) && self::removeXSS($decodedUrl) === $decodedUrl) {
             $parsedUrl = parse_url($decodedUrl);
             $testAbsoluteUrl = self::resolveBackPath($decodedUrl);
             $testRelativeUrl = self::resolveBackPath(self::dirname(self::getIndpEnv('SCRIPT_NAME')) . '/' . $decodedUrl);
@@ -3413,9 +4031,7 @@ class GeneralUtility
                 $sanitizedUrl = $url;
             } elseif (strpos($testAbsoluteUrl, self::getIndpEnv('TYPO3_SITE_PATH')) === 0 && $decodedUrl[0] === '/') {
                 $sanitizedUrl = $url;
-            } elseif (empty($parsedUrl['scheme']) && strpos($testRelativeUrl, self::getIndpEnv('TYPO3_SITE_PATH')) === 0
-                && $decodedUrl[0] !== '/' && strpbrk($decodedUrl, '*:|"<>') === false && strpos($decodedUrl, '\\\\') === false
-            ) {
+            } elseif (empty($parsedUrl['scheme']) && strpos($testRelativeUrl, self::getIndpEnv('TYPO3_SITE_PATH')) === 0 && $decodedUrl[0] !== '/') {
                 $sanitizedUrl = $url;
             }
         }
@@ -3435,19 +4051,18 @@ class GeneralUtility
      */
     public static function upload_copy_move($source, $destination)
     {
-        $result = false;
         if (is_uploaded_file($source)) {
-            // Return the value of move_uploaded_file, and if FALSE the temporary $source is still
-            // around so the user can use unlink to delete it:
-            $result = move_uploaded_file($source, $destination);
+            $uploaded = true;
+            // Return the value of move_uploaded_file, and if FALSE the temporary $source is still around so the user can use unlink to delete it:
+            $uploadedResult = move_uploaded_file($source, $destination);
         } else {
+            $uploaded = false;
             @copy($source, $destination);
         }
         // Change the permissions of the file
         self::fixPermissions($destination);
-        // If here the file is copied and the temporary $source is still around,
-        // so when returning FALSE the user can try unlink to delete the $source
-        return $result;
+        // If here the file is copied and the temporary $source is still around, so when returning FALSE the user can try unlink to delete the $source
+        return $uploaded ? $uploadedResult : false;
     }
 
     /**
@@ -3505,12 +4120,9 @@ class GeneralUtility
      */
     public static function tempnam($filePrefix, $fileSuffix = '')
     {
-        $temporaryPath = PATH_site . 'typo3temp/var/transient/';
-        if (!is_dir($temporaryPath)) {
-            GeneralUtility::mkdir_deep($temporaryPath);
-        }
+        $temporaryPath = PATH_site . 'typo3temp/';
         if ($fileSuffix === '') {
-            $tempFileName = static::fixWindowsFilePath(tempnam($temporaryPath, $filePrefix));
+            $tempFileName = $temporaryPath . basename(tempnam($temporaryPath, $filePrefix));
         } else {
             do {
                 $tempFileName = $temporaryPath . $filePrefix . mt_rand(1, PHP_INT_MAX) . $fileSuffix;
@@ -3532,7 +4144,7 @@ class GeneralUtility
     public static function stdAuthCode($uid_or_record, $fields = '', $codeLength = 8)
     {
         if (is_array($uid_or_record)) {
-            $recCopy_temp = array();
+            $recCopy_temp = [];
             if ($fields) {
                 $fieldArr = self::trimExplode(',', $fields, true);
                 foreach ($fieldArr as $k => $v) {
@@ -3571,6 +4183,24 @@ class GeneralUtility
     public static function hideIfDefaultLanguage($localizationConfiguration)
     {
         return (bool)($localizationConfiguration & 1);
+    }
+
+    /**
+     * Includes a locallang file and returns the $LOCAL_LANG array found inside.
+     *
+     * @param string $fileRef Input is a file-reference (see \TYPO3\CMS\Core\Utility\GeneralUtility::getFileAbsFileName). That file is expected to be a 'locallang.xlf' file conataining a valid XML TYPO3 language structure.
+     * @param string $langKey Language key
+     * @param string $charset Character set (option); if not set, determined by the language key
+     * @param int $errorMode Error mode (when file could not be found): 0 - syslog entry, 1 - do nothing, 2 - throw an exception
+     * @return array Value of $LOCAL_LANG found in the included file. If that array is found it will returned.
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public static function readLLfile($fileRef, $langKey, $charset = '', $errorMode = 0)
+    {
+        self::logDeprecatedFunction();
+        /** @var $languageFactory \TYPO3\CMS\Core\Localization\LocalizationFactory */
+        $languageFactory = self::makeInstance(\TYPO3\CMS\Core\Localization\LocalizationFactory::class);
+        return $languageFactory->getParsedData($fileRef, $langKey, $charset, $errorMode);
     }
 
     /**
@@ -3645,7 +4275,7 @@ class GeneralUtility
             if ($dataStruct && !is_array($dataStruct)) {
                 $file = self::getFileAbsFileName($dataStruct);
                 if ($file && @is_file($file)) {
-                    $dataStruct = self::xml2array(file_get_contents($file));
+                    $dataStruct = self::xml2array(self::getUrl($file));
                 }
             }
         } else {
@@ -3658,7 +4288,7 @@ class GeneralUtility
             // Default sheet
             $sheet = 'sDEF';
         }
-        return array($dataStruct, $sheet, $singleSheet);
+        return [$dataStruct, $sheet, $singleSheet];
     }
 
     /**
@@ -3671,7 +4301,7 @@ class GeneralUtility
     public static function resolveAllSheetsInDS(array $dataStructArray)
     {
         if (is_array($dataStructArray['sheets'])) {
-            $out = array('sheets' => array());
+            $out = ['sheets' => []];
             foreach ($dataStructArray['sheets'] as $sheetId => $sDat) {
                 list($ds, $aS) = self::resolveSheetDefInDS($dataStructArray, $sheetId);
                 if ($sheetId == $aS) {
@@ -3680,7 +4310,7 @@ class GeneralUtility
             }
         } else {
             list($ds) = self::resolveSheetDefInDS($dataStructArray);
-            $out = array('sheets' => array('sDEF' => $ds));
+            $out = ['sheets' => ['sDEF' => $ds]];
         }
         return $out;
     }
@@ -3689,38 +4319,35 @@ class GeneralUtility
      * Calls a user-defined function/method in class
      * Such a function/method should look like this: "function proc(&$params, &$ref) {...}"
      *
-     * @param string $funcName Function/Method reference or Closure, '[file-reference":"]["&"]class/function["->"method-name]'. You can prefix this reference with "[file-reference]:" and \TYPO3\CMS\Core\Utility\GeneralUtility::getFileAbsFileName() will then be used to resolve the filename and subsequently include it by "require_once()" which means you don't have to worry about including the class file either! Example: "EXT:realurl/class.tx_realurl.php:&tx_realurl->encodeSpURL". However, using file references has been marked as deprecated and should be avoided, instead use the autoloading mechanism in place directly. Finally; you can prefix the class name with "&" if you want to reuse a former instance of the same object call ("singleton").
+     * @param string $funcName Function/Method reference or Closure, '[file-reference":"]["&"]class/function["->"method-name]'. You can prefix this reference with "[file-reference]:" and \TYPO3\CMS\Core\Utility\GeneralUtility::getFileAbsFileName() will then be used to resolve the filename and subsequently include it by "require_once()" which means you don't have to worry about including the class file either! Example: "EXT:realurl/class.tx_realurl.php:&tx_realurl->encodeSpURL". Finally; you can prefix the class name with "&" if you want to reuse a former instance of the same object call ("singleton").
      * @param mixed $params Parameters to be pass along (typically an array) (REFERENCE!)
      * @param mixed $ref Reference to be passed along (typically "$this" - being a reference to the calling object) (REFERENCE!)
-     * @param string $_ Not used anymore since 6.0
+     * @param string $checkPrefix Not used anymore since 6.0
      * @param int $errorMode Error mode (when class/function could not be found): 0 - call debug(), 1 - do nothing, 2 - raise an exception (allows to call a user function that may return FALSE)
      * @return mixed Content from method/function call or FALSE if the class/method/function was not found
      * @see getUserObj()
      */
-    public static function callUserFunction($funcName, &$params, &$ref, $_ = '', $errorMode = 0)
+    public static function callUserFunction($funcName, &$params, &$ref, $checkPrefix = '', $errorMode = 0)
     {
         $content = false;
         // Check if we're using a closure and invoke it directly.
         if (is_object($funcName) && is_a($funcName, 'Closure')) {
-            return call_user_func_array($funcName, array(&$params, &$ref));
+            return call_user_func_array($funcName, [&$params, &$ref]);
         }
+        $funcName = trim($funcName);
         // Check persistent object and if found, call directly and exit.
         if (isset($GLOBALS['T3_VAR']['callUserFunction'][$funcName]) && is_array($GLOBALS['T3_VAR']['callUserFunction'][$funcName])) {
-            return call_user_func_array(array(
+            return call_user_func_array([
                 &$GLOBALS['T3_VAR']['callUserFunction'][$funcName]['obj'],
                 $GLOBALS['T3_VAR']['callUserFunction'][$funcName]['method']
-            ), array(&$params, &$ref));
+            ], [&$params, &$ref]);
         }
         // Check file-reference prefix; if found, require_once() the file (should be library of code)
         if (strpos($funcName, ':') !== false) {
-            // @deprecated since TYPO3 v8, will be removed in v9
-            self::deprecationLog('Using file references to resolve "' . $funcName . '" has been deprecated in TYPO3 v8 '
-                . 'when calling GeneralUtility::callUserFunction(), make sure the class is available via the class loader. '
-                . 'This functionality will be removed in TYPO3 v9.');
             list($file, $funcRef) = self::revExplode(':', $funcName, 2);
             $requireFile = self::getFileAbsFileName($file);
             if ($requireFile) {
-                require_once $requireFile;
+                self::requireOnce($requireFile);
             }
         } else {
             $funcRef = $funcName;
@@ -3752,13 +4379,13 @@ class GeneralUtility
                 if (method_exists($classObj, $parts[1])) {
                     // If persistent object should be created, set reference:
                     if ($storePersistentObject) {
-                        $GLOBALS['T3_VAR']['callUserFunction'][$funcName] = array(
+                        $GLOBALS['T3_VAR']['callUserFunction'][$funcName] = [
                             'method' => $parts[1],
                             'obj' => &$classObj
-                        );
+                        ];
                     }
                     // Call method:
-                    $content = call_user_func_array(array(&$classObj, $parts[1]), array(&$params, &$ref));
+                    $content = call_user_func_array([&$classObj, $parts[1]], [&$params, &$ref]);
                 } else {
                     $errorMsg = 'No method name \'' . $parts[1] . '\' in class ' . $parts[0];
                     if ($errorMode == 2) {
@@ -3778,7 +4405,7 @@ class GeneralUtility
         } else {
             // Function
             if (function_exists($funcRef)) {
-                $content = call_user_func_array($funcRef, array(&$params, &$ref));
+                $content = call_user_func_array($funcRef, [&$params, &$ref]);
             } else {
                 $errorMsg = 'No function named: ' . $funcRef;
                 if ($errorMode == 2) {
@@ -3792,42 +4419,59 @@ class GeneralUtility
     }
 
     /**
-     * This method should be avoided, as it will be deprecated soon. Instead use makeInstance() directly.
-     *
      * Creates and returns reference to a user defined object.
      * This function can return an object reference if you like.
+     * Just prefix the function call with "&": "$objRef = &\TYPO3\CMS\Core\Utility\GeneralUtility::getUserObj('EXT:myext/class.tx_myext_myclass.php:&tx_myext_myclass');".
+     * This will work ONLY if you prefix the class name with "&" as well. See description of function arguments.
+     * Please note that the reference functionality is deprecated as of TYPO3 CMS 7, and will be removed with TYPO3 CMS 8, let the class use the SingletonInterface of TYPO3 instead.
      *
-     * @param string $classRef Class reference, '[file-reference":"]class-name'.
-     *                         You can prefix the class name with "[file-reference]:" and
-     *                         GeneralUtility::getFileAbsFileName() will then be used to resolve the filename and
-     *                         subsequently include it by "require_once()" which means you don't have to worry about
-     *                         including the class file either! Example: "EXT:realurl/class.tx_realurl.php:tx_realurl".
-     *                         However, the file reference part is marked as deprecated as the class loading mechanism
-     *                         via composer or the autoloading part of TYPO3 should be used instead.
-     * @return object The instance of the class asked for. Instance is created with GeneralUtility::makeInstance
+     * @todo Deprecate the whole method in several steps:
+     *      1. Deprecated singleton pattern, (will be removed in TYPO3 CMS 8)
+     *      2. Deprecate file prefix/ require file,
+     *      3. Deprecate usage without valid class name.
+     *      4. The last step should be to deprecate the method itself.
+     *
+     * @param string $classRef Class reference, '[file-reference":"]["&"]class-name'. You can prefix the class name with "[file-reference]:" and \TYPO3\CMS\Core\Utility\GeneralUtility::getFileAbsFileName() will then be used to resolve the filename and subsequently include it by "require_once()" which means you don't have to worry about including the class file either! Example: "EXT:realurl/class.tx_realurl.php:&tx_realurl". Finally; for the class name you can prefix it with "&" and you will reuse the previous instance of the object identified by the full reference string (meaning; if you ask for the same $classRef later in another place in the code you will get a reference to the first created one!).
+     * @return object The instance of the class asked for. Instance is created with \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance
      * @see callUserFunction()
      */
     public static function getUserObj($classRef)
     {
-        // Check file-reference prefix; if found, require_once() the file (should be library of code)
-        if (strpos($classRef, ':') !== false) {
-            // @deprecated since TYPO3 v8, will be removed in v9
-            self::deprecationLog('Using file references to resolve "' . $classRef . '" has been deprecated in TYPO3 v8 '
-                . 'when calling GeneralUtility::getUserObj(), make sure the class is available via the class loader. '
-                . 'This functionality will be removed in TYPO3 v9.');
-            list($file, $class) = self::revExplode(':', $classRef, 2);
-            $requireFile = self::getFileAbsFileName($file);
-            if ($requireFile) {
-                require_once $requireFile;
-            }
+        // Check persistent object and if found, call directly and exit.
+        if (is_object($GLOBALS['T3_VAR']['getUserObj'][$classRef])) {
+            return $GLOBALS['T3_VAR']['getUserObj'][$classRef];
         } else {
-            $class = $classRef;
-        }
-
-        // Check if class exists:
-        if (class_exists($class)) {
-            $classObj = self::makeInstance($class);
-            return $classObj;
+            // Check file-reference prefix; if found, require_once() the file (should be library of code)
+            if (strpos($classRef, ':') !== false) {
+                list($file, $class) = self::revExplode(':', $classRef, 2);
+                $requireFile = self::getFileAbsFileName($file);
+                if ($requireFile) {
+                    self::requireOnce($requireFile);
+                }
+            } else {
+                $class = $classRef;
+            }
+            // Check for persistent object token, "&"
+            if ($class[0] === '&') {
+                self::deprecationLog(
+                    'The persistent functionality of getUserObj(), prepending the class name with & is deprecated since'
+                    . ' TYPO3 CMS 7 and will be removed in TYPO3 CMS 8. To allow this functionality, implement '
+                    . ' the \\TYPO3\\CMS\\Core\\SingletonInterface in the class "' . $classRef . '" instead.'
+                );
+                $class = substr($class, 1);
+                $storePersistentObject = true;
+            } else {
+                $storePersistentObject = false;
+            }
+            // Check if class exists:
+            if (class_exists($class)) {
+                $classObj = self::makeInstance($class);
+                // If persistent object should be created, set reference:
+                if ($storePersistentObject) {
+                    $GLOBALS['T3_VAR']['getUserObj'][$classRef] = $classObj;
+                }
+                return $classObj;
+            }
         }
     }
 
@@ -3846,11 +4490,12 @@ class GeneralUtility
      * the instance of a specific class.
      *
      * @param string $className name of the class to instantiate, must not be empty and not start with a backslash
-     * @param mixed $constructorArguments Arguments for the constructor
+     *
      * @return object the created instance
+     *
      * @throws \InvalidArgumentException if $className is empty or starts with a backslash
      */
-    public static function makeInstance($className, ...$constructorArguments)
+    public static function makeInstance($className)
     {
         if (!is_string($className) || empty($className)) {
             throw new \InvalidArgumentException('$className must be a non empty string.', 1288965219);
@@ -3879,10 +4524,58 @@ class GeneralUtility
             return array_shift(self::$nonSingletonInstances[$finalClassName]);
         }
         // Create new instance and call constructor with parameters
-        $instance = new $finalClassName(...$constructorArguments);
+        $instance = static::instantiateClass($finalClassName, func_get_args());
         // Register new singleton instance
         if ($instance instanceof SingletonInterface) {
             self::$singletonInstances[$finalClassName] = $instance;
+        }
+        return $instance;
+    }
+
+    /**
+     * Speed optimized alternative to ReflectionClass::newInstanceArgs()
+     *
+     * @param string $className Name of the class to instantiate
+     * @param array $arguments Arguments passed to self::makeInstance() thus the first one with index 0 holds the requested class name
+     * @return mixed
+     */
+    protected static function instantiateClass($className, $arguments)
+    {
+        switch (count($arguments)) {
+            case 1:
+                $instance = new $className();
+                break;
+            case 2:
+                $instance = new $className($arguments[1]);
+                break;
+            case 3:
+                $instance = new $className($arguments[1], $arguments[2]);
+                break;
+            case 4:
+                $instance = new $className($arguments[1], $arguments[2], $arguments[3]);
+                break;
+            case 5:
+                $instance = new $className($arguments[1], $arguments[2], $arguments[3], $arguments[4]);
+                break;
+            case 6:
+                $instance = new $className($arguments[1], $arguments[2], $arguments[3], $arguments[4], $arguments[5]);
+                break;
+            case 7:
+                $instance = new $className($arguments[1], $arguments[2], $arguments[3], $arguments[4], $arguments[5], $arguments[6]);
+                break;
+            case 8:
+                $instance = new $className($arguments[1], $arguments[2], $arguments[3], $arguments[4], $arguments[5], $arguments[6], $arguments[7]);
+                break;
+            case 9:
+                $instance = new $className($arguments[1], $arguments[2], $arguments[3], $arguments[4], $arguments[5], $arguments[6], $arguments[7], $arguments[8]);
+                break;
+            default:
+                // The default case for classes with constructors that have more than 8 arguments.
+                // This will fail when one of the arguments shall be passed by reference.
+                // In case we really need to support this edge case, we can implement the solution from here: https://review.typo3.org/26344
+                $class = new \ReflectionClass($className);
+                array_shift($arguments);
+                $instance = $class->newInstanceArgs($arguments);
         }
         return $instance;
     }
@@ -4001,7 +4694,7 @@ class GeneralUtility
      */
     public static function resetSingletonInstances(array $newSingletonInstances)
     {
-        static::$singletonInstances = array();
+        static::$singletonInstances = [];
         foreach ($newSingletonInstances as $className => $instance) {
             static::setSingletonInstance($className, $instance);
         }
@@ -4046,7 +4739,7 @@ class GeneralUtility
             throw new \InvalidArgumentException('$instance must not be an instance of TYPO3\\CMS\\Core\\SingletonInterface. ' . 'For setting singletons, please use setSingletonInstance.', 1288969325);
         }
         if (!isset(self::$nonSingletonInstances[$className])) {
-            self::$nonSingletonInstances[$className] = array();
+            self::$nonSingletonInstances[$className] = [];
         }
         self::$nonSingletonInstances[$className][] = $instance;
     }
@@ -4083,8 +4776,8 @@ class GeneralUtility
      */
     public static function purgeInstances()
     {
-        self::$singletonInstances = array();
-        self::$nonSingletonInstances = array();
+        self::$singletonInstances = [];
+        self::$nonSingletonInstances = [];
     }
 
     /**
@@ -4110,17 +4803,17 @@ class GeneralUtility
      * @param mixed $excludeServiceKeys List of service keys which should be excluded in the search for a service. Array or comma list.
      * @return object|string[] The service object or an array with error infos.
      */
-    public static function makeInstanceService($serviceType, $serviceSubType = '', $excludeServiceKeys = array())
+    public static function makeInstanceService($serviceType, $serviceSubType = '', $excludeServiceKeys = [])
     {
         $error = false;
         if (!is_array($excludeServiceKeys)) {
             $excludeServiceKeys = self::trimExplode(',', $excludeServiceKeys, true);
         }
-        $requestInfo = array(
+        $requestInfo = [
             'requestedServiceType' => $serviceType,
             'requestedServiceSubType' => $serviceSubType,
             'requestedExcludeServiceKeys' => $excludeServiceKeys
-        );
+        ];
         while ($info = ExtensionManagementUtility::findService($serviceType, $serviceSubType, $excludeServiceKeys)) {
             // provide information about requested service to service object
             $info = array_merge($info, $requestInfo);
@@ -4134,7 +4827,7 @@ class GeneralUtility
             } else {
                 $obj = self::makeInstance($info['className']);
                 if (is_object($obj)) {
-                    if (!@is_callable(array($obj, 'init'))) {
+                    if (!@is_callable([$obj, 'init'])) {
                         // use silent logging??? I don't think so.
                         die('Broken service:' . DebugUtility::viewArray($info));
                     }
@@ -4161,11 +4854,9 @@ class GeneralUtility
      *
      * @param string $requireFile: Path of the file to be included
      * @return void
-     * @deprecated since TYPO3 CMS 8, this file will be removed in TYPO3 CMS 9
      */
     public static function requireOnce($requireFile)
     {
-        self::logDeprecatedFunction();
         // Needed for require_once
         global $T3_SERVICES, $T3_VAR, $TYPO3_CONF_VARS;
         require_once $requireFile;
@@ -4178,14 +4869,169 @@ class GeneralUtility
      *
      * @param string $requireFile: Path of the file to be included
      * @return void
-     * @deprecated since TYPO3 CMS 8, this file will be removed in TYPO3 CMS 9
      */
     public static function requireFile($requireFile)
     {
-        self::logDeprecatedFunction();
         // Needed for require
         global $T3_SERVICES, $T3_VAR, $TYPO3_CONF_VARS;
         require $requireFile;
+    }
+
+    /**
+     * Implementation of quoted-printable encode.
+     * See RFC 1521, section 5.1 Quoted-Printable Content-Transfer-Encoding
+     *
+     * @param string $string Content to encode
+     * @param int $maxlen Length of the lines, default is 76
+     * @return string The QP encoded string
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8. Use mailer API instead
+     */
+    public static function quoted_printable($string, $maxlen = 76)
+    {
+        static::logDeprecatedFunction();
+        // Make sure the string contains only Unix line breaks
+        // Replace Windows breaks (\r\n)
+        $string = str_replace(CRLF, LF, $string);
+        // Replace Mac breaks (\r)
+        $string = str_replace(CR, LF, $string);
+        // Default line break for Unix systems.
+        $linebreak = LF;
+        if (TYPO3_OS == 'WIN') {
+            // Line break for Windows. This is needed because PHP on Windows systems send mails via SMTP instead of using sendmail, and thus the line break needs to be \r\n.
+            $linebreak = CRLF;
+        }
+        $newString = '';
+        // Split lines
+        $theLines = explode(LF, $string);
+        foreach ($theLines as $val) {
+            $newVal = '';
+            $theValLen = strlen($val);
+            $len = 0;
+            // Walk through each character of this line
+            for ($index = 0; $index < $theValLen; $index++) {
+                $char = substr($val, $index, 1);
+                $ordVal = ord($char);
+                if ($len > $maxlen - 4 || $len > $maxlen - 14 && $ordVal == 32) {
+                    // Add a line break
+                    $newVal .= '=' . $linebreak;
+                    // Reset the length counter
+                    $len = 0;
+                }
+                if ($ordVal >= 33 && $ordVal <= 60 || $ordVal >= 62 && $ordVal <= 126 || $ordVal == 9 || $ordVal == 32) {
+                    // This character is ok, add it to the message
+                    $newVal .= $char;
+                    $len++;
+                } else {
+                    // Special character, needs to be encoded
+                    $newVal .= sprintf('=%02X', $ordVal);
+                    $len += 3;
+                }
+            }
+            // Replaces a possible SPACE-character at the end of a line
+            $newVal = preg_replace('/' . chr(32) . '$/', '=20', $newVal);
+            // Replaces a possible TAB-character at the end of a line
+            $newVal = preg_replace('/' . TAB . '$/', '=09', $newVal);
+            $newString .= $newVal . $linebreak;
+        }
+        // Remove last newline
+        return preg_replace('/' . $linebreak . '$/', '', $newString);
+    }
+
+    /**
+     * Encode header lines
+     * Email headers must be ASCII, therefore they will be encoded to quoted_printable (default) or base64.
+     *
+     * @param string $line Content to encode
+     * @param string $enc Encoding type: "base64" or "quoted-printable". Default value is "quoted-printable".
+     * @param string $charset Charset used for encoding
+     * @return string The encoded string
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8. Use mailer API instead
+     */
+    public static function encodeHeader($line, $enc = 'quoted-printable', $charset = 'utf-8')
+    {
+        static::logDeprecatedFunction();
+        // Avoid problems if "###" is found in $line (would conflict with the placeholder which is used below)
+        if (strpos($line, '###') !== false) {
+            return $line;
+        }
+        // Check if any non-ASCII characters are found - otherwise encoding is not needed
+        if (!preg_match(('/[^' . chr(32) . '-' . chr(127) . ']/'), $line)) {
+            return $line;
+        }
+        // Wrap email addresses in a special marker
+        $line = preg_replace('/([^ ]+@[^ ]+)/', '###$1###', $line);
+        $matches = preg_split('/(.?###.+###.?|\\(|\\))/', $line, -1, PREG_SPLIT_NO_EMPTY);
+        foreach ($matches as $part) {
+            $oldPart = $part;
+            $partWasQuoted = $part[0] == '"';
+            $part = trim($part, '"');
+            switch ((string)$enc) {
+                case 'base64':
+                    $part = '=?' . $charset . '?B?' . base64_encode($part) . '?=';
+                    break;
+                case 'quoted-printable':
+
+                default:
+                    $qpValue = self::quoted_printable($part, 1000);
+                    if ($part != $qpValue) {
+                        // Encoded words in the header should not contain non-encoded:
+                        // * spaces. "_" is a shortcut for "=20". See RFC 2047 for details.
+                        // * question mark. See RFC 1342 (http://tools.ietf.org/html/rfc1342)
+                        $search = [' ', '?'];
+                        $replace = ['_', '=3F'];
+                        $qpValue = str_replace($search, $replace, $qpValue);
+                        $part = '=?' . $charset . '?Q?' . $qpValue . '?=';
+                    }
+            }
+            if ($partWasQuoted) {
+                $part = '"' . $part . '"';
+            }
+            $line = str_replace($oldPart, $part, $line);
+        }
+        // Remove the wrappers
+        $line = preg_replace('/###(.+?)###/', '$1', $line);
+        return $line;
+    }
+
+    /**
+     * Takes a clear-text message body for a plain text email, finds all 'http://' links and if they are longer than 76 chars they are converted to a shorter URL with a hash parameter. The real parameter is stored in the database and the hash-parameter/URL will be redirected to the real parameter when the link is clicked.
+     * This function is about preserving long links in messages.
+     *
+     * @param string $message Message content
+     * @param string $urlmode URL mode; "76" or "all
+     * @param string $index_script_url URL of index script (see makeRedirectUrl())
+     * @return string Processed message content
+     * @see makeRedirectUrl()
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8. Use mailer API instead
+     */
+    public static function substUrlsInPlainText($message, $urlmode = '76', $index_script_url = '')
+    {
+        static::logDeprecatedFunction();
+        switch ((string)$urlmode) {
+            case '':
+                $lengthLimit = false;
+                break;
+            case 'all':
+                $lengthLimit = 0;
+                break;
+            case '76':
+
+            default:
+                $lengthLimit = (int)$urlmode;
+        }
+        if ($lengthLimit === false) {
+            // No processing
+            $messageSubstituted = $message;
+        } else {
+            $messageSubstituted = preg_replace_callback(
+                '/(http|https):\\/\\/.+(?=[\\]\\.\\?]*([\\! \'"()<>]+|$))/iU',
+                function (array $matches) use ($lengthLimit, $index_script_url) {
+                    return GeneralUtility::makeRedirectUrl($matches[0], $lengthLimit, $index_script_url);
+                },
+                $message
+            );
+        }
+        return $messageSubstituted;
     }
 
     /**
@@ -4202,12 +5048,12 @@ class GeneralUtility
             $md5 = substr(md5($inUrl), 0, 20);
             $count = $GLOBALS['TYPO3_DB']->exec_SELECTcountRows('*', 'cache_md5params', 'md5hash=' . $GLOBALS['TYPO3_DB']->fullQuoteStr($md5, 'cache_md5params'));
             if (!$count) {
-                $insertFields = array(
+                $insertFields = [
                     'md5hash' => $md5,
                     'tstamp' => $GLOBALS['EXEC_TIME'],
                     'type' => 2,
                     'params' => $inUrl
-                );
+                ];
                 $GLOBALS['TYPO3_DB']->exec_INSERTquery('cache_md5params', $insertFields);
             }
             $inUrl = ($index_script_url ? $index_script_url : self::getIndpEnv('TYPO3_REQUEST_DIR') . 'index.php') . '?RDCT=' . $md5;
@@ -4238,14 +5084,15 @@ class GeneralUtility
     public static function initSysLog()
     {
         // For CLI logging name is <fqdn-hostname>:<TYPO3-path>
-        if (TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_CLI) {
-            $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_div.php']['systemLogHost'] = self::getHostname() . ':' . PATH_site;
+        // Note that TYPO3_REQUESTTYPE is not used here as it may not yet be defined
+        if (defined('TYPO3_cliMode') && TYPO3_cliMode) {
+            $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_div.php']['systemLogHost'] = self::getHostname(($requestHost = false)) . ':' . PATH_site;
         } else {
             $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_div.php']['systemLogHost'] = self::getIndpEnv('TYPO3_SITE_URL');
         }
         // Init custom logging
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_div.php']['systemLog'])) {
-            $params = array('initLog' => true);
+            $params = ['initLog' => true];
             $fakeThis = false;
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_div.php']['systemLog'] as $hookMethod) {
                 self::callUserFunction($hookMethod, $params, $fakeThis);
@@ -4291,7 +5138,7 @@ class GeneralUtility
         }
         // Do custom logging
         if (isset($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_div.php']['systemLog']) && is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_div.php']['systemLog'])) {
-            $params = array('msg' => $msg, 'extKey' => $extKey, 'backTrace' => debug_backtrace(), 'severity' => $severity);
+            $params = ['msg' => $msg, 'extKey' => $extKey, 'backTrace' => debug_backtrace(), 'severity' => $severity];
             $fakeThis = false;
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_div.php']['systemLog'] as $hookMethod) {
                 self::callUserFunction($hookMethod, $params, $fakeThis);
@@ -4331,7 +5178,7 @@ class GeneralUtility
             } elseif ($type == 'error_log') {
                 error_log($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_div.php']['systemLogHost'] . $msgLine, 0);
             } elseif ($type == 'syslog') {
-                $priority = array(LOG_INFO, LOG_NOTICE, LOG_WARNING, LOG_ERR, LOG_CRIT);
+                $priority = [LOG_INFO, LOG_NOTICE, LOG_WARNING, LOG_ERR, LOG_CRIT];
                 syslog($priority[(int)$severity], $msgLine);
             }
         }
@@ -4354,7 +5201,7 @@ class GeneralUtility
     public static function devLog($msg, $extKey, $severity = 0, $dataVar = false)
     {
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_div.php']['devLog'])) {
-            $params = array('msg' => $msg, 'extKey' => $extKey, 'severity' => $severity, 'dataVar' => $dataVar);
+            $params = ['msg' => $msg, 'extKey' => $extKey, 'severity' => $severity, 'dataVar' => $dataVar];
             $fakeThis = false;
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_div.php']['devLog'] as $hookMethod) {
                 self::callUserFunction($hookMethod, $params, $fakeThis);
@@ -4376,7 +5223,7 @@ class GeneralUtility
         // Legacy values (no strict comparison, $log can be boolean, string or int)
         $log = $GLOBALS['TYPO3_CONF_VARS']['SYS']['enableDeprecationLog'];
         if ($log === true || $log == '1') {
-            $log = array('file');
+            $log = ['file'];
         } else {
             $log = self::trimExplode(',', $GLOBALS['TYPO3_CONF_VARS']['SYS']['enableDeprecationLog'], true);
         }
@@ -4448,7 +5295,7 @@ class GeneralUtility
      * @param int $valueLength Long string values are shortened to this length. Default: 20
      * @return string Output string with key names and their value as string
      */
-    public static function arrayToLogString(array $arr, $valueList = array(), $valueLength = 20)
+    public static function arrayToLogString(array $arr, $valueList = [], $valueLength = 20)
     {
         $str = '';
         if (!is_array($valueList)) {
@@ -4469,12 +5316,10 @@ class GeneralUtility
      * @param string $command Command to be run: identify, convert or combine/composite
      * @param string $parameters The parameters string
      * @param string $path Override the default path (e.g. used by the install tool)
-     * @return string Compiled command that deals with ImageMagick & GraphicsMagick
-     * @deprecated since TYPO3 CMS 8, will be removed in TYPO3 CMS 9. - use CommandUtility directly
+     * @return string Compiled command that deals with IM6 & GraphicsMagick
      */
     public static function imageMagickCommand($command, $parameters, $path = '')
     {
-        self::logDeprecatedFunction();
         return CommandUtility::imageMagickCommand($command, $parameters, $path);
     }
 
@@ -4527,7 +5372,7 @@ class GeneralUtility
     {
         return strtr(
             json_encode((string)$value, JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_HEX_TAG),
-            array(
+            [
                 '"' => '\'',
                 '\\\\' => '\\u005C',
                 ' ' => '\\u0020',
@@ -4535,19 +5380,31 @@ class GeneralUtility
                 '\\t' => '\\u0009',
                 '\\n' => '\\u000A',
                 '\\r' => '\\u000D'
-            )
+            ]
         );
+    }
+
+    /**
+     * Ends and cleans all output buffers
+     *
+     * @return void
+     * @deprecated since TYPO3 CMS 7, will be removed in CMS 8, use ob_* functions directly or self::flushOutputBuffers
+     */
+    public static function cleanOutputBuffers()
+    {
+        self::logDeprecatedFunction();
+        while (ob_end_clean()) {
+        }
+        header('Content-Encoding: None', true);
     }
 
     /**
      * Ends and flushes all output buffers
      *
      * @return void
-     * @deprecated since TYPO3 CMS 8, will be removed in TYPO3 CMS 9.
      */
     public static function flushOutputBuffers()
     {
-        self::logDeprecatedFunction();
         $obContent = '';
         while ($content = ob_get_clean()) {
             $obContent .= $content;

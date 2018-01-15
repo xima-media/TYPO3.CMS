@@ -25,7 +25,6 @@ use TYPO3\CMS\Core\Database\ReferenceIndex;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Integrity\DatabaseIntegrityCheck;
-use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Fluid\View\StandaloneView;
 
@@ -112,18 +111,18 @@ class DatabaseIntegrityView extends BaseScriptClass
         // If array, then it's a selector box menu
         // If empty string it's just a variable, that'll be saved.
         // Values NOT in this array will not be saved in the settings-array for the module.
-        $this->MOD_MENU = array(
-            'function' => array(
-                0 => htmlspecialchars($lang->getLL('menuTitle')),
-                'records' => htmlspecialchars($lang->getLL('recordStatistics')),
-                'relations' => htmlspecialchars($lang->getLL('databaseRelations')),
-                'search' => htmlspecialchars($lang->getLL('fullSearch')),
-                'refindex' => htmlspecialchars($lang->getLL('manageRefIndex'))
-            ),
-            'search' => array(
-                'raw' => htmlspecialchars($lang->getLL('rawSearch')),
-                'query' => htmlspecialchars($lang->getLL('advancedQuery'))
-            ),
+        $this->MOD_MENU = [
+            'function' => [
+                0 => $lang->getLL('menuTitle', true),
+                'records' => $lang->getLL('recordStatistics', true),
+                'relations' => $lang->getLL('databaseRelations', true),
+                'search' => $lang->getLL('fullSearch', true),
+                'refindex' => $lang->getLL('manageRefIndex', true)
+            ],
+            'search' => [
+                'raw' => $lang->getLL('rawSearch', true),
+                'query' => $lang->getLL('advancedQuery', true)
+            ],
             'search_query_smallparts' => '',
             'search_result_labels' => '',
             'labels_noprefix' => '',
@@ -151,20 +150,20 @@ class DatabaseIntegrityView extends BaseScriptClass
             // Used to store the available Query config memory banks
             'storeQueryConfigs' => '',
             // Used to store the available Query configs in memory
-            'search_query_makeQuery' => array(
-                'all' => htmlspecialchars($lang->getLL('selectRecords')),
-                'count' => htmlspecialchars($lang->getLL('countResults')),
-                'explain' => htmlspecialchars($lang->getLL('explainQuery')),
-                'csv' => htmlspecialchars($lang->getLL('csvExport'))
-            ),
+            'search_query_makeQuery' => [
+                'all' => $lang->getLL('selectRecords', true),
+                'count' => $lang->getLL('countResults', true),
+                'explain' => $lang->getLL('explainQuery', true),
+                'csv' => $lang->getLL('csvExport', true)
+            ],
             'sword' => ''
-        );
+        ];
         // CLEAN SETTINGS
         $OLD_MOD_SETTINGS = BackendUtility::getModuleData($this->MOD_MENU, '', $this->moduleName, 'ses');
         $this->MOD_SETTINGS = BackendUtility::getModuleData($this->MOD_MENU, GeneralUtility::_GP('SET'), $this->moduleName, 'ses');
         if (GeneralUtility::_GP('queryConfig')) {
             $qA = GeneralUtility::_GP('queryConfig');
-            $this->MOD_SETTINGS = BackendUtility::getModuleData($this->MOD_MENU, array('queryConfig' => serialize($qA)), $this->moduleName, 'ses');
+            $this->MOD_SETTINGS = BackendUtility::getModuleData($this->MOD_MENU, ['queryConfig' => serialize($qA)], $this->moduleName, 'ses');
         }
         $addConditionCheck = GeneralUtility::_GP('qG_ins');
         $setLimitToStart = false;
@@ -236,6 +235,18 @@ class DatabaseIntegrityView extends BaseScriptClass
     }
 
     /**
+     * Print content
+     *
+     * @return void
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function printContent()
+    {
+        GeneralUtility::logDeprecatedFunction();
+        echo $this->content;
+    }
+
+    /**
      * Injects the request object for the current request or subrequest
      * Simply calls main() and init() and outputs the content
      *
@@ -292,8 +303,8 @@ class DatabaseIntegrityView extends BaseScriptClass
      */
     protected function func_default()
     {
-        $modules = array();
-        $availableModFuncs = array('records', 'relations', 'search', 'refindex');
+        $modules = [];
+        $availableModFuncs = ['records', 'relations', 'search', 'refindex'];
         foreach ($availableModFuncs as $modFunc) {
             $modules[$modFunc] = BackendUtility::getModuleUrl('system_dbint') . '&SET[function]=' . $modFunc;
         }
@@ -312,9 +323,7 @@ class DatabaseIntegrityView extends BaseScriptClass
      */
     public function func_refindex()
     {
-        $this->view->assign('ReadmeLink', ExtensionManagementUtility::extRelPath('lowlevel') . 'README.rst');
-        $this->view->assign('ReadmeLocation', ExtensionManagementUtility::extPath('lowlevel', 'README.rst'));
-        $this->view->assign('binaryPath', ExtensionManagementUtility::extPath('core', 'bin/typo3'));
+        $this->view->assign('PATH_typo3', PATH_typo3);
 
         if (GeneralUtility::_GP('_update') || GeneralUtility::_GP('_check')) {
             $testOnly = (bool)GeneralUtility::_GP('_check');
@@ -375,34 +384,34 @@ class DatabaseIntegrityView extends BaseScriptClass
         $admin->genTree(0);
 
         // Pages stat
-        $pageStatistic = array(
-            'total_pages' => array(
-                'icon' => $this->iconFactory->getIconForRecord('pages', array(), Icon::SIZE_SMALL)->render(),
+        $pageStatistic = [
+            'total_pages' => [
+                'icon' => $this->iconFactory->getIconForRecord('pages', [], Icon::SIZE_SMALL)->render(),
                 'count' => count($admin->page_idArray)
-            ),
-            'hidden_pages' => array(
-                'icon' => $this->iconFactory->getIconForRecord('pages', array('hidden' => 1), Icon::SIZE_SMALL)->render(),
+            ],
+            'hidden_pages' => [
+                'icon' => $this->iconFactory->getIconForRecord('pages', ['hidden' => 1], Icon::SIZE_SMALL)->render(),
                 'count' => $admin->recStats['hidden']
-            ),
-            'deleted_pages' => array(
-                'icon' => $this->iconFactory->getIconForRecord('pages', array('deleted' => 1), Icon::SIZE_SMALL)->render(),
-                'count' => count($admin->recStats['deleted']['pages'])
-            )
-        );
+            ],
+            'deleted_pages' => [
+                'icon' => $this->iconFactory->getIconForRecord('pages', ['deleted' => 1], Icon::SIZE_SMALL)->render(),
+                'count' => isset($admin->recStats['deleted']['pages']) ? count($admin->recStats['deleted']['pages']) : 0
+            ]
+        ];
 
         $lang = $this->getLanguageService();
 
         // Doktype
-        $doktypes = array();
+        $doktypes = [];
         $doktype = $GLOBALS['TCA']['pages']['columns']['doktype']['config']['items'];
         if (is_array($doktype)) {
             foreach ($doktype as $setup) {
                 if ($setup[1] != '--div--') {
-                    $doktypes[] = array(
-                        'icon' => $this->iconFactory->getIconForRecord('pages', array('doktype' => $setup[1]), Icon::SIZE_SMALL)->render(),
+                    $doktypes[] = [
+                        'icon' => $this->iconFactory->getIconForRecord('pages', ['doktype' => $setup[1]], Icon::SIZE_SMALL)->render(),
                         'title' => $lang->sL($setup[0]) . ' (' . $setup[1] . ')',
                         'count' => (int)$admin->recStats['doktype'][$setup[1]]
-                    );
+                    ];
                 }
             }
         }
@@ -418,7 +427,7 @@ class DatabaseIntegrityView extends BaseScriptClass
             $id_list = rtrim($id_list, ',');
             $admin->lostRecords($id_list);
         }
-        $tableStatistic = array();
+        $tableStatistic = [];
         $countArr = $admin->countRecords($id_list);
         if (is_array($GLOBALS['TCA'])) {
             foreach ($GLOBALS['TCA'] as $t => $value) {
@@ -428,7 +437,7 @@ class DatabaseIntegrityView extends BaseScriptClass
                 if ($t === 'pages' && $admin->lostPagesList !== '') {
                     $lostRecordCount = count(explode(',', $admin->lostPagesList));
                 } else {
-                    $lostRecordCount = count($admin->lRecords[$t]);
+                    $lostRecordCount = isset($admin->lRecords[$t]) ? count($admin->lRecords[$t]) : 0;
                 }
                 if ($countArr['all'][$t]) {
                     $theNumberOfRe = (int)$countArr['non_deleted'][$t] . '/' . $lostRecordCount;
@@ -439,26 +448,26 @@ class DatabaseIntegrityView extends BaseScriptClass
                 if (is_array($admin->lRecords[$t])) {
                     foreach ($admin->lRecords[$t] as $data) {
                         if (!GeneralUtility::inList($admin->lostPagesList, $data['pid'])) {
-                            $lr .= '<div class="record"><a href="' . htmlspecialchars((BackendUtility::getModuleUrl('system_dbint') . '&SET[function]=records&fixLostRecords_table=' . $t . '&fixLostRecords_uid=' . $data['uid'])) . '" title="' . htmlspecialchars($lang->getLL('fixLostRecord')) . '">' . $this->iconFactory->getIcon('status-dialog-error', Icon::SIZE_SMALL)->render() . '</a>uid:' . $data['uid'] . ', pid:' . $data['pid'] . ', ' . htmlspecialchars(GeneralUtility::fixed_lgd_cs(strip_tags($data['title']), 20)) . '</div>';
+                            $lr .= '<div class="record"><a href="' . htmlspecialchars((BackendUtility::getModuleUrl('system_dbint') . '&SET[function]=records&fixLostRecords_table=' . $t . '&fixLostRecords_uid=' . $data['uid'])) . '" title="' . $lang->getLL('fixLostRecord', true) . '">' . $this->iconFactory->getIcon('status-dialog-error', Icon::SIZE_SMALL)->render() . '</a>uid:' . $data['uid'] . ', pid:' . $data['pid'] . ', ' . htmlspecialchars(GeneralUtility::fixed_lgd_cs(strip_tags($data['title']), 20)) . '</div>';
                         } else {
                             $lr .= '<div class="record-noicon">uid:' . $data['uid'] . ', pid:' . $data['pid'] . ', ' . htmlspecialchars(GeneralUtility::fixed_lgd_cs(strip_tags($data['title']), 20)) . '</div>';
                         }
                     }
                 }
-                $tableStatistic[$t] = array(
-                    'icon' => $this->iconFactory->getIconForRecord($t, array(), Icon::SIZE_SMALL)->render(),
+                $tableStatistic[$t] = [
+                    'icon' => $this->iconFactory->getIconForRecord($t, [], Icon::SIZE_SMALL)->render(),
                     'title' => $lang->sL($GLOBALS['TCA'][$t]['ctrl']['title']),
                     'count' => $theNumberOfRe,
                     'lostRecords' => $lr
-                );
+                ];
             }
         }
 
-        $this->view->assignMultiple(array(
+        $this->view->assignMultiple([
             'pages' => $pageStatistic,
             'doktypes' => $doktypes,
             'tables' => $tableStatistic
-        ));
+        ]);
     }
 
     /**
@@ -476,11 +485,11 @@ class DatabaseIntegrityView extends BaseScriptClass
         if (is_array($fileTest['noFile'])) {
             ksort($fileTest['noFile']);
         }
-        $this->view->assignMultiple(array(
+        $this->view->assignMultiple([
             'files' =>  $fileTest,
             'select_db' => $admin->testDBRefs($admin->checkSelectDBRefs),
             'group_db' => $admin->testDBRefs($admin->checkGroupDBRefs)
-        ));
+        ]);
     }
 
     /**

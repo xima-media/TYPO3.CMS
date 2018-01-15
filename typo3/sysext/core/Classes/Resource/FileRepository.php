@@ -14,15 +14,9 @@ namespace TYPO3\CMS\Core\Resource;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Database\Query\Restriction\FrontendRestrictionContainer;
-use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
-use TYPO3\CMS\Core\Database\RelationHandler;
 use TYPO3\CMS\Core\Resource\Exception\ResourceDoesNotExistException;
 use TYPO3\CMS\Core\Resource\Index\FileIndexRepository;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\MathUtility;
 
 /**
  * Repository for accessing files
@@ -37,7 +31,7 @@ class FileRepository extends AbstractRepository
      *
      * @var string
      */
-    protected $objectType = File::class;
+    protected $objectType = \TYPO3\CMS\Core\Resource\File::class;
 
     /**
      * Main File object storage table. Note that this repository also works on
@@ -61,8 +55,8 @@ class FileRepository extends AbstractRepository
     /**
      * Find FileReference objects by relation to other records
      *
-     * @param int $tableName Table name of the related record
-     * @param int $fieldName Field name of the related record
+     * @param string $tableName Table name of the related record
+     * @param string $fieldName Field name of the related record
      * @param int $uid The UID of the related record (needs to be the localized uid, as translated IRRE elements relate to them)
      * @return array An array of objects, empty if no objects found
      * @throws \InvalidArgumentException
@@ -71,42 +65,34 @@ class FileRepository extends AbstractRepository
     public function findByRelation($tableName, $fieldName, $uid)
     {
         $itemList = [];
-        if (!MathUtility::canBeInterpretedAsInteger($uid)) {
-            throw new \InvalidArgumentException(
-                'UID of related record has to be an integer. UID given: "' . $uid . '"',
-                1316789798
-            );
+        if (!\TYPO3\CMS\Core\Utility\MathUtility::canBeInterpretedAsInteger($uid)) {
+            throw new \InvalidArgumentException('UID of related record has to be an integer. UID given: "' . $uid . '"', 1316789798);
         }
-        $referenceUids = [];
+        $referenceUids = null;
         if ($this->getEnvironmentMode() === 'FE' && !empty($GLOBALS['TSFE']->sys_page)) {
-            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-                ->getQueryBuilderForTable('sys_file_reference');
-
-            $queryBuilder->setRestrictions(GeneralUtility::makeInstance(FrontendRestrictionContainer::class));
-            if ($GLOBALS['TSFE']->sys_page->showHiddenRecords) {
-                $queryBuilder->getRestrictions()->removeByType(HiddenRestriction::class);
-            }
-
-            $res = $queryBuilder
-                ->select('uid')
-                ->from('sys_file_reference')
-                ->where(
-                    $queryBuilder->expr()->eq('uid_foreign', (int)$uid),
-                    $queryBuilder->expr()->eq('tablenames', $queryBuilder->createNamedParameter($tableName)),
-                    $queryBuilder->expr()->eq('fieldname', $queryBuilder->createNamedParameter($fieldName))
-                )
-                ->orderBy('sorting_foreign')
-                ->execute();
-
-            while ($row = $res->fetch()) {
-                $referenceUids[] = $row['uid'];
+            /** @var $frontendController \TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController */
+            $frontendController = $GLOBALS['TSFE'];
+            $references = $this->getDatabaseConnection()->exec_SELECTgetRows(
+                'uid',
+                'sys_file_reference',
+                'tablenames=' . $this->getDatabaseConnection()->fullQuoteStr($tableName, 'sys_file_reference') .
+                    ' AND uid_foreign=' . (int)$uid .
+                    ' AND fieldname=' . $this->getDatabaseConnection()->fullQuoteStr($fieldName, 'sys_file_reference')
+                    . $frontendController->sys_page->enableFields('sys_file_reference', $frontendController->showHiddenRecords),
+                '',
+                'sorting_foreign',
+                '',
+                'uid'
+            );
+            if (!empty($references)) {
+                $referenceUids = array_keys($references);
             }
         } else {
-            /** @var $relationHandler RelationHandler */
-            $relationHandler = GeneralUtility::makeInstance(RelationHandler::class);
+            /** @var $relationHandler \TYPO3\CMS\Core\Database\RelationHandler */
+            $relationHandler = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Database\RelationHandler::class);
             $relationHandler->start(
                 '', 'sys_file_reference', '', $uid, $tableName,
-                BackendUtility::getTcaFieldConfiguration($tableName, $fieldName)
+                \TYPO3\CMS\Backend\Utility\BackendUtility::getTcaFieldConfiguration($tableName, $fieldName)
             );
             if (!empty($relationHandler->tableArray['sys_file_reference'])) {
                 $referenceUids = $relationHandler->tableArray['sys_file_reference'];
@@ -123,7 +109,6 @@ class FileRepository extends AbstractRepository
                 }
             }
         }
-
         return $itemList;
     }
 
@@ -137,7 +122,7 @@ class FileRepository extends AbstractRepository
      */
     public function findFileReferenceByUid($uid)
     {
-        if (!MathUtility::canBeInterpretedAsInteger($uid)) {
+        if (!\TYPO3\CMS\Core\Utility\MathUtility::canBeInterpretedAsInteger($uid)) {
             throw new \InvalidArgumentException('The UID of record has to be an integer. UID given: "' . $uid . '"', 1316889798);
         }
         try {
@@ -153,24 +138,23 @@ class FileRepository extends AbstractRepository
      *
      * @param Folder $folder
      * @param string $fileName
-     *
      * @return File[]
      */
     public function searchByName(Folder $folder, $fileName)
     {
-        /** @var ResourceFactory $fileFactory */
-        $fileFactory = GeneralUtility::makeInstance(ResourceFactory::class);
+        /** @var \TYPO3\CMS\Core\Resource\ResourceFactory $fileFactory */
+        $fileFactory = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Resource\ResourceFactory::class);
 
         $folders = $folder->getStorage()->getFoldersInFolder($folder, 0, 0, true, true);
         $folders[$folder->getIdentifier()] = $folder;
 
         $fileRecords = $this->getFileIndexRepository()->findByFolders($folders, false, $fileName);
 
-        $files = array();
+        $files = [];
         foreach ($fileRecords as $fileRecord) {
             try {
                 $files[] = $fileFactory->getFileObject($fileRecord['uid'], $fileRecord);
-            } catch (Exception\FileDoesNotExistException $ignoredException) {
+            } catch (\TYPO3\CMS\Core\Resource\Exception\FileDoesNotExistException $ignoredException) {
                 continue;
             }
         }

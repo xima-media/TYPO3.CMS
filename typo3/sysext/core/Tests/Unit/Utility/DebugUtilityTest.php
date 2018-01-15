@@ -98,8 +98,8 @@ class DebugUtilityTest extends UnitTestCase
             'Debug object' => [
                 $object,
                 'stdClass prototype object' . PHP_EOL
-. '   foo => public 42 (integer)' . PHP_EOL
-. '   bar => public array(1 item)' . PHP_EOL
+. '   foo => 42 (integer)' . PHP_EOL
+. '   bar => array(1 item)' . PHP_EOL
 . '      0 => "baz" (3 chars)'
             ],
         ];

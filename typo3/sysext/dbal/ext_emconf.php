@@ -1,5 +1,5 @@
 <?php
-$EM_CONF[$_EXTKEY] = array(
+$EM_CONF[$_EXTKEY] = [
     'title' => 'Database Abstraction Layer',
     'description' => 'A database abstraction layer implementation for TYPO3 4.6 based on ADOdb and offering a lot of other features.',
     'category' => 'be',
@@ -10,13 +10,13 @@ $EM_CONF[$_EXTKEY] = array(
     'author' => 'Xavier Perseguers',
     'author_email' => 'xavier@typo3.org',
     'author_company' => '',
-    'version' => '8.2.0',
-    'constraints' => array(
-        'depends' => array(
-            'adodb' => '8.2.0-8.2.99',
-            'typo3' => '8.2.0-8.2.99',
-        ),
-        'conflicts' => array(),
-        'suggests' => array(),
-    ),
-);
+    'version' => '7.6.24',
+    'constraints' => [
+        'depends' => [
+            'adodb' => '7.6.0-7.6.99',
+            'typo3' => '7.6.0-7.6.24',
+        ],
+        'conflicts' => [],
+        'suggests' => [],
+    ],
+];

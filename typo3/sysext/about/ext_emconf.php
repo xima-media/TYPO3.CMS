@@ -1,20 +1,21 @@
 <?php
-$EM_CONF[$_EXTKEY] = array(
+$EM_CONF[$_EXTKEY] = [
     'title' => 'Help>About',
-    'description' => 'Shows info about TYPO3, installed extensions and a separate module for available modules.',
+    'description' => 'Shows info about TYPO3 and installed extensions.',
     'category' => 'module',
     'state' => 'stable',
     'uploadfolder' => 0,
     'createDirs' => '',
     'clearCacheOnLoad' => 0,
-    'author' => 'TYPO3 Core Team',
-    'author_email' => 'typo3cms@typo3.org',
-    'version' => '8.2.0',
-    'constraints' => array(
-        'depends' => array(
-            'typo3' => '8.2.0-8.2.99',
-        ),
-        'conflicts' => array(),
-        'suggests' => array(),
-    ),
-);
+    'author' => 'Kasper Skaarhoj',
+    'author_email' => 'kasperYYYY@typo3.com',
+    'author_company' => 'Curby Soft Multimedia',
+    'version' => '7.6.24',
+    'constraints' => [
+        'depends' => [
+            'typo3' => '7.6.0-7.6.24',
+        ],
+        'conflicts' => [],
+        'suggests' => [],
+    ],
+];

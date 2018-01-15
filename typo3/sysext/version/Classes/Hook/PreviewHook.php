@@ -15,9 +15,7 @@ namespace TYPO3\CMS\Version\Hook;
  */
 
 use TYPO3\CMS\Backend\FrontendBackendUserAuthentication;
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
-use TYPO3\CMS\Core\Database\Query\Restriction\RootLevelRestriction;
+use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -82,7 +80,7 @@ class PreviewHook implements \TYPO3\CMS\Core\SingletonInterface
                 GeneralUtility::_GP('type'),
                 GeneralUtility::_GP('no_cache'),
                 GeneralUtility::_GP('cHash'),
-                null,
+                GeneralUtility::_GP('jumpurl'),
                 GeneralUtility::_GP('MP'),
                 GeneralUtility::_GP('RDCT')
             );
@@ -121,21 +119,11 @@ class PreviewHook implements \TYPO3\CMS\Core\SingletonInterface
                 $tempBackendUser->fetchGroupData();
                 // Handle degradation of admin users
                 if ($tempBackendUser->isAdmin() && ExtensionManagementUtility::isLoaded('workspaces')) {
-                    $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-                        ->getQueryBuilderForTable('sys_workspace');
-
-                    $queryBuilder->getRestrictions()
-                        ->removeAll()
-                        ->add(GeneralUtility::makeInstance(DeletedRestriction::class))
-                        ->add(GeneralUtility::makeInstance(RootLevelRestriction::class));
-
-                    $workspaceRecord = $queryBuilder
-                        ->select('uid', 'adminusers', 'reviewers', 'members', 'db_mountpoints')
-                        ->from('sys_workspace')
-                        ->where($queryBuilder->expr()->eq('uid', (int)$workspaceUid))
-                        ->execute()
-                        ->fetch();
-
+                    $workspaceRecord = $this->getDatabaseConnection()->exec_SELECTgetSingleRow(
+                        'uid, adminusers, reviewers, members, db_mountpoints',
+                        'sys_workspace',
+                        'pid=0 AND uid=' . (int)$workspaceUid . BackendUtility::deleteClause('sys_workspace')
+                    );
                     // Either use configured workspace mount or current page id, if admin user does not have any page mounts
                     if (empty($tempBackendUser->groupData['webmounts'])) {
                         $tempBackendUser->groupData['webmounts'] = !empty($workspaceRecord['db_mountpoints']) ? $workspaceRecord['db_mountpoints'] : $pObj->id;
@@ -243,7 +231,7 @@ class PreviewHook implements \TYPO3\CMS\Core\SingletonInterface
                 if ($this->tsfeObj->TYPO3_CONF_VARS['FE']['workspacePreviewLogoutTemplate']) {
                     $templateFile = PATH_site . $this->tsfeObj->TYPO3_CONF_VARS['FE']['workspacePreviewLogoutTemplate'];
                     if (@is_file($templateFile)) {
-                        $message = file_get_contents($templateFile);
+                        $message = GeneralUtility::getUrl(PATH_site . $this->tsfeObj->TYPO3_CONF_VARS['FE']['workspacePreviewLogoutTemplate']);
                     } else {
                         $message = '<strong>ERROR!</strong><br>Template File "'
                             . $this->tsfeObj->TYPO3_CONF_VARS['FE']['workspacePreviewLogoutTemplate']
@@ -256,20 +244,8 @@ class PreviewHook implements \TYPO3\CMS\Core\SingletonInterface
                 die(sprintf($message, htmlspecialchars(preg_replace('/\\&?' . $this->previewKey . '=[[:alnum:]]+/', '', $returnUrl))));
             }
             // Look for keyword configuration record:
-            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-                ->getQueryBuilderForTable('sys_preview');
-
-            $previewData = $queryBuilder
-                ->select('*')
-                ->from('sys_preview')
-                ->where(
-                    $queryBuilder->expr()->eq('keyword', $queryBuilder->createNamedParameter($inputCode)),
-                    $queryBuilder->expr()->gt('endtime', (int)$GLOBALS['EXEC_TIME'])
-                )
-                ->setMaxResults(1)
-                ->execute()
-                ->fetch();
-
+            $where = 'keyword=' . $this->getDatabaseConnection()->fullQuoteStr($inputCode, 'sys_preview') . ' AND endtime>' . $GLOBALS['EXEC_TIME'];
+            $previewData = $this->getDatabaseConnection()->exec_SELECTgetSingleRow('*', 'sys_preview', $where);
             // Get: Backend login status, Frontend login status
             // - Make sure to remove fe/be cookies (temporarily);
             // BE already done in ADMCMD_preview_postInit()
@@ -350,23 +326,17 @@ class PreviewHook implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function compilePreviewKeyword($getVarsStr, $backendUserUid, $ttl = 172800, $fullWorkspace = null)
     {
-        $fieldData = array(
+        $fieldData = [
             'keyword' => md5(uniqid(microtime(), true)),
             'tstamp' => $GLOBALS['EXEC_TIME'],
             'endtime' => $GLOBALS['EXEC_TIME'] + $ttl,
-            'config' => serialize(array(
+            'config' => serialize([
                 'fullWorkspace' => $fullWorkspace,
                 'getVars' => $getVarsStr,
                 'BEUSER_uid' => $backendUserUid
-            ))
-        );
-        GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getConnectionForTable('sys_preview')
-            ->insert(
-                'sys_preview',
-                $fieldData
-            );
-
+            ])
+        ];
+        $this->getDatabaseConnection()->exec_INSERTquery('sys_preview', $fieldData);
         return $fieldData['keyword'];
     }
 

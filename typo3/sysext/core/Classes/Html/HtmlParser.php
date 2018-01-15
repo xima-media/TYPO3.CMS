@@ -14,9 +14,8 @@ namespace TYPO3\CMS\Core\Html;
  * The TYPO3 project - inspiring people to share!
  */
 
+use TYPO3\CMS\Core\Service\MarkerBasedTemplateService;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\MathUtility;
-use TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer;
 
 /**
  * Functions for parsing HTML.
@@ -27,10 +26,151 @@ class HtmlParser
     /**
      * @var array
      */
-    protected $caseShift_cache = array();
+    protected $caseShift_cache = [];
 
     // Void elements that do not have closing tags, as defined by HTML5, except link element
     const VOID_ELEMENTS = 'area|base|br|col|command|embed|hr|img|input|keygen|meta|param|source|track|wbr';
+
+    /**
+     * Returns the first subpart encapsulated in the marker, $marker
+     * (possibly present in $content as a HTML comment)
+     *
+     * @param string $content Content with subpart wrapped in fx. "###CONTENT_PART###" inside.
+     * @param string $marker Marker string, eg. "###CONTENT_PART###
+     *
+     * @return string
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, use the corresponding method in MarkerBasedTemplateService accordingly
+     */
+    public static function getSubpart($content, $marker)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        $templateService = GeneralUtility::makeInstance(MarkerBasedTemplateService::class);
+        return $templateService->getSubpart($content, $marker);
+    }
+
+    /**
+     * Substitutes a subpart in $content with the content of $subpartContent.
+     *
+     * @param string $content Content with subpart wrapped in fx. "###CONTENT_PART###" inside.
+     * @param string $marker Marker string, eg. "###CONTENT_PART###
+     * @param array $subpartContent If $subpartContent happens to be an array, it's [0] and [1] elements are wrapped around the content of the subpart (fetched by getSubpart())
+     * @param bool $recursive If $recursive is set, the function calls itself with the content set to the remaining part of the content after the second marker. This means that proceding subparts are ALSO substituted!
+     * @param bool $keepMarker If set, the marker around the subpart is not removed, but kept in the output
+     *
+     * @return string Processed input content
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, use the corresponding method in MarkerBasedTemplateService accordingly
+     */
+    public static function substituteSubpart($content, $marker, $subpartContent, $recursive = true, $keepMarker = false)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        $templateService = GeneralUtility::makeInstance(MarkerBasedTemplateService::class);
+        return $templateService->substituteSubpart($content, $marker, $subpartContent, $recursive, $keepMarker);
+    }
+
+    /**
+     * Substitues multiple subparts at once
+     *
+     * @param string $content The content stream, typically HTML template content.
+     * @param array $subpartsContent The array of key/value pairs being subpart/content values used in the substitution. For each element in this array the function will substitute a subpart in the content stream with the content.
+     *
+     * @return string The processed HTML content string.
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, use the corresponding method in MarkerBasedTemplateService accordingly
+     */
+    public static function substituteSubpartArray($content, array $subpartsContent)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        $templateService = GeneralUtility::makeInstance(MarkerBasedTemplateService::class);
+        return $templateService->substituteSubpartArray($content, $subpartsContent);
+    }
+
+    /**
+     * Substitutes a marker string in the input content
+     * (by a simple str_replace())
+     *
+     * @param string $content The content stream, typically HTML template content.
+     * @param string $marker The marker string, typically on the form "###[the marker string]###
+     * @param mixed $markContent The content to insert instead of the marker string found.
+     *
+     * @return string The processed HTML content string.
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, use the corresponding method in MarkerBasedTemplateService accordingly
+     */
+    public static function substituteMarker($content, $marker, $markContent)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        $templateService = GeneralUtility::makeInstance(MarkerBasedTemplateService::class);
+        return $templateService->substituteMarker($content, $marker, $markContent);
+    }
+
+    /**
+     * Traverses the input $markContentArray array and for each key the marker
+     * by the same name (possibly wrapped and in upper case) will be
+     * substituted with the keys value in the array. This is very useful if you
+     * have a data-record to substitute in some content. In particular when you
+     * use the $wrap and $uppercase values to pre-process the markers. Eg. a
+     * key name like "myfield" could effectively be represented by the marker
+     * "###MYFIELD###" if the wrap value was "###|###" and the $uppercase
+     * boolean TRUE.
+     *
+     * @param string $content The content stream, typically HTML template content.
+     * @param array $markContentArray The array of key/value pairs being marker/content values used in the substitution. For each element in this array the function will substitute a marker in the content stream with the content.
+     * @param string $wrap A wrap value - [part 1] | [part 2] - for the markers before substitution
+     * @param bool $uppercase If set, all marker string substitution is done with upper-case markers.
+     * @param bool $deleteUnused If set, all unused marker are deleted.
+     *
+     * @return string The processed output stream
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, use the corresponding method in MarkerBasedTemplateService accordingly
+     */
+    public static function substituteMarkerArray($content, $markContentArray, $wrap = '', $uppercase = false, $deleteUnused = false)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        $templateService = GeneralUtility::makeInstance(MarkerBasedTemplateService::class);
+        return $templateService->substituteMarkerArray($content, $markContentArray, $wrap, $uppercase, $deleteUnused);
+    }
+
+    /**
+     * Replaces all markers and subparts in a template with the content provided in the structured array.
+     *
+     * The array is built like the template with its markers and subparts. Keys represent the marker name and the values the
+     * content.
+     * If the value is not an array the key will be treated as a single marker.
+     * If the value is an array the key will be treated as a subpart marker.
+     * Repeated subpart contents are of course elements in the array, so every subpart value must contain an array with its
+     * markers.
+     *
+     * $markersAndSubparts = array (
+     *    '###SINGLEMARKER1###' => 'value 1',
+     *    '###SUBPARTMARKER1###' => array(
+     *        0 => array(
+     *            '###SINGLEMARKER2###' => 'value 2',
+     *        ),
+     *        1 => array(
+     *            '###SINGLEMARKER2###' => 'value 3',
+     *        )
+     *    ),
+     *    '###SUBPARTMARKER2###' => array(
+     *    ),
+     * )
+     * Subparts can be nested, so below the 'SINGLEMARKER2' it is possible to have another subpart marker with an array as the
+     * value, which in its turn contains the elements of the sub-subparts.
+     * Empty arrays for Subparts will cause the subtemplate to be cleared.
+     *
+     * @static
+     *
+     * @param string $content The content stream, typically HTML template content.
+     * @param array $markersAndSubparts The array of single markers and subpart contents.
+     * @param string $wrap A wrap value - [part1] | [part2] - for the markers before substitution.
+     * @param bool $uppercase If set, all marker string substitution is done with upper-case markers.
+     * @param bool $deleteUnused If set, all unused single markers are deleted.
+     *
+     * @return string The processed output stream
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, use the corresponding method in MarkerBasedTemplateService accordingly
+     */
+    public static function substituteMarkerAndSubpartArrayRecursive($content, array $markersAndSubparts, $wrap = '', $uppercase = false, $deleteUnused = false)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        $templateService = GeneralUtility::makeInstance(MarkerBasedTemplateService::class);
+        return $templateService->substituteMarkerAndSubpartArrayRecursive($content, $markersAndSubparts, $wrap, $uppercase, $deleteUnused);
+    }
 
     /************************************
      *
@@ -40,23 +180,23 @@ class HtmlParser
     /**
      * Returns an array with the $content divided by tag-blocks specified with the list of tags, $tag
      * Even numbers in the array are outside the blocks, Odd numbers are block-content.
-     * Use ->removeFirstAndLastTag() to process the content if needed.
+     * Use ->getAllParts() and ->removeFirstAndLastTag() to process the content if needed.
      *
      * @param string $tag List of tags, comma separated.
      * @param string $content HTML-content
      * @param bool $eliminateExtraEndTags If set, excessive end tags are ignored - you should probably set this in most cases.
      * @return array Even numbers in the array are outside the blocks, Odd numbers are block-content.
-     * @see splitTags(), removeFirstAndLastTag()
+     * @see splitTags(), getAllParts(), removeFirstAndLastTag()
      */
     public function splitIntoBlock($tag, $content, $eliminateExtraEndTags = false)
     {
         $tags = array_unique(GeneralUtility::trimExplode(',', $tag, true));
-        array_walk($tags, function (&$tag) {
+        foreach ($tags as &$tag) {
             $tag = preg_quote($tag, '/');
-        });
+        }
         $regexStr = '/\\<\\/?(' . implode('|', $tags) . ')(\\s*\\>|\\s[^\\>]*\\>)/si';
         $parts = preg_split($regexStr, $content);
-        $newParts = array();
+        $newParts = [];
         $pointer = strlen($parts[0]);
         $buffer = $parts[0];
         $nested = 0;
@@ -126,11 +266,12 @@ class HtmlParser
         foreach ($parts as $k => $v) {
             if ($k % 2) {
                 $firstTagName = $this->getFirstTagName($v, true);
-                $tagsArray = array();
+                $tagsArray = [];
                 $tagsArray['tag_start'] = $this->getFirstTag($v);
                 $tagsArray['tag_end'] = '</' . $firstTagName . '>';
                 $tagsArray['tag_name'] = strtolower($firstTagName);
-                $tagsArray['content'] = $this->splitIntoBlockRecursiveProc($tag, $this->removeFirstAndLastTag($v), $procObj, $callBackContent, $callBackTags, $level + 1);
+                $tagsArray['add_level'] = 1;
+                $tagsArray['content'] = $this->splitIntoBlockRecursiveProc($tag, $this->removeFirstAndLastTag($v), $procObj, $callBackContent, $callBackTags, $level + $tagsArray['add_level']);
                 if ($callBackTags) {
                     $tagsArray = $procObj->{$callBackTags}($tagsArray, $level);
                 }
@@ -147,23 +288,23 @@ class HtmlParser
     /**
      * Returns an array with the $content divided by tag-blocks specified with the list of tags, $tag
      * Even numbers in the array are outside the blocks, Odd numbers are block-content.
-     * Use ->removeFirstAndLastTag() to process the content if needed.
+     * Use ->getAllParts() and ->removeFirstAndLastTag() to process the content if needed.
      *
      * @param string $tag List of tags
      * @param string $content HTML-content
      * @return array Even numbers in the array are outside the blocks, Odd numbers are block-content.
-     * @see splitIntoBlock(), removeFirstAndLastTag()
+     * @see splitIntoBlock(), getAllParts(), removeFirstAndLastTag()
      */
     public function splitTags($tag, $content)
     {
         $tags = GeneralUtility::trimExplode(',', $tag, true);
-        array_walk($tags, function (&$tag) {
+        foreach ($tags as &$tag) {
             $tag = preg_quote($tag, '/');
-        });
+        }
         $regexStr = '/\\<(' . implode('|', $tags) . ')(\\s[^>]*)?\\/?>/si';
         $parts = preg_split($regexStr, $content);
         $pointer = strlen($parts[0]);
-        $newParts = array();
+        $newParts = [];
         $newParts[] = $parts[0];
         reset($parts);
         // We skip the first element in foreach loop
@@ -178,6 +319,29 @@ class HtmlParser
             // Set content:
             $newParts[] = $v;
             $pointer += strlen($v);
+        }
+        return $newParts;
+    }
+
+    /**
+     * Returns an array with either tag or non-tag content of the result from ->splitIntoBlock()/->splitTags()
+     *
+     * @param array $parts Parts generated by ->splitIntoBlock() or >splitTags()
+     * @param bool $tag_parts Whether to return the tag-parts (default,TRUE) or what was outside the tags.
+     * @param bool $include_tag Whether to include the tags in the tag-parts (most useful for input made by ->splitIntoBlock())
+     * @return array Tag-parts/Non-tag-parts depending on input argument settings
+     * @see splitIntoBlock(), splitTags()
+     */
+    public function getAllParts($parts, $tag_parts = true, $include_tag = true)
+    {
+        $newParts = [];
+        foreach ($parts as $k => $v) {
+            if (($k + ($tag_parts ? 0 : 1)) % 2) {
+                if (!$include_tag) {
+                    $v = $this->removeFirstAndLastTag($v);
+                }
+                $newParts[] = $v;
+            }
         }
         return $newParts;
     }
@@ -223,7 +387,7 @@ class HtmlParser
      */
     public function getFirstTagName($str, $preserveCase = false)
     {
-        $matches = array();
+        $matches = [];
         if (preg_match('/^\\s*\\<([^\\s\\>]+)(\\s|\\>)/', $str, $matches) === 1) {
             if (!$preserveCase) {
                 return strtoupper($matches[1]);
@@ -237,22 +401,18 @@ class HtmlParser
      * Returns an array with all attributes as keys. Attributes are only lowercase a-z
      * If an attribute is empty (shorthand), then the value for the key is empty. You can check if it existed with isset()
      *
-     * Compared to the method in GeneralUtility::get_tag_attributes this method also returns meta data about each
-     * attribute, e.g. if it is a shorthand attribute, and what the quotation is. Also, since all attribute keys
-     * are lower-cased, the meta information contains the original attribute name.
-     *
      * @param string $tag Tag: $tag is either a whole tag (eg '<TAG OPTION ATTRIB=VALUE>') or the parameterlist (ex ' OPTION ATTRIB=VALUE>')
      * @param bool $deHSC If set, the attribute values are de-htmlspecialchar'ed. Should actually always be set!
      * @return array array(Tag attributes,Attribute meta-data)
      */
-    public function get_tag_attributes($tag, $deHSC = false)
+    public function get_tag_attributes($tag, $deHSC = 0)
     {
         list($components, $metaC) = $this->split_tag_attributes($tag);
         // Attribute name is stored here
         $name = '';
         $valuemode = false;
-        $attributes = array();
-        $attributesMeta = array();
+        $attributes = [];
+        $attributesMeta = [];
         if (is_array($components)) {
             foreach ($components as $key => $val) {
                 // Only if $name is set (if there is an attribute, that waits for a value), that valuemode is enabled. This ensures that the attribute is assigned it's value
@@ -266,7 +426,7 @@ class HtmlParser
                     } else {
                         if ($namekey = preg_replace('/[^[:alnum:]_\\:\\-]/', '', $val)) {
                             $name = strtolower($namekey);
-                            $attributesMeta[$name] = array();
+                            $attributesMeta[$name] = [];
                             $attributesMeta[$name]['origTag'] = $namekey;
                             $attributes[$name] = '';
                         }
@@ -276,18 +436,13 @@ class HtmlParser
                     $valuemode = true;
                 }
             }
-            return array($attributes, $attributesMeta);
+            return [$attributes, $attributesMeta];
         }
     }
 
     /**
-     * Returns an array with the 'components' from an attribute list.
-     * The result is normally analyzed by get_tag_attributes
-     * Removes tag-name if found.
-     *
-     * The difference between this method and the one in GeneralUtility is that this method actually determines
-     * more information on the attribute, e.g. if the value is enclosed by a " or ' character.
-     * That's why this method returns two arrays, the "components" and the "meta-information" of the "components".
+     * Returns an array with the 'components' from an attribute list. The result is normally analyzed by get_tag_attributes
+     * Removes tag-name if found
      *
      * @param string $tag The tag or attributes
      * @return array
@@ -296,14 +451,14 @@ class HtmlParser
      */
     public function split_tag_attributes($tag)
     {
-        $matches = array();
+        $matches = [];
         if (preg_match('/(\\<[^\\s]+\\s+)?(.*?)\\s*(\\>)?$/s', $tag, $matches) !== 1) {
-            return array(array(), array());
+            return [[], []];
         }
         $tag_tmp = $matches[2];
-        $metaValue = array();
-        $value = array();
-        $matches = array();
+        $metaValue = [];
+        $value = [];
+        $matches = [];
         if (preg_match_all('/("[^"]*"|\'[^\']*\'|[^\\s"\'\\=]+|\\=)/s', $tag_tmp, $matches) > 0) {
             foreach ($matches[1] as $part) {
                 $firstChar = $part[0];
@@ -316,7 +471,67 @@ class HtmlParser
                 }
             }
         }
-        return array($value, $metaValue);
+        return [$value, $metaValue];
+    }
+
+    /**
+     * Checks whether block/solo tags are found in the correct amounts in HTML content
+     * Block tags are tags which are required to have an equal amount of start and end tags, eg. "<table>...</table>"
+     * Solo tags are tags which are required to have ONLY start tags (possibly with an XHTML ending like ".../>")
+     * NOTICE: Correct XHTML might actually fail since "<br></br>" is allowed as well as "<br/>". However only the LATTER is accepted by this function (with "br" in the "solo-tag" list), the first example will result in a warning.
+     * NOTICE: Correct XHTML might actually fail since "<p/>" is allowed as well as "<p></p>". However only the LATTER is accepted by this function (with "p" in the "block-tag" list), the first example will result in an ERROR!
+     * NOTICE: Correct HTML version "something" allows eg. <p> and <li> to be NON-ended (implicitly ended by other tags). However this is NOT accepted by this function (with "p" and "li" in the block-tag list) and it will result in an ERROR!
+     *
+     * @param string $content HTML content to analyze
+     * @param string $blockTags Tag names for block tags (eg. table or div or p) in lowercase, commalist (eg. "table,div,p")
+     * @param string $soloTags Tag names for solo tags (eg. img, br or input) in lowercase, commalist ("img,br,input")
+     * @return array Analyse data.
+     */
+    public function checkTagTypeCounts($content, $blockTags = 'a,b,blockquote,body,div,em,font,form,h1,h2,h3,h4,h5,h6,i,li,map,ol,option,p,pre,select,span,strong,table,td,textarea,tr,u,ul', $soloTags = 'br,hr,img,input,area')
+    {
+        $content = strtolower($content);
+        $analyzedOutput = [];
+        // Counts appearances of start-tags
+        $analyzedOutput['counts'] = [];
+        // Lists ERRORS
+        $analyzedOutput['errors'] = [];
+        // Lists warnings.
+        $analyzedOutput['warnings'] = [];
+        // Lists stats for block-tags
+        $analyzedOutput['blocks'] = [];
+        // Lists stats for solo-tags
+        $analyzedOutput['solo'] = [];
+        // Block tags, must have endings...
+        $blockTags = explode(',', $blockTags);
+        foreach ($blockTags as $tagName) {
+            $countBegin = count(preg_split(('/\\<' . preg_quote($tagName, '/') . '(\\s|\\>)/s'), $content)) - 1;
+            $countEnd = count(preg_split(('/\\<\\/' . preg_quote($tagName, '/') . '(\\s|\\>)/s'), $content)) - 1;
+            $analyzedOutput['blocks'][$tagName] = [$countBegin, $countEnd, $countBegin - $countEnd];
+            if ($countBegin) {
+                $analyzedOutput['counts'][$tagName] = $countBegin;
+            }
+            if ($countBegin - $countEnd) {
+                if ($countBegin - $countEnd > 0) {
+                    $analyzedOutput['errors'][$tagName] = 'There were more start-tags (' . $countBegin . ') than end-tags (' . $countEnd . ') for the element "' . $tagName . '". There should be an equal amount!';
+                } else {
+                    $analyzedOutput['warnings'][$tagName] = 'There were more end-tags (' . $countEnd . ') than start-tags (' . $countBegin . ') for the element "' . $tagName . '". There should be an equal amount! However the problem is not fatal.';
+                }
+            }
+        }
+        // Solo tags, must NOT have endings...
+        $soloTags = explode(',', $soloTags);
+        foreach ($soloTags as $tagName) {
+            $countBegin = count(preg_split(('/\\<' . preg_quote($tagName, '/') . '(\\s|\\>)/s'), $content)) - 1;
+            $countEnd = count(preg_split(('/\\<\\/' . preg_quote($tagName, '/') . '(\\s|\\>)/s'), $content)) - 1;
+            $analyzedOutput['solo'][$tagName] = [$countBegin, $countEnd];
+            if ($countBegin) {
+                $analyzedOutput['counts'][$tagName] = $countBegin;
+            }
+            if ($countEnd) {
+                $analyzedOutput['warnings'][$tagName] = 'There were end-tags found (' . $countEnd . ') for the element "' . $tagName . '". This was not expected (although XHTML technically allows it).';
+            }
+        }
+        return $analyzedOutput;
     }
 
     /*********************************
@@ -355,21 +570,21 @@ class HtmlParser
      *
      * @param string $content Is the HTML-content being processed. This is also the result being returned.
      * @param array $tags Is an array where each key is a tagname in lowercase. Only tags present as keys in this array are preserved. The value of the key can be an array with a vast number of options to configure.
-     * @param mixed $keepAll Boolean/'protect', if set, then all tags are kept regardless of tags present as keys in $tags-array. If 'protect' then the preserved tags have their <> converted to &lt; and &gt;
+     * @param string $keepAll Boolean/'protect', if set, then all tags are kept regardless of tags present as keys in $tags-array. If 'protect' then the preserved tags have their <> converted to &lt; and &gt;
      * @param int $hSC Values -1,0,1,2: Set to zero= disabled, set to 1 then the content BETWEEN tags is htmlspecialchar()'ed, set to -1 its the opposite and set to 2 the content will be HSC'ed BUT with preservation for real entities (eg. "&amp;" or "&#234;")
-     * @param array $addConfig Configuration array send along as $conf to the internal functions
+     * @param array $addConfig Configuration array send along as $conf to the internal functions ->processContent() and ->processTag()
      * @return string Processed HTML content
      */
-    public function HTMLcleaner($content, $tags = array(), $keepAll = 0, $hSC = 0, $addConfig = array())
+    public function HTMLcleaner($content, $tags = [], $keepAll = 0, $hSC = 0, $addConfig = [])
     {
-        $newContent = array();
+        $newContent = [];
         $tokArr = explode('<', $content);
-        $newContent[] = $this->bidir_htmlspecialchars(current($tokArr), $hSC);
+        $newContent[] = $this->processContent(current($tokArr), $hSC, $addConfig);
         // We skip the first element in foreach loop
         $tokArrSliced = array_slice($tokArr, 1, null, true);
         $c = 1;
-        $tagRegister = array();
-        $tagStack = array();
+        $tagRegister = [];
+        $tagStack = [];
         $inComment = false;
         $inCdata = false;
         $skipTag = false;
@@ -450,7 +665,7 @@ class HtmlParser
                                     } elseif (trim($tagParts[1])) {
                                         $tagAttrib = $this->get_tag_attributes($tagParts[1]);
                                         $tagParts[1] = '';
-                                        $newTagAttrib = array();
+                                        $newTagAttrib = [];
                                         if (!($tList = $tags[$tagName]['_allowedAttribs'])) {
                                             // Just explode attribts for tag once
                                             $tList = ($tags[$tagName]['_allowedAttribs'] = GeneralUtility::trimExplode(',', strtolower($tags[$tagName]['allowedAttribs']), true));
@@ -492,16 +707,16 @@ class HtmlParser
                                             }
                                             if ($params['range']) {
                                                 if (isset($params['range'][1])) {
-                                                    $tagAttrib[0][$attr] = MathUtility::forceIntegerInRange($tagAttrib[0][$attr], (int)$params['range'][0], (int)$params['range'][1]);
+                                                    $tagAttrib[0][$attr] = \TYPO3\CMS\Core\Utility\MathUtility::forceIntegerInRange($tagAttrib[0][$attr], (int)$params['range'][0], (int)$params['range'][1]);
                                                 } else {
-                                                    $tagAttrib[0][$attr] = MathUtility::forceIntegerInRange($tagAttrib[0][$attr], (int)$params['range'][0]);
+                                                    $tagAttrib[0][$attr] = \TYPO3\CMS\Core\Utility\MathUtility::forceIntegerInRange($tagAttrib[0][$attr], (int)$params['range'][0]);
                                                 }
                                             }
                                             if (is_array($params['list'])) {
                                                 // For the class attribute, remove from the attribute value any class not in the list
                                                 // Classes are case sensitive
                                                 if ($attr == 'class') {
-                                                    $newClasses = array();
+                                                    $newClasses = [];
                                                     $classes = GeneralUtility::trimExplode(' ', $tagAttrib[0][$attr], true);
                                                     foreach ($classes as $class) {
                                                         if (in_array($class, $params['list'])) {
@@ -528,8 +743,8 @@ class HtmlParser
                                             if ($params['prefixLocalAnchors']) {
                                                 if ($tagAttrib[0][$attr][0] === '#') {
                                                     if ($params['prefixLocalAnchors'] == 2) {
-                                                        /** @var ContentObjectRenderer $contentObjectRenderer */
-                                                        $contentObjectRenderer = GeneralUtility::makeInstance(ContentObjectRenderer::class);
+                                                        /** @var \TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer $contentObjectRenderer */
+                                                        $contentObjectRenderer = GeneralUtility::makeInstance(\TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer::class);
                                                         $prefix = $contentObjectRenderer->getUrlToCurrentLocation();
                                                     } else {
                                                         $prefix = GeneralUtility::getIndpEnv('TYPO3_REQUEST_URL');
@@ -581,7 +796,7 @@ class HtmlParser
                                 }
                                 if ($tags[$tagName]['nesting']) {
                                     if (!is_array($tagRegister[$tagName])) {
-                                        $tagRegister[$tagName] = array();
+                                        $tagRegister[$tagName] = [];
                                     }
                                     if ($endTag) {
                                         $correctTag = 1;
@@ -619,11 +834,11 @@ class HtmlParser
                                 }
                                 if ($setTag) {
                                     // Setting the tag
-                                    $newContent[$c++] = $lt . ($endTag ? '/' : '') . trim($tagParts[0] . ' ' . $tagParts[1]) . ($emptyTag ? ' /' : '') . $gt;
+                                    $newContent[$c++] = $this->processTag($lt . ($endTag ? '/' : '') . trim($tagParts[0] . ' ' . $tagParts[1]) . ($emptyTag ? ' /' : '') . $gt, $addConfig, $endTag, $lt == '&lt;');
                                 }
                             }
                         } else {
-                            $newContent[$c++] = '<' . ($endTag ? '/' : '') . $tagContent . '>';
+                            $newContent[$c++] = $this->processTag('<' . ($endTag ? '/' : '') . $tagContent . '>', $addConfig, $endTag);
                         }
                     } elseif ($keepAll) {
                         // This is if the tag was not defined in the array for processing:
@@ -634,14 +849,14 @@ class HtmlParser
                             $lt = '<';
                             $gt = '>';
                         }
-                        $newContent[$c++] = $lt . ($endTag ? '/' : '') . $tagContent . $gt;
+                        $newContent[$c++] = $this->processTag($lt . ($endTag ? '/' : '') . $tagContent . $gt, $addConfig, $endTag, $lt == '&lt;');
                     }
-                    $newContent[$c++] = $this->bidir_htmlspecialchars(substr($tok, $tagEnd + 1), $hSC);
+                    $newContent[$c++] = $this->processContent(substr($tok, $tagEnd + 1), $hSC, $addConfig);
                 } else {
-                    $newContent[$c++] = $this->bidir_htmlspecialchars('<' . $tok, $hSC);
+                    $newContent[$c++] = $this->processContent('<' . $tok, $hSC, $addConfig);
                 }
             } else {
-                $newContent[$c++] = $this->bidir_htmlspecialchars(($skipTag ? '' : '<') . $tok, $hSC);
+                $newContent[$c++] = $this->processContent(($skipTag ? '' : '<') . $tok, $hSC, $addConfig);
                 // It was not a tag anyways
                 $skipTag = false;
             }
@@ -666,16 +881,15 @@ class HtmlParser
      */
     public function bidir_htmlspecialchars($value, $dir)
     {
-        switch ((int)$dir) {
-            case 1:
-                return htmlspecialchars($value);
-            case 2:
-                return htmlspecialchars($value, ENT_COMPAT, 'UTF-8', false);
-            case -1:
-                return htmlspecialchars_decode($value);
-            default:
-                return $value;
+        $dir = (int)$dir;
+        if ($dir === 1) {
+            $value = htmlspecialchars($value);
+        } elseif ($dir === 2) {
+            $value = htmlspecialchars($value, ENT_COMPAT, 'UTF-8', false);
+        } elseif ($dir === -1) {
+            $value = htmlspecialchars_decode($value);
         }
+        return $value;
     }
 
     /**
@@ -687,7 +901,7 @@ class HtmlParser
      * @param string $suffix Suffix string (put after the resource).
      * @return string Processed HTML content
      */
-    public function prefixResourcePath($main_prefix, $content, $alternatives = array(), $suffix = '')
+    public function prefixResourcePath($main_prefix, $content, $alternatives = [], $suffix = '')
     {
         $parts = $this->splitTags('embed,td,table,body,img,input,form,link,script,a,param', $content);
         foreach ($parts as $k => $v) {
@@ -797,32 +1011,126 @@ class HtmlParser
     }
 
     /**
+     * Cleans up the input $value for fonttags.
+     * If keepFace,-Size and -Color is set then font-tags with an allowed property is kept. Else deleted.
+     *
+     * @param string HTML content with font-tags inside to clean up.
+     * @param bool If set, keep "face" attribute
+     * @param bool If set, keep "size" attribute
+     * @param bool If set, keep "color" attribute
+     * @return string Processed HTML content
+     */
+    public function cleanFontTags($value, $keepFace = 0, $keepSize = 0, $keepColor = 0)
+    {
+        // ,1 ?? - could probably be more stable if splitTags() was used since this depends on end-tags being properly set!
+        $fontSplit = $this->splitIntoBlock('font', $value);
+        foreach ($fontSplit as $k => $v) {
+            // Font
+            if ($k % 2) {
+                $attribArray = $this->get_tag_attributes_classic($this->getFirstTag($v));
+                $newAttribs = [];
+                if ($keepFace && $attribArray['face']) {
+                    $newAttribs[] = 'face="' . $attribArray['face'] . '"';
+                }
+                if ($keepSize && $attribArray['size']) {
+                    $newAttribs[] = 'size="' . $attribArray['size'] . '"';
+                }
+                if ($keepColor && $attribArray['color']) {
+                    $newAttribs[] = 'color="' . $attribArray['color'] . '"';
+                }
+                $innerContent = $this->cleanFontTags($this->removeFirstAndLastTag($v), $keepFace, $keepSize, $keepColor);
+                if (!empty($newAttribs)) {
+                    $fontSplit[$k] = '<font ' . implode(' ', $newAttribs) . '>' . $innerContent . '</font>';
+                } else {
+                    $fontSplit[$k] = $innerContent;
+                }
+            }
+        }
+        return implode('', $fontSplit);
+    }
+
+    /**
+     * This is used to map certain tag-names into other names.
+     *
+     * @param string $value HTML content
+     * @param array $tags Array with tag key=>value pairs where key is from-tag and value is to-tag
+     * @param string $ltChar Alternative less-than char to search for (search regex string)
+     * @param string $ltChar2 Alternative less-than char to replace with (replace regex string)
+     * @return string Processed HTML content
+     */
+    public function mapTags($value, $tags = [], $ltChar = '<', $ltChar2 = '<')
+    {
+        foreach ($tags as $from => $to) {
+            $value = preg_replace('/' . preg_quote($ltChar, '/') . '(\\/)?' . $from . '\\s([^\\>])*(\\/)?\\>/', $ltChar2 . '$1' . $to . ' $2$3>', $value);
+        }
+        return $value;
+    }
+
+    /**
+     * This converts htmlspecialchar()'ed tags (from $tagList) back to real tags. Eg. '&lt;strong&gt' would be converted back to '<strong>' if found in $tagList
+     *
+     * @param string $content HTML content
+     * @param string $tagList Tag list, separated by comma. Lowercase!
+     * @return string Processed HTML content
+     */
+    public function unprotectTags($content, $tagList = '')
+    {
+        $tagsArray = GeneralUtility::trimExplode(',', $tagList, true);
+        $contentParts = explode('&lt;', $content);
+        // bypass the first
+        $contentPartsSliced = array_slice($contentParts, 1, null, true);
+        foreach ($contentPartsSliced as $k => $tok) {
+            $firstChar = $tok[0];
+            if (trim($firstChar) !== '') {
+                $subparts = explode('&gt;', $tok, 2);
+                $tagEnd = strlen($subparts[0]);
+                if (strlen($tok) != $tagEnd) {
+                    $endTag = $firstChar == '/' ? 1 : 0;
+                    $tagContent = substr($tok, $endTag, $tagEnd - $endTag);
+                    $tagParts = preg_split('/\\s+/s', $tagContent, 2);
+                    $tagName = strtolower($tagParts[0]);
+                    if ((string)$tagList === '' || in_array($tagName, $tagsArray)) {
+                        $contentParts[$k] = '<' . $subparts[0] . '>' . $subparts[1];
+                    } else {
+                        $contentParts[$k] = '&lt;' . $tok;
+                    }
+                } else {
+                    $contentParts[$k] = '&lt;' . $tok;
+                }
+            } else {
+                $contentParts[$k] = '&lt;' . $tok;
+            }
+        }
+        return implode('', $contentParts);
+    }
+
+    /**
      * Internal function for case shifting of a string or whole array
      *
      * @param mixed $str Input string/array
-     * @param bool $caseSensitiveComparison If this value is FALSE, the string is returned in uppercase
+     * @param bool $flag If $str is a string AND this boolean(caseSensitive) is FALSE, the string is returned in uppercase
      * @param string $cacheKey Key string used for internal caching of the results. Could be an MD5 hash of the serialized version of the input $str if that is an array.
      * @return string Output string, processed
      * @access private
      */
-    public function caseShift($str, $caseSensitiveComparison, $cacheKey = '')
+    public function caseShift($str, $flag, $cacheKey = '')
     {
-        if ($caseSensitiveComparison) {
-            return $str;
-        }
+        $cacheKey .= $flag ? 1 : 0;
         if (is_array($str)) {
-            // Fetch from runlevel cache
-            if ($cacheKey && isset($this->caseShift_cache[$cacheKey])) {
-                $str = $this->caseShift_cache[$cacheKey];
-            } else {
-                array_walk($str, function (&$value) {
-                    $value = strtoupper($value);
-                });
+            if (!$cacheKey || !isset($this->caseShift_cache[$cacheKey])) {
+                foreach ($str as &$v) {
+                    if (!$flag) {
+                        $v = strtoupper($v);
+                    }
+                }
+                unset($v);
                 if ($cacheKey) {
                     $this->caseShift_cache[$cacheKey] = $str;
                 }
+            } else {
+                $str = $this->caseShift_cache[$cacheKey];
             }
-        } else {
+        } elseif (!$flag) {
             $str = strtoupper($str);
         }
         return $str;
@@ -833,21 +1141,62 @@ class HtmlParser
      *
      * @param array $tagAttrib Tag attributes
      * @param array $meta Meta information about these attributes (like if they were quoted)
+     * @param bool $xhtmlClean If set, then the attribute names will be set in lower case, value quotes in double-quotes and the value will be htmlspecialchar()'ed
      * @return string Imploded attributes, eg: 'attribute="value" attrib2="value2"'
      * @access private
      */
-    public function compileTagAttribs($tagAttrib, $meta = array())
+    public function compileTagAttribs($tagAttrib, $meta = [], $xhtmlClean = 0)
     {
-        $accu = array();
+        $accu = [];
         foreach ($tagAttrib as $k => $v) {
-            $attr = $meta[$k]['origTag'] ?: $k;
-            if (strcmp($v, '') || isset($meta[$k]['dashType'])) {
-                $dash = $meta[$k]['dashType'] ?: (MathUtility::canBeInterpretedAsInteger($v) ? '' : '"');
-                $attr .= '=' . $dash . $v . $dash;
+            if ($xhtmlClean) {
+                $attr = strtolower($k);
+                if ((string)$v !== '' || isset($meta[$k]['dashType'])) {
+                    $attr .= '="' . htmlspecialchars($v) . '"';
+                }
+            } else {
+                $attr = $meta[$k]['origTag'] ?: $k;
+                if (strcmp($v, '') || isset($meta[$k]['dashType'])) {
+                    $dash = $meta[$k]['dashType'] ?: (\TYPO3\CMS\Core\Utility\MathUtility::canBeInterpretedAsInteger($v) ? '' : '"');
+                    $attr .= '=' . $dash . $v . $dash;
+                }
             }
             $accu[] = $attr;
         }
         return implode(' ', $accu);
+    }
+
+    /**
+     * Get tag attributes, the classic version (which had some limitations?)
+     *
+     * @param string $tag The tag
+     * @param bool $deHSC De-htmlspecialchar flag.
+     * @return array
+     * @access private
+     */
+    public function get_tag_attributes_classic($tag, $deHSC = 0)
+    {
+        $attr = $this->get_tag_attributes($tag, $deHSC);
+        return is_array($attr[0]) ? $attr[0] : [];
+    }
+
+    /**
+     * Indents input content with $number instances of $indentChar
+     *
+     * @param string $content Content string, multiple lines.
+     * @param int $number Number of indents
+     * @param string $indentChar Indent character/string
+     * @return strin Indented code (typ. HTML)
+     */
+    public function indentLines($content, $number = 1, $indentChar = TAB)
+    {
+        $preTab = str_pad('', $number * strlen($indentChar), $indentChar);
+        $lines = explode(LF, str_replace(CR, '', $content));
+        foreach ($lines as &$line) {
+            $line = $preTab . $line;
+        }
+        unset($line);
+        return implode(LF, $lines);
     }
 
     /**
@@ -858,7 +1207,7 @@ class HtmlParser
      * @return array
      * @access private
      */
-    public function HTMLparserConfig($TSconfig, $keepTags = array())
+    public function HTMLparserConfig($TSconfig, $keepTags = [])
     {
         // Allow tags (base list, merged with incoming array)
         $alTags = array_flip(GeneralUtility::trimExplode(',', strtolower($TSconfig['allowTags']), true));
@@ -879,14 +1228,14 @@ class HtmlParser
                 if (is_array($tagC) && $key == strtolower($key)) {
                     $key = substr($key, 0, -1);
                     if (!is_array($keepTags[$key])) {
-                        $keepTags[$key] = array();
+                        $keepTags[$key] = [];
                     }
                     if (is_array($tagC['fixAttrib.'])) {
                         foreach ($tagC['fixAttrib.'] as $atName => $atConfig) {
                             if (is_array($atConfig)) {
                                 $atName = substr($atName, 0, -1);
                                 if (!is_array($keepTags[$key]['fixAttrib'][$atName])) {
-                                    $keepTags[$key]['fixAttrib'][$atName] = array();
+                                    $keepTags[$key]['fixAttrib'][$atName] = [];
                                 }
                                 $keepTags[$key]['fixAttrib'][$atName] = array_merge($keepTags[$key]['fixAttrib'][$atName], $atConfig);
                                 if ((string)$keepTags[$key]['fixAttrib'][$atName]['range'] !== '') {
@@ -913,7 +1262,7 @@ class HtmlParser
             foreach ($lN as $tn) {
                 if (isset($keepTags[$tn])) {
                     if (!is_array($keepTags[$tn])) {
-                        $keepTags[$tn] = array();
+                        $keepTags[$tn] = [];
                     }
                     $keepTags[$tn]['nesting'] = 1;
                 }
@@ -924,7 +1273,7 @@ class HtmlParser
             foreach ($lN as $tn) {
                 if (isset($keepTags[$tn])) {
                     if (!is_array($keepTags[$tn])) {
-                        $keepTags[$tn] = array();
+                        $keepTags[$tn] = [];
                     }
                     $keepTags[$tn]['nesting'] = 'global';
                 }
@@ -935,7 +1284,7 @@ class HtmlParser
             foreach ($lN as $tn) {
                 if (isset($keepTags[$tn])) {
                     if (!is_array($keepTags[$tn])) {
-                        $keepTags[$tn] = array();
+                        $keepTags[$tn] = [];
                     }
                     $keepTags[$tn]['rmTagIfNoAttrib'] = 1;
                     if (empty($keepTags[$tn]['nesting'])) {
@@ -949,7 +1298,7 @@ class HtmlParser
             foreach ($lN as $tn) {
                 if (isset($keepTags[$tn])) {
                     if (!is_array($keepTags[$tn])) {
-                        $keepTags[$tn] = array();
+                        $keepTags[$tn] = [];
                     }
                     $keepTags[$tn]['allowedAttribs'] = 0;
                 }
@@ -958,25 +1307,139 @@ class HtmlParser
         if ($TSconfig['removeTags']) {
             $lN = GeneralUtility::trimExplode(',', strtolower($TSconfig['removeTags']), true);
             foreach ($lN as $tn) {
-                $keepTags[$tn] = array();
+                $keepTags[$tn] = [];
                 $keepTags[$tn]['allowedAttribs'] = 0;
                 $keepTags[$tn]['rmTagIfNoAttrib'] = 1;
             }
         }
         // Create additional configuration:
-        $addConfig = array();
+        $addConfig = [];
+        if ($TSconfig['xhtml_cleaning']) {
+            $addConfig['xhtml'] = 1;
+        }
         if (isset($TSconfig['stripEmptyTags'])) {
             $addConfig['stripEmptyTags'] = $TSconfig['stripEmptyTags'];
             if (isset($TSconfig['stripEmptyTags.'])) {
                 $addConfig['stripEmptyTags.'] = $TSconfig['stripEmptyTags.'];
             }
         }
-        return array(
+        return [
             $keepTags,
             '' . $TSconfig['keepNonMatchedTags'],
             (int)$TSconfig['htmlSpecialChars'],
             $addConfig
-        );
+        ];
+    }
+
+    /**
+     * Tries to convert the content to be XHTML compliant and other stuff like that.
+     * STILL EXPERIMENTAL. See comments below.
+     *
+     * What it does NOT do (yet) according to XHTML specs.:
+     * - Wellformedness: Nesting is NOT checked
+     * - name/id attribute issue is not observed at this point.
+     * - Certain nesting of elements not allowed. Most interesting, <PRE> cannot contain img, big,small,sub,sup ...
+     * - Wrapping scripts and style element contents in CDATA - or alternatively they should have entitites converted.
+     * - Setting charsets may put some special requirements on both XML declaration/ meta-http-equiv. (C.9)
+     * - UTF-8 encoding is in fact expected by XML!!
+     * - stylesheet element and attribute names are NOT converted to lowercase
+     * - ampersands (and entities in general I think) MUST be converted to an entity reference! (&amps;). This may mean further conversion of non-tag content before output to page. May be related to the charset issue as a whole.
+     * - Minimized values not allowed: Must do this: selected="selected"
+     *
+     * What it does at this point:
+     * - All tags (frame,base,meta,link + img,br,hr,area,input) is ended with "/>" - others?
+     * - Lowercase for elements and attributes
+     * - All attributes in quotes
+     * - Add "alt" attribute to img-tags if it's not there already.
+     *
+     * @param string $content Content to clean up
+     * @return string Cleaned up content returned.
+     * @access private
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function XHTML_clean($content)
+    {
+        GeneralUtility::logDeprecatedFunction('TYPO3\CMS\Core\Html\HtmlParser::XHTML_clean has been deprecated with TYPO3 CMS 7 and will be removed with TYPO3 CMS 8.');
+        return $this->HTMLcleaner($content, [], 1, 0, ['xhtml' => 1]);
+    }
+
+    /**
+     * Processing all tags themselves
+     * (Some additions by Sacha Vorbeck)
+     *
+     * @param string Tag to process
+     * @param array Configuration array passing instructions for processing. If count()==0, function will return value unprocessed. See source code for details
+     * @param bool Is endtag, then set this.
+     * @param bool If set, just return value straight away
+     * @return string Processed value.
+     * @access private
+     */
+    public function processTag($value, $conf, $endTag, $protected = 0)
+    {
+        // Return immediately if protected or no parameters
+        if ($protected || empty($conf)) {
+            return $value;
+        }
+        // OK then, begin processing for XHTML output:
+        // STILL VERY EXPERIMENTAL!!
+        if ($conf['xhtml']) {
+            GeneralUtility::deprecationLog('This section has been deprecated with TYPO3 CMS 7 and will be removed with CMS 8.');
+            // Endtags are just set lowercase right away
+            if ($endTag) {
+                $value = strtolower($value);
+            } elseif (substr($value, 0, 4) != '<!--') {
+                // ... and comments are ignored.
+                // Finding inner value with out < >
+                $inValue = substr($value, 1, substr($value, -2) == '/>' ? -2 : -1);
+                // Separate attributes and tagname
+                list($tagName, $tagP) = preg_split('/\\s+/s', $inValue, 2);
+                $tagName = strtolower($tagName);
+                // Process attributes
+                $tagAttrib = $this->get_tag_attributes($tagP);
+                if ($tagName === 'img' && !isset($tagAttrib[0]['alt'])) {
+                    $tagAttrib[0]['alt'] = '';
+                }
+                // Set alt attribute for all images (not XHTML though...)
+                if ($tagName === 'script' && !isset($tagAttrib[0]['type'])) {
+                    $tagAttrib[0]['type'] = 'text/javascript';
+                }
+                // Set type attribute for all script-tags
+                $outA = [];
+                foreach ($tagAttrib[0] as $attrib_name => $attrib_value) {
+                    // Set attributes: lowercase, always in quotes, with htmlspecialchars converted.
+                    $outA[] = $attrib_name . '="' . $this->bidir_htmlspecialchars($attrib_value, 2) . '"';
+                }
+                $newTag = '<' . trim($tagName . ' ' . implode(' ', $outA));
+                // All tags that are standalone (not wrapping, not having endtags) should be ended with '/>'
+                if (
+                    $tagName === 'img' || $tagName === 'br' || $tagName === 'hr' || $tagName === 'meta' || $tagName === 'link' || $tagName === 'base'
+                    || $tagName === 'area' || $tagName === 'input' || $tagName === 'param' || $tagName === 'col' || substr($value, -2) === '/>'
+                ) {
+                    $newTag .= ' />';
+                } else {
+                    $newTag .= '>';
+                }
+                $value = $newTag;
+            }
+        }
+        return $value;
+    }
+
+    /**
+     * Processing content between tags for HTML_cleaner
+     *
+     * @param string $value The value
+     * @param int $dir Direction, either -1 or +1. 0 (zero) means no change to input value.
+     * @param mixed $conf Not used, ignore.
+     * @return string The processed value.
+     * @access private
+     */
+    public function processContent($value, $dir, $conf)
+    {
+        if ($dir != 0) {
+            $value = $this->bidir_htmlspecialchars($value, $dir);
+        }
+        return $value;
     }
 
     /**
@@ -986,24 +1449,19 @@ class HtmlParser
      * @param string $tagList The comma separated list of tags to be stripped.
      *                        If empty, all empty tags will be stripped
      * @param bool $treatNonBreakingSpaceAsEmpty If TRUE tags containing only &nbsp; entities will be treated as empty.
-     * @param bool $keepTags If true, the provided tags will be kept instead of stripped.
      * @return string the stripped content
      */
-    public function stripEmptyTags($content, $tagList = '', $treatNonBreakingSpaceAsEmpty = false, $keepTags = false)
+    public function stripEmptyTags($content, $tagList = null, $treatNonBreakingSpaceAsEmpty = false)
     {
-        if (!empty($tagList)) {
-            $tagRegEx = join('|', GeneralUtility::trimExplode(',', $tagList, true));
-            if ($keepTags) {
-                $tagRegEx = '(?!' . $tagRegEx . ')[^ >]+';
-            }
-        } else {
-            $tagRegEx = '[^ >]+'; // all characters until you reach a > or space;
+        $tagRegEx = '[^ >]+'; // all characters until you reach a > or space;
+        if ($tagList) {
+            $tags = preg_split('/,/', $tagList);
+            $tagRegEx = preg_replace('/ */', '', implode('|', $tags));
         }
         $count = 1;
         $nbspRegex = $treatNonBreakingSpaceAsEmpty ? '|(&nbsp;)' : '';
-        $finalRegex = sprintf('/<(%s)[^>]*>( %s)*<\/\\1[^>]*>/i', $tagRegEx, $nbspRegex);
-        while ($count !== 0) {
-            $content = preg_replace($finalRegex, '', $content, -1, $count);
+        while ($count != 0) {
+            $content = preg_replace(sprintf('/<(%s)[^>]*>( %s)*<\/\\1[^>]*>/i', $tagRegEx, $nbspRegex), '', $content, -1, $count);
         }
         return $content;
     }
@@ -1017,21 +1475,26 @@ class HtmlParser
      */
     protected function stripEmptyTagsIfConfigured($value, $configuration)
     {
-        if (empty($configuration['stripEmptyTags'])) {
-            return $value;
+        if (isset($configuration['stripEmptyTags']) && $configuration['stripEmptyTags']) {
+            $tags = null;
+            if (
+                isset($configuration['stripEmptyTags.']['tags'])
+                && $configuration['stripEmptyTags.']['tags'] !== ''
+            ) {
+                $tags = $configuration['stripEmptyTags.']['tags'];
+            }
+
+            $treatNonBreakingSpaceAsEmpty = false;
+            if (
+                isset($configuration['stripEmptyTags.']['treatNonBreakingSpaceAsEmpty'])
+                && $configuration['stripEmptyTags.']['treatNonBreakingSpaceAsEmpty']
+            ) {
+                $treatNonBreakingSpaceAsEmpty = (bool)$configuration['stripEmptyTags.']['treatNonBreakingSpaceAsEmpty'];
+            }
+
+            $value = $this->stripEmptyTags($value, $tags, $treatNonBreakingSpaceAsEmpty);
         }
 
-        $tags = null;
-        $keepTags = false;
-        if (!empty($configuration['stripEmptyTags.']['keepTags'])) {
-            $tags = $configuration['stripEmptyTags.']['keepTags'];
-            $keepTags = true;
-        } elseif (!empty($configuration['stripEmptyTags.']['tags'])) {
-            $tags = $configuration['stripEmptyTags.']['tags'];
-        }
-
-        $treatNonBreakingSpaceAsEmpty = !empty($configuration['stripEmptyTags.']['treatNonBreakingSpaceAsEmpty']);
-
-        return $this->stripEmptyTags($value, $tags, $treatNonBreakingSpaceAsEmpty, $keepTags);
+        return $value;
     }
 }

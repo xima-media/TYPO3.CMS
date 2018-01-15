@@ -19,8 +19,7 @@ define(['jquery', './RsaLibrary'], function($) {
 	'use strict';
 
 	/**
-	 *
-	 * @type {{$currentForm: null, fetchedRsaKey: boolean, initialize: Function, handleFormSubmitRequest: Function, handlePublicKeyResponse: Function}}
+	 * @type {{$currentForm: null, fetchedRsaKey: boolean, initialize: Function, registerForm: Function, handleFormSubmitRequest: Function, handlePublicKeyResponse: Function}}
 	 * @exports TYPO3/CMS/Rsaauth/RsaEncryptionModule
 	 */
 	var RsaEncryption = {
@@ -36,24 +35,30 @@ define(['jquery', './RsaLibrary'], function($) {
 		fetchedRsaKey: false,
 
 		/**
-		 * Replace event handler of submit button
+		 * Replace event handler of submit button for given form
+		 *
+		 * @param {Form} form Form DOM object
 		 */
-		initialize: function() {
-			$(':input[data-rsa-encryption]').closest('form').each(function() {
-				var $this = $(this);
+		registerForm: function(form) {
+			var $form = $(form);
 
-				// Store the original submit handler that is executed later
-				$this.data('original-onsubmit', $this.attr('onsubmit'));
+			if ($form.data('rsaRegistered')) {
+				// Do not register form twice
+				return;
+			}
+			// Mark form as registered
+			$form.data('rsaRegistered', true);
 
-				// Remove the original submit handler and register RsaEncryption.handleFormSubmitRequest instead
-				$this.removeAttr('onsubmit').on('submit', RsaEncryption.handleFormSubmitRequest);
+			// Store the original submit handler that is executed later
+			$form.data('original-onsubmit', $form.attr('onsubmit'));
 
-				// Bind submit event first (this is a dirty hack with jquery internals, but there is no way around that)
-				var handlers = $._data(this, 'events').submit;
-				var handler = handlers.pop();
-				handlers.unshift(handler);
-			});
-			rng_seed_time();
+			// Remove the original submit handler and register RsaEncryption.handleFormSubmitRequest instead
+			$form.removeAttr('onsubmit').on('submit', RsaEncryption.handleFormSubmitRequest);
+
+			// Bind submit event first (this is a dirty hack with jquery internals, but there is no way around that)
+			var handlers = $._data(form, 'events').submit;
+			var handler = handlers.pop();
+			handlers.unshift(handler);
 		},
 
 		/**
@@ -131,6 +136,16 @@ define(['jquery', './RsaLibrary'], function($) {
 				RsaEncryption.$currentForm.trigger('submit');
 			}
 		}
+	};
+
+	/**
+	 * Search for forms and add event handler
+	 */
+	RsaEncryption.initialize = function() {
+		$(':input[data-rsa-encryption]').closest('form').each(function() {
+			RsaEncryption.registerForm(this);
+		});
+		rng_seed_time();
 	};
 
 	$(RsaEncryption.initialize);

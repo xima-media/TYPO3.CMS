@@ -32,9 +32,9 @@ class EditLinkViewHelper extends AbstractViewHelper
     public function render($id)
     {
         return static::renderStatic(
-            array(
+            [
                 'id' => $id
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
@@ -51,10 +51,10 @@ class EditLinkViewHelper extends AbstractViewHelper
     {
         return BackendUtility::getModuleUrl(
             'record_edit',
-            array(
+            [
                 'edit[sys_note][' . $arguments['id'] . ']' => 'edit',
                 'returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')
-            )
+            ]
         );
     }
 }

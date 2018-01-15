@@ -14,7 +14,6 @@ namespace TYPO3\CMS\Core\Resource;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Core\Utility\PathUtility;
 
 /**
@@ -191,7 +190,7 @@ abstract class AbstractFile implements FileInterface
             throw new \RuntimeException('File has been deleted.', 1329821480);
         }
         if (empty($this->properties['size'])) {
-            $size = array_pop($this->getStorage()->getFileInfoByIdentifier($this->getIdentifier(), array('size')));
+            $size = array_pop($this->getStorage()->getFileInfoByIdentifier($this->getIdentifier(), ['size']));
         } else {
             $size = $this->properties['size'];
         }
@@ -271,7 +270,7 @@ abstract class AbstractFile implements FileInterface
      */
     public function getMimeType()
     {
-        return $this->properties['mime_type'] ?: array_pop($this->getStorage()->getFileInfoByIdentifier($this->getIdentifier(), array('mimetype')));
+        return $this->properties['mime_type'] ?: array_pop($this->getStorage()->getFileInfoByIdentifier($this->getIdentifier(), ['mimetype']));
     }
 
     /**
@@ -423,7 +422,7 @@ abstract class AbstractFile implements FileInterface
      */
     public function getCombinedIdentifier()
     {
-        if (is_array($this->properties) && MathUtility::canBeInterpretedAsInteger($this->properties['storage'])) {
+        if (is_array($this->properties) && \TYPO3\CMS\Core\Utility\MathUtility::canBeInterpretedAsInteger($this->properties['storage'])) {
             $combinedIdentifier = $this->properties['storage'] . ':' . $this->getIdentifier();
         } else {
             $combinedIdentifier = $this->getStorage()->getUid() . ':' . $this->getIdentifier();
@@ -439,7 +438,15 @@ abstract class AbstractFile implements FileInterface
     public function delete()
     {
         // The storage will mark this file as deleted
-        return $this->getStorage()->deleteFile($this);
+        $wasDeleted = $this->getStorage()->deleteFile($this);
+
+        // Unset all properties when deleting the file, as they will be stale anyway
+        // This needs to happen AFTER the storage deleted the file, because the storage
+        // emits a signal, which passes the file object to the slots, which may need
+        // all file properties of the deleted file.
+        $this->properties = [];
+
+        return $wasDeleted;
     }
 
     /**

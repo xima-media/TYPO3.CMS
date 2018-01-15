@@ -37,7 +37,7 @@ CREATE TABLE be_groups (
 #
 CREATE TABLE be_sessions (
 	ses_id varchar(32) DEFAULT '' NOT NULL,
-	ses_name varchar(32) DEFAULT '' NOT NULL,
+	ses_name varchar(100) DEFAULT '' NOT NULL,
 	ses_iplock varchar(39) DEFAULT '' NOT NULL,
 	ses_hashlock int(11) DEFAULT '0' NOT NULL,
 	ses_userid int(11) unsigned DEFAULT '0' NOT NULL,
@@ -148,7 +148,7 @@ CREATE TABLE pages (
 	no_search tinyint(3) unsigned DEFAULT '0' NOT NULL,
 	SYS_LASTCHANGED int(10) unsigned DEFAULT '0' NOT NULL,
 	abstract text,
-	module varchar(10) DEFAULT '' NOT NULL,
+	module varchar(255) DEFAULT '' NOT NULL,
 	extendToSubpages tinyint(3) unsigned DEFAULT '0' NOT NULL,
 	author varchar(255) DEFAULT '' NOT NULL,
 	author_email varchar(80) DEFAULT '' NOT NULL,
@@ -413,7 +413,7 @@ CREATE TABLE sys_file_reference (
 	# Local usage overlay fields
 	title tinytext,
 	description text,
-	alternative tinytext,
+	alternative text,
 	link varchar(1024) DEFAULT '' NOT NULL,
 	crop varchar(4000) DEFAULT '' NOT NULL,
 	autoplay tinyint(4) DEFAULT '0' NOT NULL,
@@ -422,6 +422,7 @@ CREATE TABLE sys_file_reference (
 	KEY parent (pid,deleted),
 	KEY tablenames_fieldname (tablenames(32),fieldname(12)),
 	KEY deleted (deleted),
+	KEY uid_local (uid_local),
 	KEY uid_foreign (uid_foreign)
 );
 
@@ -572,7 +573,7 @@ CREATE TABLE sys_refindex (
 	hash varchar(32) DEFAULT '' NOT NULL,
 	tablename varchar(255) DEFAULT '' NOT NULL,
 	recuid int(11) DEFAULT '0' NOT NULL,
-	field varchar(40) DEFAULT '' NOT NULL,
+	field varchar(64) DEFAULT '' NOT NULL,
 	flexpointer varchar(255) DEFAULT '' NOT NULL,
 	softref_key varchar(30) DEFAULT '' NOT NULL,
 	softref_id varchar(40) DEFAULT '' NOT NULL,
@@ -601,7 +602,7 @@ CREATE TABLE sys_log (
 	tablename varchar(255) DEFAULT '' NOT NULL,
 	recpid int(11) DEFAULT '0' NOT NULL,
 	error tinyint(4) unsigned DEFAULT '0' NOT NULL,
-	details text NOT NULL,
+	details text,
 	tstamp int(11) unsigned DEFAULT '0' NOT NULL,
 	type tinyint(3) unsigned DEFAULT '0' NOT NULL,
 	details_nr tinyint(3) DEFAULT '0' NOT NULL,

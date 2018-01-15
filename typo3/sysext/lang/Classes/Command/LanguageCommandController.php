@@ -18,16 +18,11 @@ use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Package\PackageInterface;
 use TYPO3\CMS\Core\Package\PackageManager;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extbase\Mvc\Controller\CommandController;
-use TYPO3\CMS\Extbase\SignalSlot\Dispatcher;
-use TYPO3\CMS\Lang\Domain\Repository\LanguageRepository;
-use TYPO3\CMS\Lang\Service\RegistryService;
-use TYPO3\CMS\Lang\Service\TranslationService;
 
 /**
  * Language command controller updates translation packages
  */
-class LanguageCommandController extends CommandController
+class LanguageCommandController extends \TYPO3\CMS\Extbase\Mvc\Controller\CommandController
 {
     /**
      * @var \TYPO3\CMS\Extbase\SignalSlot\Dispatcher
@@ -42,7 +37,7 @@ class LanguageCommandController extends CommandController
     /**
      * @param \TYPO3\CMS\Extbase\SignalSlot\Dispatcher $signalSlotDispatcher
      */
-    public function injectSignalSlotDispatcher(Dispatcher $signalSlotDispatcher)
+    public function injectSignalSlotDispatcher(\TYPO3\CMS\Extbase\SignalSlot\Dispatcher $signalSlotDispatcher)
     {
         $this->signalSlotDispatcher = $signalSlotDispatcher;
     }
@@ -50,7 +45,7 @@ class LanguageCommandController extends CommandController
     /**
      * @param \TYPO3\CMS\Lang\Service\RegistryService $registryService
      */
-    public function injectRegistryService(RegistryService $registryService)
+    public function injectRegistryService(\TYPO3\CMS\Lang\Service\RegistryService $registryService)
     {
         $this->registryService = $registryService;
     }
@@ -64,10 +59,10 @@ class LanguageCommandController extends CommandController
     public function updateCommand($localesToUpdate = '')
     {
         /** @var $translationService \TYPO3\CMS\Lang\Service\TranslationService */
-        $translationService = $this->objectManager->get(TranslationService::class);
+        $translationService = $this->objectManager->get(\TYPO3\CMS\Lang\Service\TranslationService::class);
         /** @var $languageRepository \TYPO3\CMS\Lang\Domain\Repository\LanguageRepository */
-        $languageRepository = $this->objectManager->get(LanguageRepository::class);
-        $locales = array();
+        $languageRepository = $this->objectManager->get(\TYPO3\CMS\Lang\Domain\Repository\LanguageRepository::class);
+        $locales = [];
         if (!empty($localesToUpdate)) {
             $locales = GeneralUtility::trimExplode(',', $localesToUpdate, true);
         } else {
@@ -78,7 +73,7 @@ class LanguageCommandController extends CommandController
             }
         }
         /** @var PackageManager $packageManager */
-        $packageManager = $this->objectManager->get(PackageManager::class);
+        $packageManager = $this->objectManager->get(\TYPO3\CMS\Core\Package\PackageManager::class);
         $this->emitPackagesMayHaveChangedSignal();
         $packages = $packageManager->getAvailablePackages();
         $this->outputLine((sprintf('Updating language packs of all activated extensions for locales "%s"', implode(', ', $locales))));

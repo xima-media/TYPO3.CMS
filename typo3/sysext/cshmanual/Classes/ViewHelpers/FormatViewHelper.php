@@ -47,9 +47,9 @@ class FormatViewHelper extends AbstractViewHelper
     public function render($content = '')
     {
         return self::renderStatic(
-            array(
+            [
                 'content' => $content,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

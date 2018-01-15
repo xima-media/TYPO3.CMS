@@ -30,8 +30,8 @@ class MemcachedBackendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     protected function setUp()
     {
-        if (!extension_loaded('memcache') && !extension_loaded('memcached')) {
-            $this->markTestSkipped('Neither "memcache" nor "memcached" extension was available');
+        if (!extension_loaded('memcache')) {
+            $this->markTestSkipped('memcache extension was not available');
         }
         try {
             if (!@fsockopen('localhost', 11211)) {
@@ -44,13 +44,11 @@ class MemcachedBackendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
 
     /**
      * @test
+     * @expectedException \TYPO3\CMS\Core\Cache\Exception
      */
     public function setThrowsExceptionIfNoFrontEndHasBeenSet()
     {
-        $this->expectException(\TYPO3\CMS\Core\Cache\Exception::class);
-        $this->expectExceptionCode(1207149215);
-
-        $backendOptions = array('servers' => array('localhost:11211'));
+        $backendOptions = ['servers' => ['localhost:11211']];
         $backend = new MemcachedBackend('Testing', $backendOptions);
         $backend->initializeObject();
         $data = 'Some data';
@@ -60,12 +58,10 @@ class MemcachedBackendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
 
     /**
      * @test
+     * @expectedException \TYPO3\CMS\Core\Cache\Exception
      */
     public function initializeObjectThrowsExceptionIfNoMemcacheServerIsConfigured()
     {
-        $this->expectException(\TYPO3\CMS\Core\Cache\Exception::class);
-        $this->expectExceptionCode(1213115903);
-
         $backend = new MemcachedBackend('Testing');
         $backend->initializeObject();
     }
@@ -133,7 +129,7 @@ class MemcachedBackendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
         $backend = $this->setUpBackend();
         $data = 'Some data';
         $identifier = $this->getUniqueId('MyIdentifier');
-        $backend->set($identifier, $data, array('UnitTestTag%tag1', 'UnitTestTag%tag2'));
+        $backend->set($identifier, $data, ['UnitTestTag%tag1', 'UnitTestTag%tag2']);
         $retrieved = $backend->findIdentifiersByTag('UnitTestTag%tag1');
         $this->assertEquals($identifier, $retrieved[0], 'Could not retrieve expected entry by tag.');
         $retrieved = $backend->findIdentifiersByTag('UnitTestTag%tag2');
@@ -148,10 +144,10 @@ class MemcachedBackendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
         $backend = $this->setUpBackend();
         $data = 'Some data';
         $identifier = $this->getUniqueId('MyIdentifier');
-        $backend->set($identifier, $data, array('UnitTestTag%tag1', 'UnitTestTag%tag2'));
-        $backend->set($identifier, $data, array('UnitTestTag%tag3'));
+        $backend->set($identifier, $data, ['UnitTestTag%tag1', 'UnitTestTag%tag2']);
+        $backend->set($identifier, $data, ['UnitTestTag%tag3']);
         $retrieved = $backend->findIdentifiersByTag('UnitTestTag%tagX');
-        $this->assertEquals(array(), $retrieved, 'Found entry which should no longer exist.');
+        $this->assertEquals([], $retrieved, 'Found entry which should no longer exist.');
     }
 
     /**
@@ -183,9 +179,9 @@ class MemcachedBackendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     {
         $backend = $this->setUpBackend();
         $data = 'some data' . microtime();
-        $backend->set('BackendMemcacheTest1', $data, array('UnitTestTag%test', 'UnitTestTag%boring'));
-        $backend->set('BackendMemcacheTest2', $data, array('UnitTestTag%test', 'UnitTestTag%special'));
-        $backend->set('BackendMemcacheTest3', $data, array('UnitTestTag%test'));
+        $backend->set('BackendMemcacheTest1', $data, ['UnitTestTag%test', 'UnitTestTag%boring']);
+        $backend->set('BackendMemcacheTest2', $data, ['UnitTestTag%test', 'UnitTestTag%special']);
+        $backend->set('BackendMemcacheTest3', $data, ['UnitTestTag%test']);
         $backend->flushByTag('UnitTestTag%special');
         $this->assertTrue($backend->has('BackendMemcacheTest1'), 'BackendMemcacheTest1');
         $this->assertFalse($backend->has('BackendMemcacheTest2'), 'BackendMemcacheTest2');
@@ -213,16 +209,16 @@ class MemcachedBackendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function flushRemovesOnlyOwnEntries()
     {
-        $backendOptions = array('servers' => array('localhost:11211'));
+        $backendOptions = ['servers' => ['localhost:11211']];
         /** @var \PHPUnit_Framework_MockObject_MockObject|\TYPO3\CMS\Core\Cache\Frontend\FrontendInterface $thisCache */
-        $thisCache = $this->getMock(\TYPO3\CMS\Core\Cache\Frontend\AbstractFrontend::class, array(), array(), '', false);
+        $thisCache = $this->getMock(\TYPO3\CMS\Core\Cache\Frontend\AbstractFrontend::class, [], [], '', false);
         $thisCache->expects($this->any())->method('getIdentifier')->will($this->returnValue('thisCache'));
         $thisBackend = new MemcachedBackend('Testing', $backendOptions);
         $thisBackend->setCache($thisCache);
         $thisBackend->initializeObject();
 
         /** @var \PHPUnit_Framework_MockObject_MockObject|\TYPO3\CMS\Core\Cache\Frontend\FrontendInterface $thatCache */
-        $thatCache = $this->getMock(\TYPO3\CMS\Core\Cache\Frontend\AbstractFrontend::class, array(), array(), '', false);
+        $thatCache = $this->getMock(\TYPO3\CMS\Core\Cache\Frontend\AbstractFrontend::class, [], [], '', false);
         $thatCache->expects($this->any())->method('getIdentifier')->will($this->returnValue('thatCache'));
         $thatBackend = new MemcachedBackend('Testing', $backendOptions);
         $thatBackend->setCache($thatCache);
@@ -254,9 +250,9 @@ class MemcachedBackendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function setTagsOnlyOnceToIdentifier()
     {
-        $backendOptions = array('servers' => array('localhost:11211'));
+        $backendOptions = ['servers' => ['localhost:11211']];
         $identifier = $this->getUniqueId('MyIdentifier');
-        $tags = array('UnitTestTag%test', 'UnitTestTag%boring');
+        $tags = ['UnitTestTag%test', 'UnitTestTag%boring'];
 
         $backend = $this->setUpBackend($backendOptions, true);
         $backend->_call('addIdentifierToTags', $identifier, $tags);
@@ -279,12 +275,12 @@ class MemcachedBackendTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      * @param bool $accessible TRUE if backend should be encapsulated in accessible proxy otherwise FALSE.
      * @return \TYPO3\CMS\Core\Tests\AccessibleObjectInterface|MemcachedBackend
      */
-    protected function setUpBackend(array $backendOptions = array(), $accessible = false)
+    protected function setUpBackend(array $backendOptions = [], $accessible = false)
     {
         /** @var \PHPUnit_Framework_MockObject_MockObject|\TYPO3\CMS\Core\Cache\Frontend\FrontendInterface $cache */
-        $cache = $this->getMock(\TYPO3\CMS\Core\Cache\Frontend\FrontendInterface::class, array(), array(), '', false);
-        if ($backendOptions == array()) {
-            $backendOptions = array('servers' => array('localhost:11211'));
+        $cache = $this->getMock(\TYPO3\CMS\Core\Cache\Frontend\FrontendInterface::class, [], [], '', false);
+        if ($backendOptions == []) {
+            $backendOptions = ['servers' => ['localhost:11211']];
         }
         if ($accessible) {
             $accessibleClassName = $this->buildAccessibleProxy(MemcachedBackend::class);

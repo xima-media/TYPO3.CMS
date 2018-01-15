@@ -52,9 +52,9 @@ class ArrayUtility
      * @param array $haystack The array in which to search
      * @return array $haystack array reduced matching $needle values
      */
-    public static function filterByValueRecursive($needle = '', array $haystack = array())
+    public static function filterByValueRecursive($needle = '', array $haystack = [])
     {
-        $resultArray = array();
+        $resultArray = [];
         // Define a lambda function to be applied to all members of this array dimension
         // Call recursive if current value is of type array
         // Write to $resultArray (by reference!) if types and value match
@@ -130,7 +130,10 @@ class ArrayUtility
      */
     public static function getValueByPath(array $array, $path, $delimiter = '/')
     {
-        if (empty($path)) {
+        if (!is_string($path)) {
+            throw new \RuntimeException('Path must be a string', 1477699595);
+        }
+        if ($path === '') {
             throw new \RuntimeException('Path must not be empty', 1341397767);
         }
         // Extract parts of the path
@@ -177,11 +180,11 @@ class ArrayUtility
      */
     public static function setValueByPath(array $array, $path, $value, $delimiter = '/')
     {
-        if (empty($path)) {
-            throw new \RuntimeException('Path must not be empty', 1341406194);
-        }
         if (!is_string($path)) {
             throw new \RuntimeException('Path must be a string', 1341406402);
+        }
+        if ($path === '') {
+            throw new \RuntimeException('Path must not be empty', 1341406194);
         }
         // Extract parts of the path
         $path = str_getcsv($path, $delimiter);
@@ -190,12 +193,12 @@ class ArrayUtility
         // Find path in given array
         foreach ($path as $segment) {
             // Fail if the part is empty
-            if (empty($segment)) {
+            if ($segment === '') {
                 throw new \RuntimeException('Invalid path segment specified', 1341406846);
             }
             // Create cell if it doesn't exist
             if (!array_key_exists($segment, $pointer)) {
-                $pointer[$segment] = array();
+                $pointer[$segment] = [];
             }
             // Set pointer to new cell
             $pointer = &$pointer[$segment];
@@ -216,11 +219,11 @@ class ArrayUtility
      */
     public static function removeByPath(array $array, $path, $delimiter = '/')
     {
-        if (empty($path)) {
-            throw new \RuntimeException('Path must not be empty', 1371757718);
-        }
         if (!is_string($path)) {
             throw new \RuntimeException('Path must be a string', 1371757719);
+        }
+        if ($path === '') {
+            throw new \RuntimeException('Path must not be empty', 1371757718);
         }
         // Extract parts of the path
         $path = str_getcsv($path, $delimiter);
@@ -231,7 +234,7 @@ class ArrayUtility
         foreach ($path as $segment) {
             $currentDepth++;
             // Fail if the part is empty
-            if (empty($segment)) {
+            if ($segment === '') {
                 throw new \RuntimeException('Invalid path segment specified', 1371757720);
             }
             if (!array_key_exists($segment, $pointer)) {
@@ -249,7 +252,7 @@ class ArrayUtility
     /**
      * Sorts an array recursively by key
      *
-     * @param $array Array to sort recursively by key
+     * @param array $array Array to sort recursively by key
      * @return array Sorted array
      */
     public static function sortByKeyRecursive(array $array)
@@ -300,7 +303,7 @@ class ArrayUtility
      * @return string String representation of array
      * @throws \RuntimeException
      */
-    public static function arrayExport(array $array = array(), $level = 0)
+    public static function arrayExport(array $array = [], $level = 0)
     {
         $lines = '[' . LF;
         $level++;
@@ -384,7 +387,7 @@ class ArrayUtility
      */
     public static function flatten(array $array, $prefix = '')
     {
-        $flatArray = array();
+        $flatArray = [];
         foreach ($array as $key => $value) {
             // Ensure there is no trailling dot:
             $key = rtrim($key, '.');
@@ -432,9 +435,9 @@ class ArrayUtility
      * @param array $mask Array that has the keys which should be kept in the source array
      * @return array Keys which are present in both arrays with values of the source array
      */
-    public static function intersectRecursive(array $source, array $mask = array())
+    public static function intersectRecursive(array $source, array $mask = [])
     {
-        $intersection = array();
+        $intersection = [];
         foreach ($source as $key => $_) {
             if (!array_key_exists($key, $mask)) {
                 continue;
@@ -476,7 +479,7 @@ class ArrayUtility
      * @param int $level Internal level used for recursion, do *not* set from outside!
      * @return array
      */
-    public static function renumberKeysToAvoidLeapsIfKeysAreAllNumeric(array $array = array(), $level = 0)
+    public static function renumberKeysToAvoidLeapsIfKeysAreAllNumeric(array $array = [], $level = 0)
     {
         $level++;
         $allKeysAreNumeric = true;
@@ -665,7 +668,7 @@ class ArrayUtility
      */
     public static function arrayDiffAssocRecursive(array $array1, array $array2)
     {
-        $differenceArray = array();
+        $differenceArray = [];
         foreach ($array1 as $key => $value) {
             if (!array_key_exists($key, $array2)) {
                 $differenceArray[$key] = $value;

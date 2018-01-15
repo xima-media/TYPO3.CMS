@@ -74,6 +74,13 @@ class RedisBackend extends AbstractBackend implements TaggableBackendInterface
     protected $connected = false;
 
     /**
+     * Persistent connection
+     *
+     * @var bool
+     */
+    protected $persistentConnection = false;
+
+    /**
      * Hostname / IP of the Redis server, defaults to 127.0.0.1.
      *
      * @var string
@@ -122,7 +129,7 @@ class RedisBackend extends AbstractBackend implements TaggableBackendInterface
      * @param array $options Configuration options
      * @throws \TYPO3\CMS\Core\Cache\Exception if php redis module is not loaded
      */
-    public function __construct($context, array $options = array())
+    public function __construct($context, array $options = [])
     {
         if (!extension_loaded('redis')) {
             throw new \TYPO3\CMS\Core\Cache\Exception('The PHP extension "redis" must be installed and loaded in order to use the redis backend.', 1279462933);
@@ -140,7 +147,11 @@ class RedisBackend extends AbstractBackend implements TaggableBackendInterface
     {
         $this->redis = new \Redis();
         try {
-            $this->connected = $this->redis->connect($this->hostname, $this->port);
+            if ($this->persistentConnection) {
+                $this->connected = $this->redis->pconnect($this->hostname, $this->port);
+            } else {
+                $this->connected = $this->redis->connect($this->hostname, $this->port);
+            }
         } catch (\Exception $e) {
             \TYPO3\CMS\Core\Utility\GeneralUtility::sysLog('Could not connect to redis server.', 'core', \TYPO3\CMS\Core\Utility\GeneralUtility::SYSLOG_SEVERITY_ERROR);
         }
@@ -158,6 +169,18 @@ class RedisBackend extends AbstractBackend implements TaggableBackendInterface
                 }
             }
         }
+    }
+
+    /**
+     * Setter for persistent connection
+     *
+     * @param bool $persistentConnection
+     * @return void
+     * @api
+     */
+    public function setPersistentConnection($persistentConnection)
+    {
+        $this->persistentConnection = $persistentConnection;
     }
 
     /**
@@ -194,7 +217,7 @@ class RedisBackend extends AbstractBackend implements TaggableBackendInterface
      */
     public function setDatabase($database)
     {
-        if (!is_integer($database)) {
+        if (!is_int($database)) {
             throw new \InvalidArgumentException('The specified database number is of type "' . gettype($database) . '" but an integer is expected.', 1279763057);
         }
         if ($database < 0) {
@@ -243,7 +266,7 @@ class RedisBackend extends AbstractBackend implements TaggableBackendInterface
      */
     public function setCompressionLevel($compressionLevel)
     {
-        if (!is_integer($compressionLevel)) {
+        if (!is_int($compressionLevel)) {
             throw new \InvalidArgumentException('The specified compression of type "' . gettype($compressionLevel) . '" but an integer is expected.', 1289679154);
         }
         if ($compressionLevel >= -1 && $compressionLevel <= 9) {
@@ -268,7 +291,7 @@ class RedisBackend extends AbstractBackend implements TaggableBackendInterface
      * @throws \TYPO3\CMS\Core\Cache\Exception\InvalidDataException if data is not a string
      * @api
      */
-    public function set($entryIdentifier, $data, array $tags = array(), $lifetime = null)
+    public function set($entryIdentifier, $data, array $tags = [], $lifetime = null)
     {
         if (!$this->canBeUsedInStringContext($entryIdentifier)) {
             throw new \InvalidArgumentException('The specified identifier is of type "' . gettype($entryIdentifier) . '" which can\'t be converted to string.', 1377006651);
@@ -277,7 +300,7 @@ class RedisBackend extends AbstractBackend implements TaggableBackendInterface
             throw new \TYPO3\CMS\Core\Cache\Exception\InvalidDataException('The specified data is of type "' . gettype($data) . '" but a string is expected.', 1279469941);
         }
         $lifetime = $lifetime === null ? $this->defaultLifetime : $lifetime;
-        if (!is_integer($lifetime)) {
+        if (!is_int($lifetime)) {
             throw new \InvalidArgumentException('The specified lifetime is of type "' . gettype($lifetime) . '" but an integer or NULL is expected.', 1279488008);
         }
         if ($lifetime < 0) {
@@ -290,7 +313,7 @@ class RedisBackend extends AbstractBackend implements TaggableBackendInterface
             }
             $this->redis->setex(self::IDENTIFIER_DATA_PREFIX . $entryIdentifier, $expiration, $data);
             $addTags = $tags;
-            $removeTags = array();
+            $removeTags = [];
             $existingTags = $this->redis->sMembers(self::IDENTIFIER_TAGS_PREFIX . $entryIdentifier);
             if (!empty($existingTags)) {
                 $addTags = array_diff($tags, $existingTags);
@@ -403,7 +426,7 @@ class RedisBackend extends AbstractBackend implements TaggableBackendInterface
         if (!$this->canBeUsedInStringContext($tag)) {
             throw new \InvalidArgumentException('The specified tag is of type "' . gettype($tag) . '" which can\'t be converted to string.', 1377006655);
         }
-        $foundIdentifiers = array();
+        $foundIdentifiers = [];
         if ($this->connected) {
             $foundIdentifiers = $this->redis->sMembers(self::TAG_IDENTIFIERS_PREFIX . $tag);
         }
@@ -444,7 +467,7 @@ class RedisBackend extends AbstractBackend implements TaggableBackendInterface
         if ($this->connected) {
             $identifiers = $this->redis->sMembers(self::TAG_IDENTIFIERS_PREFIX . $tag);
             if (!empty($identifiers)) {
-                $this->removeIdentifierEntriesAndRelations($identifiers, array($tag));
+                $this->removeIdentifierEntriesAndRelations($identifiers, [$tag]);
             }
         }
     }
@@ -494,8 +517,8 @@ class RedisBackend extends AbstractBackend implements TaggableBackendInterface
         // Set a temporary entry which holds all identifiers that need to be removed from
         // the tag to identifiers sets
         $uniqueTempKey = 'temp:' . StringUtility::getUniqueId();
-        $prefixedKeysToDelete = array($uniqueTempKey);
-        $prefixedIdentifierToTagsKeysToDelete = array();
+        $prefixedKeysToDelete = [$uniqueTempKey];
+        $prefixedIdentifierToTagsKeysToDelete = [];
         foreach ($identifiers as $identifier) {
             $prefixedKeysToDelete[] = self::IDENTIFIER_DATA_PREFIX . $identifier;
             $prefixedIdentifierToTagsKeysToDelete[] = self::IDENTIFIER_TAGS_PREFIX . $identifier;

@@ -14,14 +14,12 @@ namespace TYPO3\CMS\FluidStyledContent\ViewHelpers\Menu;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Frontend\Controller\TypoScriptFrontendController;
 use TYPO3\CMS\Frontend\Page\PageRepository;
 
 /**
  * Trait for Menu-ViewHelpers that require support functions for
  * working with menus that require page selection constraints.
- * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
  */
 trait MenuViewHelperTrait
 {
@@ -39,13 +37,11 @@ trait MenuViewHelperTrait
      *
      * @param bool $includeNotInMenu Should pages which are hidden for menu's be included
      * @param bool $includeMenuSeparator Should pages of type "Menu separator" be included
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9, use AbstractMenuViewHelper instead of MenuViewHelperTrait
      * @return string
      */
     protected function getPageConstraints($includeNotInMenu = false, $includeMenuSeparator = false)
     {
-        GeneralUtility::logDeprecatedFunction();
-        $constraints = array();
+        $constraints = [];
 
         $constraints[] = 'doktype NOT IN (' . PageRepository::DOKTYPE_BE_USER_SECTION . ',' . PageRepository::DOKTYPE_RECYCLER . ',' . PageRepository::DOKTYPE_SYSFOLDER . ')';
 
@@ -66,40 +62,39 @@ trait MenuViewHelperTrait
      *
      * @param array $pageUids
      * @param int|NULL $entryLevel
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9, use AbstractMenuViewHelper instead of MenuViewHelperTrait
      * @return array
      */
     protected function getPageUids(array $pageUids, $entryLevel = 0)
     {
-        GeneralUtility::logDeprecatedFunction();
         $typoScriptFrontendController = $this->getTypoScriptFrontendController();
 
         // Remove empty entries from array
         $pageUids = array_filter($pageUids);
 
         // If no pages have been defined, use the current page
-        if (empty($pageUids)) {
-            if ($entryLevel !== null) {
-                if ($entryLevel < 0) {
-                    $entryLevel = count($typoScriptFrontendController->tmpl->rootLine) - 1 + $entryLevel;
-                }
-                $pageUids = array($typoScriptFrontendController->tmpl->rootLine[$entryLevel]['uid']);
-            } else {
-                $pageUids = array($typoScriptFrontendController->id);
-            }
+        if (!empty($pageUids)) {
+            return $pageUids;
         }
 
-        return $pageUids;
+        if ($entryLevel === null) {
+            return [$typoScriptFrontendController->id];
+        }
+
+        if ($entryLevel < 0) {
+            $entryLevel = count($typoScriptFrontendController->tmpl->rootLine) - 1 + $entryLevel;
+        }
+        if (isset($typoScriptFrontendController->tmpl->rootLine[$entryLevel]['uid'])) {
+            return [$typoScriptFrontendController->tmpl->rootLine[$entryLevel]['uid']];
+        }
+        return [];
     }
 
     /**
      * @param array $variables
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9, use AbstractMenuViewHelper instead of MenuViewHelperTrait
      * @return mixed
      */
     protected function renderChildrenWithVariables(array $variables)
     {
-        GeneralUtility::logDeprecatedFunction();
         foreach ($variables as $name => $value) {
             $this->templateVariableContainer->add($name, $value);
         }
@@ -114,12 +109,10 @@ trait MenuViewHelperTrait
     }
 
     /**
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9, use AbstractMenuViewHelper instead of MenuViewHelperTrait
      * @return TypoScriptFrontendController
      */
     protected function getTypoScriptFrontendController()
     {
-        GeneralUtility::logDeprecatedFunction();
         return $GLOBALS['TSFE'];
     }
 }

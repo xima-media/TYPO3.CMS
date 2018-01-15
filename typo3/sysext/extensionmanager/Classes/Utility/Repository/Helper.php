@@ -14,8 +14,6 @@ namespace TYPO3\CMS\Extensionmanager\Utility\Repository;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extensionmanager\Exception\ExtensionManagerException;
 use TYPO3\CMS\Extensionmanager\Utility\ConfigurationUtility;
 
@@ -150,7 +148,7 @@ class Helper implements \TYPO3\CMS\Core\SingletonInterface
             throw new ExtensionManagerException('Extension Manager is in offline mode. No TER connection available.', 1437078780);
         }
         if (is_string($remoteResource) && is_string($localResource) && !empty($remoteResource) && !empty($localResource)) {
-            $fileContent = \TYPO3\CMS\Core\Utility\GeneralUtility::getUrl($remoteResource);
+            $fileContent = \TYPO3\CMS\Core\Utility\GeneralUtility::getUrl($remoteResource, 0, [TYPO3_user_agent]);
             if ($fileContent !== false) {
                 if (\TYPO3\CMS\Core\Utility\GeneralUtility::writeFileToTypo3tempDir($localResource, $fileContent) !== null) {
                     throw new ExtensionManagerException(sprintf('Could not write to file %s.', $localResource), 1342635378);
@@ -170,7 +168,8 @@ class Helper implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function getLocalExtListFile()
     {
-        return PATH_site . 'typo3temp/var/ExtensionManager/' . (int)$this->repository->getUid() . '.extensions.xml.gz';
+        $absFilePath = PATH_site . 'typo3temp/ExtensionManager/' . (int)$this->repository->getUid() . '.extensions.xml.gz';
+        return $absFilePath;
     }
 
     /**
@@ -210,7 +209,8 @@ class Helper implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function getLocalMirrorListFile()
     {
-        return PATH_site . 'typo3temp/var/ExtensionManager/' . (int)$this->repository->getUid() . '.mirrors.xml.gz';
+        $absFilePath = PATH_site . 'typo3temp/ExtensionManager/' . (int)$this->repository->getUid() . '.mirrors.xml.gz';
+        return $absFilePath;
     }
 
     /**
@@ -270,7 +270,7 @@ class Helper implements \TYPO3\CMS\Core\SingletonInterface
         if (!is_file($this->getLocalExtListFile())) {
             $updateNecessity |= self::PROBLEM_EXTENSION_FILE_NOT_EXISTING;
         } else {
-            $remotemd5 = \TYPO3\CMS\Core\Utility\GeneralUtility::getUrl($this->getRemoteExtHashFile());
+            $remotemd5 = \TYPO3\CMS\Core\Utility\GeneralUtility::getUrl($this->getRemoteExtHashFile(), 0, [TYPO3_user_agent]);
             if ($remotemd5 !== false) {
                 $localmd5 = md5_file($this->getLocalExtListFile());
                 if ($remotemd5 !== $localmd5) {
@@ -309,9 +309,7 @@ class Helper implements \TYPO3\CMS\Core\SingletonInterface
                 // Use straight query as extbase "remove" is too slow here
                 // This truncates the whole table. It would be more correct to remove only rows of a specific
                 // repository, but multiple repository handling is not implemented, and truncate is quicker.
-                GeneralUtility::makeInstance(ConnectionPool::class)
-                    ->getConnectionForTable('tx_extensionmanager_domain_model_extension')
-                    ->truncate('tx_extensionmanager_domain_model_extension');
+                $this->getDatabaseConnection()->exec_TRUNCATEquery('tx_extensionmanager_domain_model_extension');
             }
             // no further problems - start of import process
             if ($updateNecessity === 0) {
@@ -323,5 +321,15 @@ class Helper implements \TYPO3\CMS\Core\SingletonInterface
             }
         }
         return $updated;
+    }
+
+    /**
+     * Get database connection
+     *
+     * @return \TYPO3\CMS\Core\Database\DatabaseConnection
+     */
+    protected function getDatabaseConnection()
+    {
+        return $GLOBALS['TYPO3_DB'];
     }
 }

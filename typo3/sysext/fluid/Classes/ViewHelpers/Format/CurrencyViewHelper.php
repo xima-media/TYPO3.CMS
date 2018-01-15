@@ -68,14 +68,14 @@ class CurrencyViewHelper extends AbstractViewHelper
     public function render($currencySign = '', $decimalSeparator = ',', $thousandsSeparator = '.', $prependCurrency = false, $separateCurrency = true, $decimals = 2)
     {
         return static::renderStatic(
-            array(
+            [
                 'currencySign' => $currencySign,
                 'decimalSeparator' => $decimalSeparator,
                 'thousandsSeparator' => $thousandsSeparator,
                 'prependCurrency' => $prependCurrency,
                 'separateCurrency' => $separateCurrency,
                 'decimals' => $decimals
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

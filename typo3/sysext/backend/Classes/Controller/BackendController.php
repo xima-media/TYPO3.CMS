@@ -21,10 +21,10 @@ use TYPO3\CMS\Backend\Module\ModuleLoader;
 use TYPO3\CMS\Backend\Toolbar\ToolbarItemInterface;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Page\PageRenderer;
+use TYPO3\CMS\Core\Type\File\ImageInfo;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
-use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Fluid\View\StandaloneView;
 use TYPO3\CMS\Rsaauth\RsaEncryptionEncoder;
 
@@ -46,7 +46,7 @@ class BackendController
     /**
      * @var array
      */
-    protected $cssFiles = array();
+    protected $cssFiles = [];
 
     /**
      * @var string
@@ -56,12 +56,12 @@ class BackendController
     /**
      * @var array
      */
-    protected $jsFiles = array();
+    protected $jsFiles = [];
 
     /**
      * @var array
      */
-    protected $toolbarItems = array();
+    protected $toolbarItems = [];
 
     /**
      * @var int
@@ -94,6 +94,16 @@ class BackendController
     protected $pageRenderer;
 
     /**
+     * @return PageRenderer
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function getPageRenderer()
+    {
+        GeneralUtility::logDeprecatedFunction();
+        return $this->pageRenderer;
+    }
+
+    /**
      * Constructor
      */
     public function __construct()
@@ -114,7 +124,7 @@ class BackendController
         $this->pageRenderer->addExtDirectCode();
         // Add default BE javascript
         $backendRelPath = ExtensionManagementUtility::extRelPath('backend');
-        $this->jsFiles = array(
+        $this->jsFiles = [
             'locallang' => $this->getLocalLangFileName(),
             'md5' => $backendRelPath . 'Resources/Public/JavaScript/md5.js',
             'modulemenu' => $backendRelPath . 'Resources/Public/JavaScript/modulemenu.js',
@@ -125,10 +135,12 @@ class BackendController
             'iframepanel' => $backendRelPath . 'Resources/Public/JavaScript/iframepanel.js',
             'backendcontentiframe' => $backendRelPath . 'Resources/Public/JavaScript/extjs/backendcontentiframe.js',
             'viewportConfiguration' => $backendRelPath . 'Resources/Public/JavaScript/extjs/viewportConfiguration.js',
-        );
+        ];
         $this->pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/LoginRefresh', 'function(LoginRefresh) {
+			LoginRefresh.setIntervalTime(' . MathUtility::forceIntegerInRange((int)$GLOBALS['TYPO3_CONF_VARS']['BE']['sessionTimeout'] - 60, 60) . ');
 			LoginRefresh.setLoginFramesetUrl(' . GeneralUtility::quoteJSvalue(BackendUtility::getModuleUrl('login_frameset')) . ');
 			LoginRefresh.setLogoutUrl(' . GeneralUtility::quoteJSvalue(BackendUtility::getModuleUrl('logout')) . ');
+			LoginRefresh.initialize();
 		}');
 
         // load Utility class
@@ -139,6 +151,9 @@ class BackendController
 
         // load Modals
         $this->pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/Modal');
+
+        // load Legacy CSS Support
+        $this->pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/LegacyCssClasses');
 
         // load the storage API and fill the UC into the PersistentStorage, so no additional AJAX call is needed
         $this->pageRenderer->loadRequireJsModule('TYPO3/CMS/Backend/Storage', 'function(Storage) {
@@ -183,16 +198,16 @@ class BackendController
             foreach ($GLOBALS['TBE_MODULES']['_configuration'] as $moduleConfig) {
                 if (is_array($moduleConfig['cssFiles'])) {
                     foreach ($moduleConfig['cssFiles'] as $cssFileName => $cssFile) {
-                        $cssFile = GeneralUtility::getFileAbsFileName($cssFile);
-                        $cssFile = PathUtility::getAbsoluteWebPath($cssFile);
-                        $TYPO3backend->addCssFile($cssFileName, $cssFile);
+                        $files = [\TYPO3\CMS\Core\Utility\GeneralUtility::getFileAbsFileName($cssFile)];
+                        $files = \TYPO3\CMS\Core\Utility\GeneralUtility::removePrefixPathFromList($files, PATH_site);
+                        $TYPO3backend->addCssFile($cssFileName, '../' . $files[0]);
                     }
                 }
                 if (is_array($moduleConfig['jsFiles'])) {
                     foreach ($moduleConfig['jsFiles'] as $jsFile) {
-                        $jsFile = GeneralUtility::getFileAbsFileName($jsFile);
-                        $jsFile = PathUtility::getAbsoluteWebPath($jsFile);
-                        $TYPO3backend->addJavascriptFile($jsFile);
+                        $files = [\TYPO3\CMS\Core\Utility\GeneralUtility::getFileAbsFileName($jsFile)];
+                        $files = \TYPO3\CMS\Core\Utility\GeneralUtility::removePrefixPathFromList($files, PATH_site);
+                        $TYPO3backend->addJavascriptFile('../' . $files[0]);
                     }
                 }
             }
@@ -207,7 +222,7 @@ class BackendController
      */
     protected function initializeToolbarItems()
     {
-        $toolbarItemInstances = array();
+        $toolbarItemInstances = [];
         $classNameRegistry = $GLOBALS['TYPO3_CONF_VARS']['BE']['toolbarItems'];
         foreach ($classNameRegistry as $className) {
             $toolbarItemInstance = GeneralUtility::makeInstance($className);
@@ -262,28 +277,22 @@ class BackendController
         // Prepare the scaffolding, at this point extension may still add javascript and css
         $view = $this->getFluidTemplateObject($this->templatePath . 'Backend/Main.html');
 
-        // Extension Configuration to find the TYPO3 logo in the left corner
-        $extConf = unserialize($GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf']['backend'], ['allowed_classes' => false]);
-        $logoPath = '';
-        if (!empty($extConf['backendLogo'])) {
-            $customBackendLogo = GeneralUtility::getFileAbsFileName($extConf['backendLogo']);
-            if (!empty($customBackendLogo)) {
-                $logoPath = $customBackendLogo;
-            }
-        }
-        // if no custom logo was set or the path is invalid, use the original one
-        if (empty($logoPath)) {
-            $logoPath = GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Public/Images/typo3-topbar@2x.png');
-        }
-        list($logoWidth, $logoHeight) = @getimagesize($logoPath);
+        // Render the TYPO3 logo in the left corner
+        $logoUrl = $GLOBALS['TBE_STYLES']['logo'] ?: ExtensionManagementUtility::extRelPath('backend') . 'Resources/Public/Images/typo3-topbar@2x.png';
+        $logoPath = GeneralUtility::resolveBackPath(PATH_typo3 . $logoUrl);
+
+        // set width/height for custom logo
+        $imageInfo = GeneralUtility::makeInstance(ImageInfo::class, $logoPath);
+        $logoWidth = $imageInfo->getWidth() ?: '22';
+        $logoHeight = $imageInfo->getHeight() ?: '22';
 
         // High-resolution?
-        if (strpos($logoPath, '@2x.') !== false) {
+        if (strpos($logoUrl, '@2x.') !== false) {
             $logoWidth = $logoWidth/2;
             $logoHeight = $logoHeight/2;
         }
 
-        $view->assign('logoUrl', PathUtility::getAbsoluteWebPath($logoPath));
+        $view->assign('logoUrl', $logoUrl);
         $view->assign('logoWidth', $logoWidth);
         $view->assign('logoHeight', $logoHeight);
         $view->assign('logoLink', TYPO3_URL_GENERAL);
@@ -334,7 +343,7 @@ class BackendController
         $title = $GLOBALS['TYPO3_CONF_VARS']['SYS']['sitename'] ? $GLOBALS['TYPO3_CONF_VARS']['SYS']['sitename'] . ' [TYPO3 CMS ' . TYPO3_version . ']' : 'TYPO3 CMS ' . TYPO3_version;
         // Renders the module page
         $this->content = $this->getDocumentTemplate()->render($title, $view->render());
-        $hookConfiguration = array('content' => &$this->content);
+        $hookConfiguration = ['content' => &$this->content];
         $this->executeHook('renderPostProcess', $hookConfiguration);
     }
 
@@ -348,7 +357,7 @@ class BackendController
         if (!is_array($GLOBALS['TBE_MODULES']['_navigationComponents'])) {
             return;
         }
-        $loadedComponents = array();
+        $loadedComponents = [];
         foreach ($GLOBALS['TBE_MODULES']['_navigationComponents'] as $module => $info) {
             if (in_array($info['componentId'], $loadedComponents)) {
                 continue;
@@ -365,7 +374,7 @@ class BackendController
             $cssFiles = GeneralUtility::getFilesInDir($absoluteComponentPath . 'css/', 'css');
             if (file_exists($absoluteComponentPath . 'css/loadorder.txt')) {
                 // Don't allow inclusion outside directory
-                $loadOrder = str_replace('../', '', file_get_contents($absoluteComponentPath . 'css/loadorder.txt'));
+                $loadOrder = str_replace('../', '', GeneralUtility::getUrl($absoluteComponentPath . 'css/loadorder.txt'));
                 $cssFilesOrdered = GeneralUtility::trimExplode(LF, $loadOrder, true);
                 $cssFiles = array_merge($cssFilesOrdered, $cssFiles);
             }
@@ -375,7 +384,7 @@ class BackendController
             $jsFiles = GeneralUtility::getFilesInDir($absoluteComponentPath . 'javascript/', 'js');
             if (file_exists($absoluteComponentPath . 'javascript/loadorder.txt')) {
                 // Don't allow inclusion outside directory
-                $loadOrder = str_replace('../', '', file_get_contents($absoluteComponentPath . 'javascript/loadorder.txt'));
+                $loadOrder = str_replace('../', '', GeneralUtility::getUrl($absoluteComponentPath . 'javascript/loadorder.txt'));
                 $jsFilesOrdered = GeneralUtility::trimExplode(LF, $loadOrder, true);
                 $jsFiles = array_merge($jsFilesOrdered, $jsFiles);
             }
@@ -395,17 +404,17 @@ class BackendController
      */
     protected function renderToolbar()
     {
-        $toolbar = array();
+        $toolbar = [];
         foreach ($this->toolbarItems as $toolbarItem) {
             /** @var \TYPO3\CMS\Backend\Toolbar\ToolbarItemInterface $toolbarItem */
             if ($toolbarItem->checkAccess()) {
                 $hasDropDown = (bool)$toolbarItem->hasDropDown();
                 $additionalAttributes = (array)$toolbarItem->getAdditionalAttributes();
 
-                $liAttributes = array();
+                $liAttributes = [];
 
                 // Merge class: Add dropdown class if hasDropDown, add classes from additonal attributes
-                $classes = array();
+                $classes = [];
                 if ($hasDropDown) {
                     $classes[] = 'dropdown';
                 }
@@ -424,7 +433,7 @@ class BackendController
                 $className = get_class($toolbarItem);
                 $className = GeneralUtility::underscoredToLowerCamelCase($className);
                 $className = GeneralUtility::camelCaseToLowerCaseUnderscored($className);
-                $className = str_replace(array('_', '\\'), '-', $className);
+                $className = str_replace(['_', '\\'], '-', $className);
                 $liAttributes[] = 'id="' . $className . '"';
 
                 $toolbar[] = '<li ' . implode(' ', $liAttributes) . '>';
@@ -455,7 +464,7 @@ class BackendController
     protected function getLocalLangFileName()
     {
         $code = $this->generateLocalLang();
-        $filePath = 'typo3temp/assets/js/backend-' . sha1($code) . '.js';
+        $filePath = 'typo3temp/Language/Backend-' . sha1($code) . '.js';
         if (!file_exists(PATH_site . $filePath)) {
             // writeFileToTypo3tempDir() returns NULL on success (please double-read!)
             $error = GeneralUtility::writeFileToTypo3tempDir(PATH_site . $filePath, $code);
@@ -475,27 +484,35 @@ class BackendController
     protected function generateLocalLang()
     {
         $lang = $this->getLanguageService();
-        $coreLabels = array(
+        $coreLabels = [
             'waitTitle' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_logging_in'),
             'refresh_login_failed' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_failed'),
             'refresh_login_failed_message' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_failed_message'),
-            'refresh_login_title' => sprintf($lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_title'), htmlspecialchars($this->getBackendUser()->user['username'])),
+            'refresh_login_title' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_title'),
             'login_expired' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.login_expired'),
             'refresh_login_username' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_username'),
             'refresh_login_password' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_password'),
             'refresh_login_emptyPassword' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_emptyPassword'),
             'refresh_login_button' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_button'),
+            'refresh_logout_button' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_logout_button'),
             'refresh_exit_button' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_exit_button'),
             'please_wait' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.please_wait'),
+            'loadingIndicator' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:loadingIndicator'),
             'be_locked' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.be_locked'),
+            'refresh_login_countdown_singular' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_countdown_singular'),
+            'refresh_login_countdown' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_countdown'),
             'login_about_to_expire' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.login_about_to_expire'),
             'login_about_to_expire_title' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.login_about_to_expire_title'),
             'refresh_login_logout_button' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_logout_button'),
             'refresh_login_refresh_button' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_refresh_button'),
+            'tabs_closeAll' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:tabs.closeAll'),
+            'tabs_closeOther' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:tabs.closeOther'),
+            'tabs_close' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:tabs.close'),
+            'tabs_openInBrowserWindow' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:tabs.openInBrowserWindow'),
             'csh_tooltip_loading' => $lang->sL('LLL:EXT:lang/locallang_core.xlf:csh_tooltip_loading')
-        );
-        $labels = array(
-            'fileUpload' => array(
+        ];
+        $labels = [
+            'fileUpload' => [
                 'windowTitle',
                 'buttonSelectFiles',
                 'buttonCancelAll',
@@ -526,8 +543,8 @@ class BackendController
                 'allErrorMessageText',
                 'allError401',
                 'allError2038'
-            ),
-            'liveSearch' => array(
+            ],
+            'liveSearch' => [
                 'title',
                 'helpTitle',
                 'emptyText',
@@ -537,15 +554,15 @@ class BackendController
                 'helpDescription',
                 'helpDescriptionPages',
                 'helpDescriptionContent'
-            ),
-            'viewPort' => array(
+            ],
+            'viewPort' => [
                 'tooltipModuleMenuSplit',
                 'tooltipNavigationContainerSplitDrag',
                 'tooltipNavigationContainerSplitClick',
                 'tooltipDebugPanelSplitDrag'
-            )
-        );
-        $generatedLabels = array();
+            ]
+        ];
+        $generatedLabels = [];
         $generatedLabels['core'] = $coreLabels;
         // First loop over all categories (fileUpload, liveSearch, ..)
         foreach ($labels as $categoryName => $categoryLabels) {
@@ -567,31 +584,62 @@ class BackendController
     {
         $beUser = $this->getBackendUser();
         // Needed for FormEngine manipulation (date picker)
-        $dateFormat = ($GLOBALS['TYPO3_CONF_VARS']['SYS']['USdateFormat'] ? array('MM-DD-YYYY', 'HH:mm MM-DD-YYYY') : array('DD-MM-YYYY', 'HH:mm DD-MM-YYYY'));
+        $dateFormat = ($GLOBALS['TYPO3_CONF_VARS']['SYS']['USdateFormat'] ? ['MM-DD-YYYY', 'HH:mm MM-DD-YYYY'] : ['DD-MM-YYYY', 'HH:mm DD-MM-YYYY']);
         $this->pageRenderer->addInlineSetting('DateTimePicker', 'DateFormat', $dateFormat);
+        // define the window size of the element browser etc.
+        $popupWindowWidth  = 700;
+        $popupWindowHeight = 750;
+        $popupWindowSize = trim($beUser->getTSConfigVal('options.popupWindowSize'));
+        if (!empty($popupWindowSize)) {
+            list($popupWindowWidth, $popupWindowHeight) = GeneralUtility::intExplode('x', $popupWindowSize);
+        }
 
+        // define the window size of the popups within the RTE
+        $rtePopupWindowSize = trim($beUser->getTSConfigVal('options.rte.popupWindowSize'));
+        if (!empty($rtePopupWindowSize)) {
+            list($rtePopupWindowWidth, $rtePopupWindowHeight) = GeneralUtility::trimExplode('x', $rtePopupWindowSize);
+        }
+        $rtePopupWindowWidth  = !empty($rtePopupWindowWidth) ? (int)$rtePopupWindowWidth : ($popupWindowWidth-200);
+        $rtePopupWindowHeight = !empty($rtePopupWindowHeight) ? (int)$rtePopupWindowHeight : ($popupWindowHeight-250);
+
+        $pathTYPO3 = GeneralUtility::dirname(GeneralUtility::getIndpEnv('SCRIPT_NAME')) . '/';
         // If another page module was specified, replace the default Page module with the new one
         $newPageModule = trim($beUser->getTSConfigVal('options.overridePageModule'));
         $pageModule = BackendUtility::isModuleSetInTBE_MODULES($newPageModule) ? $newPageModule : 'web_layout';
         if (!$beUser->check('modules', $pageModule)) {
             $pageModule = '';
         }
-        $t3Configuration = array(
+        $t3Configuration = [
             'siteUrl' => GeneralUtility::getIndpEnv('TYPO3_SITE_URL'),
+            'PATH_typo3' => $pathTYPO3,
+            'PATH_typo3_enc' => rawurlencode($pathTYPO3),
             'username' => htmlspecialchars($beUser->user['username']),
+            'userUid' => htmlspecialchars($beUser->user['uid']),
             'uniqueID' => GeneralUtility::shortMD5(uniqid('', true)),
+            'securityLevel' => trim($GLOBALS['TYPO3_CONF_VARS']['BE']['loginSecurityLevel']) ?: 'normal',
+            'TYPO3_mainDir' => TYPO3_mainDir,
             'pageModule' => $pageModule,
             'inWorkspace' => $beUser->workspace !== 0,
             'workspaceFrontendPreviewEnabled' => $beUser->user['workspace_preview'] ? 1 : 0,
+            'veriCode' => $beUser->veriCode(),
+            'denyFileTypes' => PHP_EXTENSIONS_DEFAULT,
             'moduleMenuWidth' => $this->menuWidth - 1,
             'topBarHeight' => isset($GLOBALS['TBE_STYLES']['dims']['topFrameH']) ? (int)$GLOBALS['TBE_STYLES']['dims']['topFrameH'] : 45,
             'showRefreshLoginPopup' => isset($GLOBALS['TYPO3_CONF_VARS']['BE']['showRefreshLoginPopup']) ? (int)$GLOBALS['TYPO3_CONF_VARS']['BE']['showRefreshLoginPopup'] : false,
             'debugInWindow' => $beUser->uc['debugInWindow'] ? 1 : 0,
-            'ContextHelpWindows' => array(
+            'ContextHelpWindows' => [
                 'width' => 600,
                 'height' => 400
-            )
-        );
+            ],
+            'PopupWindow' => [
+                'width' => $popupWindowWidth,
+                'height' => $popupWindowHeight
+            ],
+            'RTEPopupWindow' => [
+                'width' => $rtePopupWindowWidth,
+                'height' => $rtePopupWindowHeight
+            ]
+        ];
         $this->js .= '
 	TYPO3.configuration = ' . json_encode($t3Configuration) . ';
 
@@ -599,8 +647,13 @@ class BackendController
 	 * TypoSetup object.
 	 */
 	function typoSetup() {	//
+		this.PATH_typo3 = TYPO3.configuration.PATH_typo3;
+		this.PATH_typo3_enc = TYPO3.configuration.PATH_typo3_enc;
 		this.username = TYPO3.configuration.username;
 		this.uniqueID = TYPO3.configuration.uniqueID;
+		this.securityLevel = TYPO3.configuration.securityLevel;
+		this.veriCode = TYPO3.configuration.veriCode;
+		this.denyFileTypes = TYPO3.configuration.denyFileTypes;
 	}
 	var TS = new typoSetup();
 		//backwards compatibility
@@ -784,6 +837,20 @@ class BackendController
     }
 
     /**
+     * Adds an item to the toolbar, the class file for the toolbar item must be loaded at this point
+     *
+     * @param string $toolbarItemName Toolbar item name, f.e. tx_toolbarExtension_coolItem
+     * @param string $toolbarItemClassName Toolbar item class name, f.e. tx_toolbarExtension_coolItem
+     * @return void
+     * @throws \UnexpectedValueException
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8. Toolbar items are registered in $GLOBALS['TYPO3_CONF_VARS']['BE']['toolbarItems'] now.
+     */
+    public function addToolbarItem($toolbarItemName, $toolbarItemClassName)
+    {
+        GeneralUtility::logDeprecatedFunction();
+    }
+
+    /**
      * Executes defined hooks functions for the given identifier.
      *
      * These hook identifiers are valid:
@@ -795,7 +862,7 @@ class BackendController
      * @param array $hookConfiguration Additional configuration passed to hook functions
      * @return void
      */
-    protected function executeHook($identifier, array $hookConfiguration = array())
+    protected function executeHook($identifier, array $hookConfiguration = [])
     {
         $options = &$GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['typo3/backend.php'];
         if (isset($options[$identifier]) && is_array($options[$identifier])) {
@@ -814,7 +881,7 @@ class BackendController
     protected function generateModuleMenu()
     {
         // get all modules except the user modules for the side menu
-        $moduleStorage = $this->backendModuleRepository->loadAllowedModules(array('user', 'help'));
+        $moduleStorage = $this->backendModuleRepository->loadAllowedModules(['user', 'help']);
 
         $view = $this->getFluidTemplateObject($this->templatePath . 'ModuleMenu/Main.html');
         $view->assign('modules', $moduleStorage);

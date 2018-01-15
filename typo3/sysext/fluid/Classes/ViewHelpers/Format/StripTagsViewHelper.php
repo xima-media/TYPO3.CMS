@@ -1,21 +1,19 @@
 <?php
 namespace TYPO3\CMS\Fluid\ViewHelpers\Format;
 
-/*
- * This file is part of the TYPO3 CMS project.
- *
- * It is free software; you can redistribute it and/or modify it under
- * the terms of the GNU General Public License, either version 2
- * of the License, or any later version.
- *
- * For the full copyright and license information, please read the
- * LICENSE.txt file that was distributed with this source code.
- *
- * The TYPO3 project - inspiring people to share!
- */
+/*                                                                        *
+ * This script is backported from the TYPO3 Flow package "TYPO3.Fluid".   *
+ *                                                                        *
+ * It is free software; you can redistribute it and/or modify it under    *
+ * the terms of the GNU Lesser General Public License, either version 3   *
+ *  of the License, or (at your option) any later version.                *
+ *                                                                        *
+ * The TYPO3 project - inspiring people to share!                         *
+ *                                                                        */
 
+use TYPO3\CMS\Fluid\Core\Rendering\RenderingContextInterface;
 use TYPO3\CMS\Fluid\Core\ViewHelper\AbstractViewHelper;
-use TYPO3Fluid\Fluid\Core\Rendering\RenderingContextInterface;
+use TYPO3\CMS\Fluid\Core\ViewHelper\Facets\CompilableInterface;
 
 /**
  * Removes tags from the given string (applying PHPs strip_tags() function)
@@ -40,38 +38,30 @@ use TYPO3Fluid\Fluid\Core\Rendering\RenderingContextInterface;
  *
  * @api
  */
-class StripTagsViewHelper extends AbstractViewHelper
+class StripTagsViewHelper extends AbstractViewHelper implements CompilableInterface
 {
     /**
-     * No output escaping as some tags may be allowed
+     * Disable the escaping interceptor because otherwise the child nodes would be escaped before this view helper
+     * can decode the text's entities.
      *
      * @var bool
      */
-    protected $escapeOutput = false;
-
-    /**
-     * To ensure all tags are removed, child node's output must not be escaped
-     *
-     * @var bool
-     */
-    protected $escapeChildren = false;
+    protected $escapingInterceptorEnabled = false;
 
     /**
      * Escapes special characters with their escaped counterparts as needed using PHPs strip_tags() function.
      *
      * @param string $value string to format
-     * @param string $allowedTags Optional string of allowed tags as required by PHPs strip_tags() function
      * @return mixed
      * @see http://www.php.net/manual/function.strip-tags.php
      * @api
      */
-    public function render($value = null, $allowedTags = null)
+    public function render($value = null)
     {
         return static::renderStatic(
-            array(
-                'value' => $value,
-                'allowedTags' => $allowedTags
-            ),
+            [
+                'value' => $value
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
@@ -82,7 +72,7 @@ class StripTagsViewHelper extends AbstractViewHelper
      *
      * @param array $arguments
      * @param \Closure $renderChildrenClosure
-     * @param \TYPO3Fluid\Fluid\Core\Rendering\RenderingContextInterface $renderingContext
+     * @param \TYPO3\CMS\Fluid\Core\Rendering\RenderingContextInterface $renderingContext
      * @return string
      */
     public static function renderStatic(array $arguments, \Closure $renderChildrenClosure, RenderingContextInterface $renderingContext)
@@ -94,6 +84,6 @@ class StripTagsViewHelper extends AbstractViewHelper
         if (!is_string($value)) {
             return $value;
         }
-        return strip_tags($value, (string)$arguments['allowedTags']);
+        return strip_tags($value);
     }
 }

@@ -177,6 +177,7 @@ var inline = {
 	synchronizeLocalizeRecords: function (objectId, type) {
 		var context = this.getContext(objectId);
 		this.makeAjaxCall('synchronizelocalize', [objectId, type], true, context);
+		return false;
 	},
 
 	setExpandedCollapsedState: function (objectId, expand, collapse) {
@@ -1132,7 +1133,7 @@ var inline = {
 			} else {
 				value = formObj.value;
 			}
-			TYPO3.jQuery('#' + this.escapeObjectId(objectId) + '_label').html(value.length ? value : this.noTitleString);
+			TYPO3.jQuery('#' + this.escapeObjectId(objectId) + '_label').text(value.length ? value : this.noTitleString);
 		}
 		return true;
 	},
@@ -1219,11 +1220,11 @@ var inline = {
 	},
 
 	hideElementsWithClassName: function (selector, parentElement) {
-		TYPO3.jQuery('#' + parentElement).find(selector).fadeOut(200);
+		TYPO3.jQuery('#' + this.escapeObjectId(parentElement)).find(selector).fadeOut(200);
 	},
 
 	showElementsWithClassName: function (selector, parentElement) {
-		TYPO3.jQuery('#' + parentElement).find(selector).fadeIn(200);
+		TYPO3.jQuery('#' + this.escapeObjectId(parentElement)).find(selector).fadeIn(200);
 	},
 
 	// sets the opacity to 0.2 and then fades in to opacity 1

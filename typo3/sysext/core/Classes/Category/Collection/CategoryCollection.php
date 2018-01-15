@@ -52,7 +52,7 @@ class CategoryCollection extends AbstractRecordCollection implements EditableCol
         if (!empty($tableName)) {
             $this->setItemTableName($tableName);
         } elseif (empty($this->itemTableName)) {
-            throw new \RuntimeException(CategoryCollection::class . ' needs a valid itemTableName.', 1341826168);
+            throw new \RuntimeException(self::class . ' needs a valid itemTableName.', 1341826168);
         }
         if (!empty($fieldName)) {
             $this->setRelationFieldName($fieldName);
@@ -71,7 +71,7 @@ class CategoryCollection extends AbstractRecordCollection implements EditableCol
     {
         /** @var $collection CategoryCollection */
         $collection = GeneralUtility::makeInstance(
-            CategoryCollection::class,
+            self::class,
             $collectionRecord['table_name'],
             $collectionRecord['field_name']
         );
@@ -117,7 +117,7 @@ class CategoryCollection extends AbstractRecordCollection implements EditableCol
     {
         $db = self::getDatabaseConnection();
 
-        $relatedRecords = array();
+        $relatedRecords = [];
         // Assemble where clause
         $where = 'AND ' . self::$storageTableName . '.uid = ' . (int)$this->getIdentifier();
         // Add condition on tablenames fields
@@ -174,11 +174,11 @@ class CategoryCollection extends AbstractRecordCollection implements EditableCol
      */
     protected function getPersistableDataArray()
     {
-        return array(
+        return [
             'title' => $this->getTitle(),
             'description' => $this->getDescription(),
             'items' => $this->getItemUidList(true)
-        );
+        ];
     }
 
     /**
@@ -242,7 +242,7 @@ class CategoryCollection extends AbstractRecordCollection implements EditableCol
      */
     public function getItems()
     {
-        $itemArray = array();
+        $itemArray = [];
         /** @var $item \TYPO3\CMS\Core\Resource\File */
         foreach ($this->storage as $item) {
             $itemArray[] = $item;

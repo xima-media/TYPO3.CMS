@@ -15,7 +15,6 @@ namespace TYPO3\CMS\Backend\Form\Wizard;
  */
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Charset\CharsetConverter;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -71,14 +70,14 @@ class SuggestWizardDefaultReceiver
      *
      * @var array
      */
-    protected $config = array();
+    protected $config = [];
 
     /**
      * The list of pages that are allowed to perform the search for records on
      *
      * @var array Array of PIDs
      */
-    protected $allowedPages = array();
+    protected $allowedPages = [];
 
     /**
      * The maximum number of items to select.
@@ -90,7 +89,7 @@ class SuggestWizardDefaultReceiver
     /**
      * @var array
      */
-    protected $params = array();
+    protected $params = [];
 
     /**
      * @var IconFactory
@@ -149,7 +148,7 @@ class SuggestWizardDefaultReceiver
      */
     public function queryTable(&$params, $recursionCounter = 0)
     {
-        $rows = array();
+        $rows = [];
         $this->params = &$params;
         $start = $recursionCounter * 50;
         $this->prepareSelectStatement();
@@ -157,8 +156,6 @@ class SuggestWizardDefaultReceiver
         $res = $GLOBALS['TYPO3_DB']->exec_SELECTquery('*', $this->table, $this->selectClause, '', $this->orderByStatement, $start . ', 50');
         $allRowsCount = $GLOBALS['TYPO3_DB']->sql_num_rows($res);
         if ($allRowsCount) {
-            /** @var CharsetConverter $charsetConverter */
-            $charsetConverter = GeneralUtility::makeInstance(CharsetConverter::class);
             while ($row = $GLOBALS['TYPO3_DB']->sql_fetch_assoc($res)) {
                 // check if we already have collected the maximum number of records
                 if (count($rows) > $this->maxItems) {
@@ -174,18 +171,19 @@ class SuggestWizardDefaultReceiver
                 $uid = $row['t3ver_oid'] > 0 ? $row['t3ver_oid'] : $row['uid'];
                 $path = $this->getRecordPath($row, $uid);
                 if (strlen($path) > 30) {
+                    $languageService = $this->getLanguageService();
                     $croppedPath = '<abbr title="' . htmlspecialchars($path) . '">' .
                         htmlspecialchars(
-                            $charsetConverter->crop('utf-8', $path, 10)
+                                $languageService->csConvObj->crop($languageService->charSet, $path, 10)
                                 . '...'
-                                . $charsetConverter->crop('utf-8', $path, -20)
+                                . $languageService->csConvObj->crop($languageService->charSet, $path, -20)
                         ) .
                         '</abbr>';
                 } else {
                     $croppedPath = htmlspecialchars($path);
                 }
                 $label = $this->getLabel($row);
-                $entry = array(
+                $entry = [
                     'text' => '<span class="suggest-label">' . $label . '</span><span class="suggest-uid">[' . $uid . ']</span><br />
 								<span class="suggest-path">' . $croppedPath . '</span>',
                     'table' => $this->mmForeignTable ? $this->mmForeignTable : $this->table,
@@ -195,7 +193,7 @@ class SuggestWizardDefaultReceiver
                     'style' => '',
                     'class' => isset($this->config['cssClass']) ? $this->config['cssClass'] : '',
                     'sprite' => $spriteIcon
-                );
+                ];
                 $rows[$this->table . '_' . $uid] = $this->renderRecord($row, $entry);
             }
             $GLOBALS['TYPO3_DB']->sql_free_result($res);
@@ -226,7 +224,7 @@ class SuggestWizardDefaultReceiver
             $selectFieldsList = $GLOBALS['TCA'][$this->table]['ctrl']['label'] . ',' . $GLOBALS['TCA'][$this->table]['ctrl']['label_alt'] . ',' . $this->config['additionalSearchFields'];
             $selectFields = GeneralUtility::trimExplode(',', $selectFieldsList, true);
             $selectFields = array_unique($selectFields);
-            $selectParts = array();
+            $selectParts = [];
             foreach ($selectFields as $field) {
                 $selectParts[] = $field . $likeCondition;
             }
@@ -261,9 +259,9 @@ class SuggestWizardDefaultReceiver
      */
     protected function getAllSubpagesOfPage($uid, $depth = 99)
     {
-        $pageIds = array($uid);
+        $pageIds = [$uid];
         $level = 0;
-        $pages = array($uid);
+        $pages = [$uid];
         // fetch all
         while ($depth - $level > 0 && !empty($pageIds)) {
             ++$level;
@@ -341,6 +339,19 @@ class SuggestWizardDefaultReceiver
     }
 
     /**
+     * Return the icon for a record - just a wrapper for two functions from \TYPO3\CMS\Backend\Utility\IconUtility
+     *
+     * @param array $row The record to get the icon for
+     * @return string The path to the icon
+     * @deprecated since TYPO3 CMS 7, will be removed with TYPO3 CMS 8, use IconFactory::getIconForRecord() directly
+     */
+    protected function getIcon($row)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        return $this->iconFactory->getIconForRecord($this->mmForeignTable ?: $this->table, $row, Icon::SIZE_SMALL)->render();
+    }
+
+    /**
      * Returns the path for a record. Is the whole path for all records except pages - for these the last part is cut
      * off, because it contains the pagetitle itself, which would be double information
      *
@@ -388,13 +399,13 @@ class SuggestWizardDefaultReceiver
     {
         // Call renderlet if available (normal pages etc. usually don't have one)
         if ($this->config['renderFunc'] != '') {
-            $params = array(
+            $params = [
                 'table' => $this->table,
                 'uid' => $row['uid'],
                 'row' => $row,
                 'entry' => &$entry
-            );
-            GeneralUtility::callUserFunction($this->config['renderFunc'], $params, $this);
+            ];
+            GeneralUtility::callUserFunction($this->config['renderFunc'], $params, $this, '');
         }
         return $entry;
     }

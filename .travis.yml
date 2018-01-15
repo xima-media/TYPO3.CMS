@@ -4,8 +4,12 @@ matrix:
   fast_finish: true
 
   include:
+    - php: 5.5
+      env: UNIT_TESTS=yes FUNCTIONAL_TESTS=yes PHP_LINT=yes XLF_CHECK=yes SUBMODULE_TEST=yes
+    - php: 5.6
+      env: UNIT_TESTS=yes FUNCTIONAL_TESTS=yes PHP_LINT=yes
     - php: 7
-      env: UNIT_TESTS=yes FUNCTIONAL_TESTS=yes ACCEPTANCE_TESTS=no PHP_LINT=yes XLF_CHECK=yes SUBMODULE_TEST=yes  EXCEPTIONCODE_TEST=yes
+      env: UNIT_TESTS=yes FUNCTIONAL_TESTS=yes PHP_LINT=yes
 
 sudo: false
 
@@ -13,17 +17,10 @@ addons:
   apt:
     packages:
       - parallel
-      - ack-grep
-      - nginx
-      - realpath
 
 cache:
   directories:
     - $HOME/.composer/cache
-
-env:
-  global:
-    secure: NGVAI0ayw2h9pB2bi2u9AkfV1OKa2LCrGXNtxAvQhFxKW28qmeOUehFuacxpvCI5fA8Ae7oVo2Ba0vcpb5a3uJry1lMpxcn9Ic+voB7SwlCuL6Rx/vntPkYUH+58cC3t40yHKArCUE9KCJA6znNCaZ7MyG6dWHgry0cvAjVOQzE=
 
 services:
   - memcached
@@ -50,45 +47,47 @@ notifications:
 
 before_script:
   - phpenv config-rm xdebug.ini
-  - echo "extension = memcached.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
-  - echo "extension = redis.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
-  - if [ "$GITHUB_COMPOSER_AUTH" ]; then composer config -g github-oauth.github.com $GITHUB_COMPOSER_AUTH; fi
+  - >
+    if [[ "$TRAVIS_PHP_VERSION" < "7" && -e ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini ]]; then
+        echo "extension = memcache.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
+        echo "extension = redis.so" >> ~/.phpenv/versions/$(phpenv version-name)/etc/php.ini
+    fi
+  - rm -rf typo3/sysext/compatibility6
   - composer install
-  - typo3/sysext/core/Build/Configuration/TravisNginxFpm/ConfigureStartNginxFpm.sh
-  - mkdir -p typo3temp/var/tests
-  - export typo3DatabaseName="typo3"
-  - export typo3DatabaseHost="localhost"
-  - export typo3DatabaseUsername="root"
-  - export typo3DatabasePassword=""
 
 script:
   - >
     if [[ "$UNIT_TESTS" == "yes" ]]; then
+      echo;
+      echo "Running unit tests";
       ./bin/phpunit -c typo3/sysext/core/Build/UnitTests.xml
     fi
-
   - >
     if [[ "$FUNCTIONAL_TESTS" == "yes" ]]; then
-        find . -wholename '*typo3/sysext/*/Tests/Functional/*Test.php' | parallel --jobs 6 --gnu 'echo; echo "Running functional test suite {}"; ./bin/phpunit -c typo3/sysext/core/Build/FunctionalTests.xml {}'
+        echo;
+        export typo3DatabaseName="typo3";
+        export typo3DatabaseHost="localhost";
+        export typo3DatabaseUsername="root";
+        export typo3DatabasePassword="";
+        ./typo3/sysext/core/Build/Scripts/splitFunctionalTests.sh 24;
+        parallel --jobs 4 -a <(seq 0 23) --gnu './bin/phpunit -c typo3/sysext/core/Build/FunctionalTests-Job-{}.xml'
     fi
-
-  - >
-    if [[ "$ACCEPTANCE_TESTS" == "yes" ]]; then
-        ./bin/codecept run Acceptance -c typo3/sysext/core/Build/AcceptanceTests.yml --debug
-    fi
-
   - >
     if [[ "$PHP_LINT" == "yes" ]]; then
-        find typo3/ -name \*.php -not -path "vendor/*" | parallel --jobs 6 --gnu php -d display_errors=stderr -l {} > /dev/null \;
+        echo;
+        echo "Running php lint";
+        find typo3/ -name \*.php -not -path "vendor/*" | parallel --gnu php -d display_errors=stderr -l {} > /dev/null \;
     fi
-
   - >
     if [[ "$XLF_CHECK" == "yes" ]]; then
+        echo;
+        echo "Running XLF checker";
         ./typo3/sysext/core/Build/Scripts/xlfcheck.sh
     fi
-
   - >
       if [[ "$SUBMODULE_TEST" == "yes" ]]; then
+          echo;
+          echo "Running git submodule check";
           /bin/bash -c "
               if [[ `git submodule status 2>&1 | wc -l` -ne 0 ]]; then
                   echo \"Found a submodule definition in repository\";
@@ -96,8 +95,3 @@ script:
               fi
           "
       fi
-
-  - >
-    if [[ "$EXCEPTIONCODE_TEST" == "yes" ]]; then
-        ./typo3/sysext/core/Build/Scripts/duplicateExceptionCodeCheck.sh
-    fi

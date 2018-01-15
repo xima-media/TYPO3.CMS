@@ -51,9 +51,9 @@ class SizeViewHelper extends AbstractViewHelper
     public function render($format = true)
     {
         return static::renderStatic(
-            array(
+            [
                 'format' => $format,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

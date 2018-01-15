@@ -146,18 +146,26 @@ class RecordList extends AbstractModule
     public $doc;
 
     /**
+     * Module configuration
+     *
+     * @var array
+     * @deprecated since TYPO3 CMS 7, will be removed in CMS 8.
+     */
+    public $MCONF = [];
+
+    /**
      * Menu configuration
      *
      * @var string[]
      */
-    public $MOD_MENU = array();
+    public $MOD_MENU = [];
 
     /**
      * Module settings (session variable)
      *
      * @var string[]
      */
-    public $MOD_SETTINGS = array();
+    public $MOD_SETTINGS = [];
 
     /**
      * Module output accumulation
@@ -229,7 +237,7 @@ class RecordList extends AbstractModule
         // Initialize menu
         $this->menuConfig();
         // Store session data
-        $backendUser->setAndSaveSessionData(RecordList::class, $sessionData);
+        $backendUser->setAndSaveSessionData(self::class, $sessionData);
         $this->getPageRenderer()->addInlineLanguageLabelFile('EXT:lang/locallang_mod_web_list.xlf');
     }
 
@@ -241,11 +249,11 @@ class RecordList extends AbstractModule
     public function menuConfig()
     {
         // MENU-ITEMS:
-        $this->MOD_MENU = array(
+        $this->MOD_MENU = [
             'bigControlPanel' => '',
             'clipBoard' => '',
             'localization' => ''
-        );
+        ];
         // Loading module configuration:
         $this->modTSconfig = BackendUtility::getModTSconfig($this->id, 'mod.' . $this->moduleName);
         // Clean up settings:
@@ -261,7 +269,8 @@ class RecordList extends AbstractModule
     {
         if ($this->clear_cache) {
             $tce = GeneralUtility::makeInstance(DataHandler::class);
-            $tce->start(array(), array());
+            $tce->stripslashes_values = 0;
+            $tce->start([], []);
             $tce->clear_cacheCmd($this->id);
         }
     }
@@ -336,7 +345,7 @@ class RecordList extends AbstractModule
         $dblist->newWizards = $this->modTSconfig['properties']['newWizards'] ? 1 : 0;
         $dblist->pageRow = $this->pageinfo;
         $dblist->counter++;
-        $dblist->MOD_MENU = array('bigControlPanel' => '', 'clipBoard' => '', 'localization' => '');
+        $dblist->MOD_MENU = ['bigControlPanel' => '', 'clipBoard' => '', 'localization' => ''];
         $dblist->modTSconfig = $this->modTSconfig;
         $clickTitleMode = trim($this->modTSconfig['properties']['clickTitleMode']);
         $dblist->clickTitleMode = $clickTitleMode === '' ? 'edit' : $clickTitleMode;
@@ -378,13 +387,14 @@ class RecordList extends AbstractModule
             if ($this->cmd == 'delete') {
                 $items = $dblist->clipObj->cleanUpCBC(GeneralUtility::_POST('CBC'), $this->cmd_table, 1);
                 if (!empty($items)) {
-                    $cmd = array();
+                    $cmd = [];
                     foreach ($items as $iK => $value) {
                         $iKParts = explode('|', $iK);
                         $cmd[$iKParts[0]][$iKParts[1]]['delete'] = 1;
                     }
                     $tce = GeneralUtility::makeInstance(DataHandler::class);
-                    $tce->start(array(), $cmd);
+                    $tce->stripslashes_values = 0;
+                    $tce->start([], $cmd);
                     $tce->process_cmdmap();
                     if (isset($cmd['pages'])) {
                         BackendUtility::setUpdateSignal('updatePageTree');
@@ -433,7 +443,7 @@ class RecordList extends AbstractModule
 				' . $this->moduleTemplate->redirectUrls($listUrl) . '
 				' . $dblist->CBfunctions() . '
 				function editRecords(table,idList,addParams,CBflag) {	//
-					window.location.href="' . BackendUtility::getModuleUrl('record_edit', array('returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI'))) . '&edit["+table+"]["+idList+"]=edit"+addParams;
+					window.location.href="' . BackendUtility::getModuleUrl('record_edit', ['returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')]) . '&edit["+table+"]["+idList+"]=edit"+addParams;
 				}
 				function editList(table,idList) {	//
 					var list="";
@@ -512,7 +522,7 @@ class RecordList extends AbstractModule
                 $this->body .= '<div class="checkbox">' .
                     '<label for="checkLargeControl">' .
                     BackendUtility::getFuncCheck($this->id, 'SET[bigControlPanel]', $this->MOD_SETTINGS['bigControlPanel'], '', $this->table ? '&table=' . $this->table : '', 'id="checkLargeControl"') .
-                    BackendUtility::wrapInHelp('xMOD_csh_corebe', 'list_options', htmlspecialchars($lang->getLL('largeControl'))) .
+                    BackendUtility::wrapInHelp('xMOD_csh_corebe', 'list_options', $lang->getLL('largeControl', true)) .
                     '</label>' .
                     '</div>';
             }
@@ -523,7 +533,7 @@ class RecordList extends AbstractModule
                     $this->body .= '<div class="checkbox">' .
                         '<label for="checkShowClipBoard">' .
                         BackendUtility::getFuncCheck($this->id, 'SET[clipBoard]', $this->MOD_SETTINGS['clipBoard'], '', $this->table ? '&table=' . $this->table : '', 'id="checkShowClipBoard"') .
-                        BackendUtility::wrapInHelp('xMOD_csh_corebe', 'list_options', htmlspecialchars($lang->getLL('showClipBoard'))) .
+                        BackendUtility::wrapInHelp('xMOD_csh_corebe', 'list_options', $lang->getLL('showClipBoard', true)) .
                         '</label>' .
                         '</div>';
                 }
@@ -534,7 +544,7 @@ class RecordList extends AbstractModule
                 $this->body .= '<div class="checkbox">' .
                     '<label for="checkLocalization">' .
                     BackendUtility::getFuncCheck($this->id, 'SET[localization]', $this->MOD_SETTINGS['localization'], '', $this->table ? '&table=' . $this->table : '', 'id="checkLocalization"') .
-                    BackendUtility::wrapInHelp('xMOD_csh_corebe', 'list_options', htmlspecialchars($lang->getLL('localization'))) .
+                    BackendUtility::wrapInHelp('xMOD_csh_corebe', 'list_options', $lang->getLL('localization', true)) .
                     '</label>' .
                     '</div>';
             }
@@ -551,7 +561,7 @@ class RecordList extends AbstractModule
         $footerContentHook = $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['recordlist/Modules/Recordlist/index.php']['drawFooterHook'];
         if (is_array($footerContentHook)) {
             foreach ($footerContentHook as $hook) {
-                $params = array();
+                $params = [];
                 $this->body .= GeneralUtility::callUserFunction($hook, $params, $this);
             }
         }
@@ -598,6 +608,18 @@ class RecordList extends AbstractModule
         $this->moduleTemplate->setContent($this->content);
         $response->getBody()->write($this->moduleTemplate->renderContent());
         return $response;
+    }
+
+    /**
+     * Outputting the accumulated content to screen
+     *
+     * @return void
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function printContent()
+    {
+        GeneralUtility::logDeprecatedFunction();
+        echo $this->content;
     }
 
     /**

@@ -50,7 +50,7 @@ class FontawesomeIconProviderTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function prepareIconMarkupWithNameReturnsInstanceOfIconWithCorrectMarkup()
     {
-        $this->subject->prepareIconMarkup($this->icon, array('name' => 'times'));
+        $this->subject->prepareIconMarkup($this->icon, ['name' => 'times']);
         $this->assertEquals('<span class="icon-unify"><i class="fa fa-times"></i></span>', $this->icon->getMarkup());
     }
 
@@ -62,25 +62,22 @@ class FontawesomeIconProviderTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function wrongNamesDataProvider()
     {
         return [
-            'name with spaces' => ['name with spaces', 1440754979],
-            'name with spaces and umlauts' => ['name with spaces äöü', 1440754979],
-            'name umlauts' => ['häuser', 1440754979],
-            'name with underscore' => ['name_with_underscore', 1440754979],
-            'name is empty' => ['', 1440754978],
+            'name with spaces' => ['name with spaces'],
+            'name with spaces and umlauts' => ['name with spaces äöü'],
+            'name umlauts' => ['häuser'],
+            'name with underscore' => ['name_with_underscore'],
+            'name is empty' => [''],
         ];
     }
 
     /**
+     * @expectedException \InvalidArgumentException
      * @dataProvider wrongNamesDataProvider
      * @param string $name
-     * @param int $expectedExceptionCode
      * @test
      */
-    public function prepareIconMarkupWithInvalidNameThrowsException($name, $expectedExceptionCode)
+    public function prepareIconMarkupWithInvalidNameThrowsException($name)
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionCode($expectedExceptionCode);
-
         $this->subject->prepareIconMarkup($this->icon, ['name' => $name]);
     }
 }

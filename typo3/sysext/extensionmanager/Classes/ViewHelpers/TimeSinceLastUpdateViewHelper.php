@@ -34,9 +34,9 @@ class TimeSinceLastUpdateViewHelper extends AbstractViewHelper
     public function render($lastUpdateTime)
     {
         return static::renderStatic(
-            array(
+            [
                 'lastUpdateTime' => $lastUpdateTime,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

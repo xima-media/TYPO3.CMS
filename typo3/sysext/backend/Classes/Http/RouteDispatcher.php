@@ -16,7 +16,7 @@ namespace TYPO3\CMS\Backend\Http;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use TYPO3\CMS\Backend\Routing\Exception\RouteNotFoundException;
+use TYPO3\CMS\Backend\Routing\Exception\InvalidRequestTokenException;
 use TYPO3\CMS\Backend\Routing\Route;
 use TYPO3\CMS\Backend\Routing\Router;
 use TYPO3\CMS\Core\FormProtection\FormProtectionFactory;
@@ -35,7 +35,7 @@ class RouteDispatcher extends Dispatcher implements DispatcherInterface
      * @param ServerRequestInterface $request the current server request
      * @param ResponseInterface $response the prepared response
      * @return ResponseInterface the filled response by the callable / controller/action
-     * @throws RouteNotFoundException if the route was not found
+     * @throws InvalidRequestTokenException if the route was not found
      * @throws \InvalidArgumentException if the defined target for the route is invalid
      */
     public function dispatch(ServerRequestInterface $request, ResponseInterface $response)
@@ -46,12 +46,12 @@ class RouteDispatcher extends Dispatcher implements DispatcherInterface
         $route = $router->matchRequest($request);
         $request = $request->withAttribute('route', $route);
         if (!$this->isValidRequest($request)) {
-            throw new RouteNotFoundException('Invalid request for route "' . $route->getPath() . '"', 1425389455);
+            throw new InvalidRequestTokenException('Invalid request for route "' . $route->getPath() . '"', 1425389455);
         }
 
         $targetIdentifier = $route->getOption('target');
         $target = $this->getCallableFromTarget($targetIdentifier);
-        return call_user_func_array($target, array($request, $response));
+        return call_user_func_array($target, [$request, $response]);
     }
 
     /**

@@ -1,7 +1,8 @@
 <f:if condition="{model.showElement}">
 	<f:if condition="{model.additionalArguments.checked} == 'checked'">
 		<li class="csc-form-{model.elementCounter} csc-form-element csc-form-element-{model.elementTypeLowerCase}">
-			{f:render(partial: '{themeName}/Confirmation/AdditionalElements/Label', arguments: {model: model, themeName: themeName})}
+			<label>{model.additionalArguments.label}</label>
+			<f:if condition="{model.additionalArguments.value}">{model.additionalArguments.value}</f:if>
 		</li>
 	</f:if>
 </f:if>

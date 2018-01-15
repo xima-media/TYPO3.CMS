@@ -39,14 +39,14 @@ class DefaultConfiguration extends AbstractStepAction
         switch ($this->postValues['values']['sitesetup']) {
             // Update the admin backend user to show the distribution management on login
             case 'loaddistribution':
-                $adminUserFirstLogin = array(
+                $adminUserFirstLogin = [
                     'startModuleOnFirstLogin' => 'tools_ExtensionmanagerExtensionmanager->tx_extensionmanager_tools_extensionmanagerextensionmanager%5Baction%5D=distributions&tx_extensionmanager_tools_extensionmanagerextensionmanager%5Bcontroller%5D=List',
                     'ucSetByInstallTool' => '1',
-                );
+                ];
                 $this->getDatabaseConnection()->exec_UPDATEquery(
                     'be_users',
                     'admin=1',
-                    array('uc' => serialize($adminUserFirstLogin))
+                    ['uc' => serialize($adminUserFirstLogin)]
                 );
             break;
 
@@ -54,7 +54,7 @@ class DefaultConfiguration extends AbstractStepAction
             case 'createsite':
                 $this->getDatabaseConnection()->exec_INSERTquery(
                     'pages',
-                    array(
+                    [
                         'pid' => 0,
                         'crdate' => time(),
                         'cruser_id' => 1,
@@ -64,10 +64,10 @@ class DefaultConfiguration extends AbstractStepAction
                         'is_siteroot' => 1,
                         'perms_userid' => 1,
                         'perms_groupid' => 1,
-                        'perms_user' => 32,
-                        'perms_group' => 32,
+                        'perms_user' => 31,
+                        'perms_group' => 31,
                         'perms_everybody' => 1
-                    )
+                    ]
                 );
 
                 $pageUid = $this->getDatabaseConnection()->sql_insert_id();
@@ -75,7 +75,7 @@ class DefaultConfiguration extends AbstractStepAction
                 // add a root sys_template with fluid_styled_content and a default PAGE typoscript snippet
                 $this->getDatabaseConnection()->exec_INSERTquery(
                     'sys_template',
-                    array(
+                    [
                         'pid' => $pageUid,
                         'crdate' => time(),
                         'cruser_id' => 1,
@@ -100,7 +100,7 @@ page.100 < styles.content.get',
                         'description' => 'This is an Empty Site Package TypoScript template.
 
 For each website you need a TypoScript template on the main page of your website (on the top level). For better maintenance all TypoScript should be extracted into external files via <INCLUDE_TYPOSCRIPT: source="FILE:EXT:site_myproject/Configuration/TypoScript/setup.ts">.'
-                    )
+                    ]
                 );
             break;
         }
@@ -131,7 +131,7 @@ For each website you need a TypoScript template on the main page of your website
         );
         $formProtection->clean();
 
-        if (!EnableFileService::isInstallToolEnableFilePermanent()) {
+        if (EnableFileService::installToolEnableFileExists() && !EnableFileService::isInstallToolEnableFilePermanent()) {
             EnableFileService::removeInstallToolEnableFile();
         }
 

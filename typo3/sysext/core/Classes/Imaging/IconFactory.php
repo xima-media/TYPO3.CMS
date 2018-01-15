@@ -42,7 +42,7 @@ class IconFactory
      *
      * @var string[]
      */
-    protected $recordStatusMapping = array();
+    protected $recordStatusMapping = [];
 
     /**
      * Order of priorities for overlays.
@@ -50,14 +50,7 @@ class IconFactory
      *
      * @var string[]
      */
-    protected $overlayPriorities = array();
-
-    /**
-     * Runtime icon cache
-     *
-     * @var array
-     */
-    protected static $iconCache = array();
+    protected $overlayPriorities = [];
 
     /**
      * @param IconRegistry $iconRegistry
@@ -84,13 +77,13 @@ class IconFactory
             true
         );
 
-        list($identifier, $size, $overlayIdentifier, $iconState, $alternativeMarkupIdentifier) = $requestedIcon;
+        list($identifier, $size, $overlayIdentifier, $iconState) = $requestedIcon;
         if (empty($overlayIdentifier)) {
             $overlayIdentifier = null;
         }
         $iconState = IconState::cast($iconState);
         $response->getBody()->write(
-            $this->getIcon($identifier, $size, $overlayIdentifier, $iconState)->render($alternativeMarkupIdentifier)
+            $this->getIcon($identifier, $size, $overlayIdentifier, $iconState)->render()
         );
         $response = $response->withHeader('Content-Type', 'text/html; charset=utf-8');
         return $response;
@@ -105,9 +98,12 @@ class IconFactory
      */
     public function getIcon($identifier, $size = Icon::SIZE_DEFAULT, $overlayIdentifier = null, IconState $state = null)
     {
-        $cacheIdentifier = md5($identifier . $size . $overlayIdentifier . (string)$state);
-        if (!empty(static::$iconCache[$cacheIdentifier])) {
-            return static::$iconCache[$cacheIdentifier];
+        if ($this->iconRegistry->isDeprecated($identifier)) {
+            $deprecationSettings = $this->iconRegistry->getDeprecationSettings($identifier);
+            GeneralUtility::deprecationLog(sprintf($deprecationSettings['message'], $identifier));
+            if (!empty($deprecationSettings['replacement'])) {
+                $identifier = $deprecationSettings['replacement'];
+            }
         }
         if (!$this->iconRegistry->isRegistered($identifier)) {
             $identifier = $this->iconRegistry->getDefaultIconIdentifier();
@@ -120,8 +116,6 @@ class IconFactory
         /** @var IconProviderInterface $iconProvider */
         $iconProvider = GeneralUtility::makeInstance($iconConfiguration['provider']);
         $iconProvider->prepareIconMarkup($icon, $iconConfiguration['options']);
-
-        static::$iconCache[$cacheIdentifier] = $icon;
 
         return $icon;
     }
@@ -162,7 +156,7 @@ class IconFactory
      */
     public function mapRecordTypeToIconIdentifier($table, array $row)
     {
-        $recordType = array();
+        $recordType = [];
         $ref = null;
 
         if (isset($GLOBALS['TCA'][$table]['ctrl']['typeicon_column'])) {
@@ -201,7 +195,9 @@ class IconFactory
                     }
                 }
             }
-            if (is_array($GLOBALS['TCA'][$table]['ctrl']['typeicon_classes'])) {
+            if (isset($GLOBALS['TCA'][$table]['ctrl']['typeicon_classes'])
+                && is_array($GLOBALS['TCA'][$table]['ctrl']['typeicon_classes'])
+            ) {
                 foreach ($recordType as $key => $type) {
                     if (isset($GLOBALS['TCA'][$table]['ctrl']['typeicon_classes'][$type])) {
                         $recordType[$key] = $GLOBALS['TCA'][$table]['ctrl']['typeicon_classes'][$type];
@@ -218,7 +214,7 @@ class IconFactory
                     );
                 }
                 if (isset($GLOBALS['TCA'][$table]['ctrl']['typeicon_classes']['userFunc'])) {
-                    $parameters = array('row' => $row);
+                    $parameters = ['row' => $row];
                     $recordType[6] = GeneralUtility::callUserFunction(
                         $GLOBALS['TCA'][$table]['ctrl']['typeicon_classes']['userFunc'],
                         $parameters,
@@ -232,7 +228,9 @@ class IconFactory
                 unset($type);
                 $recordType[0] = 'tcarecords-' . $table . '-default';
             }
-        } elseif (is_array($GLOBALS['TCA'][$table]['ctrl']['typeicon_classes'])) {
+        } elseif (isset($GLOBALS['TCA'][$table]['ctrl']['typeicon_classes'])
+            && is_array($GLOBALS['TCA'][$table]['ctrl']['typeicon_classes'])
+        ) {
             $recordType[0] = $GLOBALS['TCA'][$table]['ctrl']['typeicon_classes']['default'];
         } else {
             $recordType[0] = 'tcarecords-' . $table . '-default';
@@ -261,7 +259,7 @@ class IconFactory
     {
         $tcaCtrl = $GLOBALS['TCA'][$table]['ctrl'];
         // Calculate for a given record the actual visibility at the moment
-        $status = array(
+        $status = [
             'hidden' => false,
             'starttime' => false,
             'endtime' => false,
@@ -269,10 +267,10 @@ class IconFactory
             'fe_group' => false,
             'deleted' => false,
             'protectedSection' => false,
-            'nav_hide' => (bool)$row['nav_hide']
-        );
+            'nav_hide' => !empty($row['nav_hide']),
+        ];
         // Icon state based on "enableFields":
-        if (is_array($tcaCtrl['enablecolumns'])) {
+        if (isset($tcaCtrl['enablecolumns']) && is_array($tcaCtrl['enablecolumns'])) {
             $enableColumns = $tcaCtrl['enablecolumns'];
             // If "hidden" is enabled:
             if (isset($enableColumns['disabled']) && !empty($row[$enableColumns['disabled']])) {
@@ -322,8 +320,8 @@ class IconFactory
         }
 
         // Hook to define an alternative iconName
-        if (!empty($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS'][IconFactory::class]['overrideIconOverlay'])) {
-            $hookObjects = $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS'][IconFactory::class]['overrideIconOverlay'];
+        if (!empty($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS'][self::class]['overrideIconOverlay'])) {
+            $hookObjects = $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS'][self::class]['overrideIconOverlay'];
             foreach ($hookObjects as $classRef) {
                 $hookObject = GeneralUtility::getUserObj($classRef);
                 if (method_exists($hookObject, 'postOverlayPriorityLookup')) {
@@ -371,7 +369,7 @@ class IconFactory
         ResourceInterface $resource,
         $size = Icon::SIZE_DEFAULT,
         $overlayIdentifier = null,
-        array $options = array()
+        array $options = []
     ) {
         $iconIdentifier = null;
 
@@ -467,7 +465,7 @@ class IconFactory
      * @param array $iconConfiguration the icon configuration array
      * @return Icon
      */
-    protected function createIcon($identifier, $size, $overlayIdentifier = null, array $iconConfiguration = array())
+    protected function createIcon($identifier, $size, $overlayIdentifier = null, array $iconConfiguration = [])
     {
         $icon = GeneralUtility::makeInstance(Icon::class);
         $icon->setIdentifier($identifier);
@@ -503,13 +501,13 @@ class IconFactory
         $overlayIdentifier
     ) {
         $result = $this->getSignalSlotDispatcher()->dispatch(
-            IconFactory::class,
+            self::class,
             'buildIconForResourceSignal',
-            array($resource, $size, $options, $iconIdentifier, $overlayIdentifier)
+            [$resource, $size, $options, $iconIdentifier, $overlayIdentifier]
         );
         $iconIdentifier = $result[3];
         $overlayIdentifier = $result[4];
-        return array($iconIdentifier, $overlayIdentifier);
+        return [$iconIdentifier, $overlayIdentifier];
     }
 
     /**
@@ -520,13 +518,5 @@ class IconFactory
     protected function getSignalSlotDispatcher()
     {
         return GeneralUtility::makeInstance(Dispatcher::class);
-    }
-
-    /**
-     * clear icon cache
-     */
-    public function clearIconCache()
-    {
-        static::$iconCache = [];
     }
 }

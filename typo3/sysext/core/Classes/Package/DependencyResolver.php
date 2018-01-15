@@ -25,6 +25,11 @@ use TYPO3\CMS\Core\Service\DependencyOrderingService;
 class DependencyResolver
 {
     /**
+     * Folder with framework extensions
+     */
+    const SYSEXT_FOLDER = 'typo3/sysext';
+
+    /**
      * @var DependencyOrderingService
      */
     protected $dependencyOrderingService;
@@ -44,7 +49,24 @@ class DependencyResolver
      */
     public function sortPackageStatesConfigurationByDependency(array $packageStatesConfiguration)
     {
-        return $this->dependencyOrderingService->calculateOrder($this->buildDependencyGraph($packageStatesConfiguration));
+        // We just want to consider active packages
+        $activePackageStatesConfiguration = array_filter($packageStatesConfiguration, function ($packageState) {
+            return isset($packageState['state']) && $packageState['state'] === 'active';
+        });
+        $inactivePackageStatesConfiguration = array_diff_key($packageStatesConfiguration, $activePackageStatesConfiguration);
+
+        $sortedPackageKeys = $this->dependencyOrderingService->calculateOrder($this->buildDependencyGraph($activePackageStatesConfiguration));
+
+        // Reorder the package states according to the loading order
+        $newPackageStatesConfiguration = [];
+        foreach ($sortedPackageKeys as $packageKey) {
+            $newPackageStatesConfiguration[$packageKey] = $packageStatesConfiguration[$packageKey];
+        }
+
+        // Append the inactive configurations again
+        $newPackageStatesConfiguration = array_merge($newPackageStatesConfiguration, $inactivePackageStatesConfiguration);
+
+        return $newPackageStatesConfiguration;
     }
 
     /**
@@ -151,7 +173,7 @@ class DependencyResolver
      */
     protected function findFrameworkPackages(array $packageStateConfiguration)
     {
-        $frameworkPackageKeys = array();
+        $frameworkPackageKeys = [];
         /** @var PackageManager $packageManager */
         $packageManager = Bootstrap::getInstance()->getEarlyInstance(\TYPO3\CMS\Core\Package\PackageManager::class);
         foreach ($packageStateConfiguration as $packageKey => $packageConfiguration) {

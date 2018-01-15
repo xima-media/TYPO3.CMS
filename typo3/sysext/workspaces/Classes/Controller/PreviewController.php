@@ -16,16 +16,9 @@ namespace TYPO3\CMS\Workspaces\Controller;
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Backend\View\BackendTemplateView;
-use TYPO3\CMS\Core\FormProtection\FormProtectionFactory;
-use TYPO3\CMS\Core\Messaging\FlashMessage;
-use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Extbase\Mvc\View\ViewInterface;
-use TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder;
-use TYPO3\CMS\Workspaces\Service\StagesService;
-use TYPO3\CMS\Workspaces\Service\WorkspaceService;
 
 /**
  * Implements the preview controller of the workspace module.
@@ -33,12 +26,12 @@ use TYPO3\CMS\Workspaces\Service\WorkspaceService;
 class PreviewController extends AbstractController
 {
     /**
-     * @var StagesService
+     * @var \TYPO3\CMS\Workspaces\Service\StagesService
      */
     protected $stageService;
 
     /**
-     * @var WorkspaceService
+     * @var \TYPO3\CMS\Workspaces\Service\WorkspaceService
      */
     protected $workspaceService;
 
@@ -66,17 +59,32 @@ class PreviewController extends AbstractController
     {
         parent::initializeAction();
         $backendRelPath = ExtensionManagementUtility::extRelPath('backend');
-        $this->stageService = GeneralUtility::makeInstance(StagesService::class);
-        $this->workspaceService = GeneralUtility::makeInstance(WorkspaceService::class);
+        $workspacesRelPath = ExtensionManagementUtility::extRelPath('workspaces');
+        $this->stageService = GeneralUtility::makeInstance(\TYPO3\CMS\Workspaces\Service\StagesService::class);
+        $this->workspaceService = GeneralUtility::makeInstance(\TYPO3\CMS\Workspaces\Service\WorkspaceService::class);
         $this->pageRenderer->addJsFile($backendRelPath . 'Resources/Public/JavaScript/ExtDirect.StateProvider.js');
-        $this->pageRenderer->loadExtJS(false, false);
+        $resourcePath = $workspacesRelPath . 'Resources/Public/Css/preview.css';
+        $GLOBALS['TBE_STYLES']['extJS']['theme'] = $resourcePath;
+        $this->pageRenderer->loadExtJS();
         // Load  JavaScript:
-        $this->pageRenderer->addExtDirectCode(array(
+        $this->pageRenderer->addExtDirectCode([
             'TYPO3.Workspaces',
             'TYPO3.ExtDirectStateProvider'
-        ));
-        $states = $this->getBackendUser()->uc['moduleData']['Workspaces']['States'];
+        ]);
+        $states = $GLOBALS['BE_USER']->uc['moduleData']['Workspaces']['States'];
         $this->pageRenderer->addInlineSetting('Workspaces', 'States', $states);
+        $this->pageRenderer->addJsFile($backendRelPath . 'Resources/Public/JavaScript/notifications.js');
+        $this->pageRenderer->addJsFile($backendRelPath . 'Resources/Public/JavaScript/iframepanel.js');
+        $resourcePathJavaScript = $workspacesRelPath . 'Resources/Public/JavaScript/';
+        $jsFiles = [
+            'Ext.ux.plugins.TabStripContainer.js',
+            'Store/mainstore.js',
+            'helpers.js',
+            'actions.js'
+        ];
+        foreach ($jsFiles as $jsFile) {
+            $this->pageRenderer->addJsFile($resourcePathJavaScript . $jsFile);
+        }
         $this->pageRenderer->addInlineSetting('FormEngine', 'moduleUrl', BackendUtility::getModuleUrl('record_edit'));
         $this->pageRenderer->addInlineSetting('RecordHistory', 'moduleUrl', BackendUtility::getModuleUrl('record_history'));
         // @todo this part should be done with inlineLocallanglabels
@@ -93,103 +101,81 @@ class PreviewController extends AbstractController
      */
     public function indexAction($previewWS = null)
     {
-        $backendUser = $this->getBackendUser();
-
         // Get all the GET parameters to pass them on to the frames
         $queryParameters = GeneralUtility::_GET();
-
-        // Remove the GET parameters related to the workspaces module and the page id
+            // Remove the GET parameters related to the workspaces module and the page id
         unset($queryParameters['tx_workspaces_web_workspacesworkspaces']);
         unset($queryParameters['M']);
         unset($queryParameters['id']);
-
-        // Assemble a query string from the retrieved parameters
+            // Assemble a query string from the retrieved parameters
         $queryString = GeneralUtility::implodeArrayForUrl('', $queryParameters);
 
         // fetch the next and previous stage
         $workspaceItemsArray = $this->workspaceService->selectVersionsInWorkspace($this->stageService->getWorkspaceId(), ($filter = 1), ($stage = -99), $this->pageId, ($recursionLevel = 0), ($selectionType = 'tables_modify'));
         list(, $nextStage) = $this->stageService->getNextStageForElementCollection($workspaceItemsArray);
         list(, $previousStage) = $this->stageService->getPreviousStageForElementCollection($workspaceItemsArray);
-        /** @var $wsService WorkspaceService */
-        $wsService = GeneralUtility::makeInstance(WorkspaceService::class);
+        /** @var $wsService \TYPO3\CMS\Workspaces\Service\WorkspaceService */
+        $wsService = GeneralUtility::makeInstance(\TYPO3\CMS\Workspaces\Service\WorkspaceService::class);
         $wsList = $wsService->getAvailableWorkspaces();
-        $activeWorkspace = $backendUser->workspace;
+        $activeWorkspace = $GLOBALS['BE_USER']->workspace;
         if (!is_null($previewWS)) {
             if (in_array($previewWS, array_keys($wsList)) && $activeWorkspace != $previewWS) {
                 $activeWorkspace = $previewWS;
-                $backendUser->setWorkspace($activeWorkspace);
+                $GLOBALS['BE_USER']->setWorkspace($activeWorkspace);
                 BackendUtility::setUpdateSignal('updatePageTree');
             }
         }
-        /** @var $uriBuilder UriBuilder */
-        $uriBuilder = $this->objectManager->get(UriBuilder::class);
+        /** @var $uriBuilder \TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder */
+        $uriBuilder = $this->objectManager->get(\TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder::class);
         $wsSettingsPath = GeneralUtility::getIndpEnv('TYPO3_SITE_URL');
-        $wsSettingsUri = $uriBuilder->uriFor('singleIndex', array(), ReviewController::class, 'workspaces', 'web_workspacesworkspaces');
+        $wsSettingsUri = $uriBuilder->uriFor('singleIndex', [], \TYPO3\CMS\Workspaces\Controller\ReviewController::class, 'workspaces', 'web_workspacesworkspaces');
         $wsSettingsParams = '&tx_workspaces_web_workspacesworkspaces[controller]=Review';
         $wsSettingsUrl = $wsSettingsPath . $wsSettingsUri . $wsSettingsParams;
         $viewDomain = BackendUtility::getViewDomain($this->pageId);
         $wsBaseUrl = $viewDomain . '/index.php?id=' . $this->pageId . $queryString;
         // @todo - handle new pages here
         // branchpoints are not handled anymore because this feature is not supposed anymore
-        if (WorkspaceService::isNewPage($this->pageId)) {
-            $wsNewPageUri = $uriBuilder->uriFor('newPage', array(), PreviewController::class, 'workspaces', 'web_workspacesworkspaces');
+        if (\TYPO3\CMS\Workspaces\Service\WorkspaceService::isNewPage($this->pageId)) {
+            $wsNewPageUri = $uriBuilder->uriFor('newPage', [], \TYPO3\CMS\Workspaces\Controller\PreviewController::class, 'workspaces', 'web_workspacesworkspaces');
             $wsNewPageParams = '&tx_workspaces_web_workspacesworkspaces[controller]=Preview';
-            $liveUrl = $wsSettingsPath . $wsNewPageUri . $wsNewPageParams . '&ADMCMD_prev=IGNORE';
+            $this->view->assign('liveUrl', $wsSettingsPath . $wsNewPageUri . $wsNewPageParams . '&ADMCMD_prev=IGNORE');
         } else {
-            $liveUrl = $wsBaseUrl . '&ADMCMD_noBeUser=1&ADMCMD_prev=IGNORE';
+            $this->view->assign('liveUrl', $wsBaseUrl . '&ADMCMD_noBeUser=1&ADMCMD_prev=IGNORE');
         }
-        $wsUrl = $wsBaseUrl . '&ADMCMD_prev=IGNORE&ADMCMD_view=1&ADMCMD_editIcons=1&ADMCMD_previewWS=' . $backendUser->workspace;
-        $backendDomain = GeneralUtility::getIndpEnv('TYPO3_HOST_ONLY');
+        $this->view->assign('wsUrl', $wsBaseUrl . '&ADMCMD_prev=IGNORE&ADMCMD_view=1&ADMCMD_editIcons=1&ADMCMD_previewWS=' . $GLOBALS['BE_USER']->workspace);
+        $this->view->assign('wsSettingsUrl', $wsSettingsUrl);
+        $this->view->assign('backendDomain', GeneralUtility::getIndpEnv('TYPO3_HOST_ONLY'));
         $splitPreviewTsConfig = BackendUtility::getModTSconfig($this->pageId, 'workspaces.splitPreviewModes');
         $splitPreviewModes = GeneralUtility::trimExplode(',', $splitPreviewTsConfig['value']);
-        $allPreviewModes = array('slider', 'vbox', 'hbox');
+        $allPreviewModes = ['slider', 'vbox', 'hbox'];
         if (!array_intersect($splitPreviewModes, $allPreviewModes)) {
             $splitPreviewModes = $allPreviewModes;
         }
-
-        $wsList = $wsService->getAvailableWorkspaces();
-        $activeWorkspace = $backendUser->workspace;
-
-        $this->pageRenderer->loadRequireJsModule('TYPO3/CMS/Workspaces/Preview');
         $this->pageRenderer->addInlineSetting('Workspaces', 'SplitPreviewModes', $splitPreviewModes);
-        $this->pageRenderer->addInlineSetting('Workspaces', 'token', FormProtectionFactory::get('backend')->generateToken('extDirect'));
-
-        $cssFile = 'EXT:workspaces/Resources/Public/Css/preview.css';
-        $cssFile = GeneralUtility::getFileAbsFileName($cssFile);
-        $this->pageRenderer->addCssFile(PathUtility::getAbsoluteWebPath($cssFile));
-
-        $backendUser->setAndSaveSessionData('workspaces.backend_domain', GeneralUtility::getIndpEnv('TYPO3_HOST_ONLY'));
-
-        $logoPath = GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Public/Images/typo3-topbar@2x.png');
-        list($logoWidth, $logoHeight) = @getimagesize($logoPath);
-
-        // High-resolution?
-        $logoWidth = $logoWidth/2;
-        $logoHeight = $logoHeight/2;
-
-        $this->view->assignMultiple([
-            'logoUrl' => PathUtility::getAbsoluteWebPath($logoPath),
-            'logoLink' => TYPO3_URL_GENERAL,
-            'logoWidth' => $logoWidth,
-            'logoHeight' => $logoHeight,
-            'liveUrl' => $liveUrl,
-            'wsUrl' => $wsUrl,
-            'wsSettingsUrl' => $wsSettingsUrl,
-            'backendDomain' => $backendDomain,
-            'activeWorkspace' => $wsList[$activeWorkspace],
-            'splitPreviewModes' => $splitPreviewModes,
-            'firstPreviewMode' => current($splitPreviewModes),
-            'enablePreviousStageButton' => !$this->isInvalidStage($previousStage),
-            'enableNextStageButton' => !$this->isInvalidStage($nextStage),
-            'enableDiscardStageButton' => !$this->isInvalidStage($nextStage) || !$this->isInvalidStage($previousStage),
-            'nextStage' => $nextStage['title'],
-            'nextStageId' => $nextStage['uid'],
-            'prevStage' => $previousStage['title'],
-            'prevStageId' => $previousStage['uid'],
-        ]);
-        foreach ($this->getAdditionalResourceService()->getLocalizationResources() as $localizationResource) {
-            $this->pageRenderer->addInlineLanguageLabelFile($localizationResource);
-        }
+        $GLOBALS['BE_USER']->setAndSaveSessionData('workspaces.backend_domain', GeneralUtility::getIndpEnv('TYPO3_HOST_ONLY'));
+        $this->pageRenderer->addInlineSetting('Workspaces', 'disableNextStageButton', $this->isInvalidStage($nextStage));
+        $this->pageRenderer->addInlineSetting('Workspaces', 'disablePreviousStageButton', $this->isInvalidStage($previousStage));
+        $this->pageRenderer->addInlineSetting('Workspaces', 'disableDiscardStageButton', $this->isInvalidStage($nextStage) && $this->isInvalidStage($previousStage));
+        $resourcePath = ExtensionManagementUtility::extRelPath('lang') . 'Resources/Public/JavaScript/';
+        $this->pageRenderer->addJsFile($resourcePath . 'Typo3Lang.js');
+        $this->pageRenderer->addJsInlineCode('workspaces.preview.lll', '
+		TYPO3.lang = {
+			visualPreview: ' . GeneralUtility::quoteJSvalue($GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:preview.visualPreview', true)) . ',
+			listView: ' . GeneralUtility::quoteJSvalue($GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:preview.listView', true)) . ',
+			livePreview: ' . GeneralUtility::quoteJSvalue($GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:preview.livePreview', true)) . ',
+			livePreviewDetail: ' . GeneralUtility::quoteJSvalue($GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:preview.livePreviewDetail', true)) . ',
+			workspacePreview: ' . GeneralUtility::quoteJSvalue($GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:preview.workspacePreview', true)) . ',
+			workspacePreviewDetail: ' . GeneralUtility::quoteJSvalue($GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:preview.workspacePreviewDetail', true)) . ',
+			modeSlider: ' . GeneralUtility::quoteJSvalue($GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:preview.modeSlider', true)) . ',
+			modeVbox: ' . GeneralUtility::quoteJSvalue($GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:preview.modeVbox', true)) . ',
+			modeHbox: ' . GeneralUtility::quoteJSvalue($GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:preview.modeHbox', true)) . ',
+			discard: ' . GeneralUtility::quoteJSvalue($GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:label_doaction_discard', true)) . ',
+			nextStage: ' . GeneralUtility::quoteJSvalue($nextStage['title']) . ',
+			previousStage: ' . GeneralUtility::quoteJSvalue($previousStage['title']) . '
+		};TYPO3.l10n.initialize();
+');
+        $resourcePath = ExtensionManagementUtility::extRelPath('workspaces') . 'Resources/Public/';
+        $this->pageRenderer->addJsFile($resourcePath . 'JavaScript/preview.js');
     }
 
     /**
@@ -208,10 +194,9 @@ class PreviewController extends AbstractController
      */
     public function newPageAction()
     {
-        /** @var FlashMessage $flashMessage */
-        $flashMessage = GeneralUtility::makeInstance(FlashMessage::class, $this->getLanguageService()->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:info.newpage.detail'), $this->getLanguageService()->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:info.newpage'), FlashMessage::INFO);
-        /** @var $flashMessageService FlashMessageService */
-        $flashMessageService = GeneralUtility::makeInstance(FlashMessageService::class);
+        $flashMessage = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Messaging\FlashMessage::class, $GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:info.newpage.detail'), $GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:info.newpage'), \TYPO3\CMS\Core\Messaging\FlashMessage::INFO);
+        /** @var $flashMessageService \TYPO3\CMS\Core\Messaging\FlashMessageService */
+        $flashMessageService = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Messaging\FlashMessageService::class);
         /** @var $defaultFlashMessageQueue \TYPO3\CMS\Core\Messaging\FlashMessageQueue */
         $defaultFlashMessageQueue = $flashMessageService->getMessageQueueByIdentifier();
         $defaultFlashMessageQueue->enqueue($flashMessage);
@@ -226,58 +211,86 @@ class PreviewController extends AbstractController
      */
     protected function generateJavascript()
     {
-        $backendUser = $this->getBackendUser();
-        $lang = $this->getLanguageService();
+        $pathTYPO3 = GeneralUtility::dirname(GeneralUtility::getIndpEnv('SCRIPT_NAME')) . '/';
         // If another page module was specified, replace the default Page module with the new one
-        $newPageModule = trim($backendUser->getTSConfigVal('options.overridePageModule'));
+        $newPageModule = trim($GLOBALS['BE_USER']->getTSConfigVal('options.overridePageModule'));
         $pageModule = BackendUtility::isModuleSetInTBE_MODULES($newPageModule) ? $newPageModule : 'web_layout';
-        if (!$backendUser->check('modules', $pageModule)) {
+        if (!$GLOBALS['BE_USER']->check('modules', $pageModule)) {
             $pageModule = '';
         }
-        $t3Configuration = array(
+        $t3Configuration = [
             'siteUrl' => GeneralUtility::getIndpEnv('TYPO3_SITE_URL'),
-            'username' => htmlspecialchars($backendUser->user['username']),
+            'PATH_typo3' => $pathTYPO3,
+            'PATH_typo3_enc' => rawurlencode($pathTYPO3),
+            'username' => htmlspecialchars($GLOBALS['BE_USER']->user['username']),
             'uniqueID' => GeneralUtility::shortMD5(uniqid('', true)),
+            'securityLevel' => trim($GLOBALS['TYPO3_CONF_VARS']['BE']['loginSecurityLevel']) ?: 'normal',
+            'TYPO3_mainDir' => TYPO3_mainDir,
             'pageModule' => $pageModule,
-            'inWorkspace' => $backendUser->workspace !== 0,
-            'workspaceFrontendPreviewEnabled' => $backendUser->user['workspace_preview'] ? 1 : 0,
+            'inWorkspace' => $GLOBALS['BE_USER']->workspace !== 0,
+            'workspaceFrontendPreviewEnabled' => $GLOBALS['BE_USER']->user['workspace_preview'] ? 1 : 0,
+            'veriCode' => $GLOBALS['BE_USER']->veriCode(),
+            'denyFileTypes' => PHP_EXTENSIONS_DEFAULT,
+            'moduleMenuWidth' => $this->menuWidth - 1,
             'topBarHeight' => isset($GLOBALS['TBE_STYLES']['dims']['topFrameH']) ? (int)$GLOBALS['TBE_STYLES']['dims']['topFrameH'] : 30,
             'showRefreshLoginPopup' => isset($GLOBALS['TYPO3_CONF_VARS']['BE']['showRefreshLoginPopup']) ? (int)$GLOBALS['TYPO3_CONF_VARS']['BE']['showRefreshLoginPopup'] : false,
-            'debugInWindow' => $backendUser->uc['debugInWindow'] ? 1 : 0,
-            'ContextHelpWindows' => array(
+            'debugInWindow' => $GLOBALS['BE_USER']->uc['debugInWindow'] ? 1 : 0,
+            'ContextHelpWindows' => [
                 'width' => 600,
                 'height' => 400
-            )
-        );
-
+            ]
+        ];
+        $t3LLLcore = [
+            'waitTitle' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_logging_in'),
+            'refresh_login_failed' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_failed'),
+            'refresh_login_failed_message' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_failed_message'),
+            'refresh_login_title' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_title'),
+            'login_expired' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.login_expired'),
+            'refresh_login_username' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_username'),
+            'refresh_login_password' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_password'),
+            'refresh_login_emptyPassword' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_emptyPassword'),
+            'refresh_login_button' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_button'),
+            'refresh_logout_button' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_logout_button'),
+            'refresh_exit_button' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_exit_button'),
+            'please_wait' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.please_wait'),
+            'loadingIndicator' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:loadingIndicator'),
+            'be_locked' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.be_locked'),
+            'refresh_login_countdown_singular' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_countdown_singular'),
+            'refresh_login_countdown' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_countdown'),
+            'login_about_to_expire' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.login_about_to_expire'),
+            'login_about_to_expire_title' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.login_about_to_expire_title'),
+            'refresh_login_refresh_button' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_login_refresh_button'),
+            'refresh_direct_logout_button' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:mess.refresh_direct_logout_button'),
+            'tabs_closeAll' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:tabs.closeAll'),
+            'tabs_closeOther' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:tabs.closeOther'),
+            'tabs_close' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:tabs.close'),
+            'tabs_openInBrowserWindow' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:tabs.openInBrowserWindow'),
+            'donateWindow_title' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:donateWindow.title'),
+            'donateWindow_message' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:donateWindow.message'),
+            'donateWindow_button_donate' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:donateWindow.button_donate'),
+            'donateWindow_button_disable' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:donateWindow.button_disable'),
+            'donateWindow_button_postpone' => $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_core.xlf:donateWindow.button_postpone')
+        ];
         return '
 		TYPO3.configuration = ' . json_encode($t3Configuration) . ';
+		TYPO3.LLL = {
+			core : ' . json_encode($t3LLLcore) . '
+		};
 
 		/**
 		 * TypoSetup object.
 		 */
 		function typoSetup()	{	//
+			this.PATH_typo3 = TYPO3.configuration.PATH_typo3;
+			this.PATH_typo3_enc = TYPO3.configuration.PATH_typo3_enc;
 			this.username = TYPO3.configuration.username;
 			this.uniqueID = TYPO3.configuration.uniqueID;
+			this.securityLevel = TYPO3.configuration.securityLevel;
+			this.veriCode = TYPO3.configuration.veriCode;
+			this.denyFileTypes = TYPO3.configuration.denyFileTypes;
 		}
 		var TS = new typoSetup();
 			//backwards compatibility
 		';
-    }
-
-    /**
-     * @return \TYPO3\CMS\Lang\LanguageService
-     */
-    protected function getLanguageService()
-    {
-        return $GLOBALS['LANG'];
-    }
-
-    /**
-     * @return \TYPO3\CMS\Core\Authentication\BackendUserAuthentication
-     */
-    protected function getBackendUser()
-    {
-        return $GLOBALS['BE_USER'];
     }
 }

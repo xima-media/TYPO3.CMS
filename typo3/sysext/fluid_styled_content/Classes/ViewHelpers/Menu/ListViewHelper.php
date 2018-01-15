@@ -48,7 +48,7 @@ class ListViewHelper extends AbstractMenuViewHelper
     {
         $this->registerArgument('as', 'string', 'Name of template variable which will contain selected pages', true);
         $this->registerArgument('levelAs', 'string', 'Name of template variable which will contain current level', false, null);
-        $this->registerArgument('pageUids', 'array', 'Page UIDs of parent pages', false, array());
+        $this->registerArgument('pageUids', 'array', 'Page UIDs of parent pages', false, []);
         $this->registerArgument('entryLevel', 'integer', 'The entry level', false, null);
         $this->registerArgument('maximumLevel', 'integer', 'Maximum level for rendering of nested menus', false, 10);
         $this->registerArgument('includeNotInMenu', 'boolean', 'Include pages that are marked "hide in menu"?', false, false);
@@ -73,12 +73,24 @@ class ListViewHelper extends AbstractMenuViewHelper
         $includeMenuSeparator = (bool)$this->arguments['includeMenuSeparator'];
 
         $pageUids = $this->getPageUids($pageUids, $entryLevel);
+        if (empty($pageUids)) {
+            return '';
+        }
+
         $pages = $typoScriptFrontendController->sys_page->getMenuForPages(
             $pageUids,
             '*',
             '',
             $this->getPageConstraints($includeNotInMenu, $includeMenuSeparator)
         );
+
+        $tempPagesForSort = [];
+        foreach ($pageUids as $pageUid) {
+            if ($pages[$pageUid]) {
+                $tempPagesForSort[$pageUid] = $pages[$pageUid];
+            }
+        }
+        $pages = $tempPagesForSort;
 
         $output = '';
 
@@ -94,9 +106,9 @@ class ListViewHelper extends AbstractMenuViewHelper
                 return '';
             }
 
-            $variables = array(
+            $variables = [
                 $as => $pages
-            );
+            ];
             if (!empty($levelAs)) {
                 $variables[$levelAs] = $typoScriptFrontendController->register['ceMenuLevel_list'];
             }

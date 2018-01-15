@@ -44,7 +44,7 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
      *
      * @var array
      */
-    protected $supportedHashAlgorithms = array('sha1', 'md5');
+    protected $supportedHashAlgorithms = ['sha1', 'md5'];
 
     /**
      * The base URL that points to this driver's storage. As long is this
@@ -54,17 +54,22 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
      */
     protected $baseUri = null;
 
+    /**
+     * @var \TYPO3\CMS\Core\Charset\CharsetConverter
+     */
+    protected $charsetConversion;
+
     /** @var array */
-    protected $mappingFolderNameToRole = array(
+    protected $mappingFolderNameToRole = [
         '_recycler_' => FolderInterface::ROLE_RECYCLER,
         '_temp_' => FolderInterface::ROLE_TEMPORARY,
         'user_upload' => FolderInterface::ROLE_USERUPLOAD,
-    );
+    ];
 
     /**
      * @param array $configuration
      */
-    public function __construct(array $configuration = array())
+    public function __construct(array $configuration = [])
     {
         parent::__construct($configuration);
         // The capabilities default of this driver. See CAPABILITY_* constants for possible values
@@ -235,7 +240,7 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
             GeneralUtility::mkdir($this->getAbsolutePath($newIdentifier));
         } else {
             $parts = GeneralUtility::trimExplode('/', $newFolderName);
-            $parts = array_map(array($this, 'sanitizeFileName'), $parts);
+            $parts = array_map([$this, 'sanitizeFileName'], $parts);
             $newFolderName = implode('/', $parts);
             $newIdentifier = $parentFolderIdentifier . $newFolderName . '/';
             GeneralUtility::mkdir_deep($this->getAbsolutePath($parentFolderIdentifier) . '/', $newFolderName);
@@ -251,7 +256,7 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
      * @return array
      * @throws \InvalidArgumentException
      */
-    public function getFileInfoByIdentifier($fileIdentifier, array $propertiesToExtract = array())
+    public function getFileInfoByIdentifier($fileIdentifier, array $propertiesToExtract = [])
     {
         $absoluteFilePath = $this->getAbsolutePath($fileIdentifier);
         // don't use $this->fileExists() because we need the absolute path to the file anyways, so we can directly
@@ -282,14 +287,11 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
                 1314516810
             );
         }
-        $absolutePath = $this->getAbsolutePath($folderIdentifier);
-        return array(
+        return [
             'identifier' => $folderIdentifier,
             'name' => PathUtility::basename($folderIdentifier),
-            'mtime' => filemtime($absolutePath),
-            'ctime' => filectime($absolutePath),
             'storage' => $this->storageUid
-        );
+        ];
     }
 
     /**
@@ -300,18 +302,30 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
      * Previously in \TYPO3\CMS\Core\Utility\File\BasicFileUtility::cleanFileName()
      *
      * @param string $fileName Input string, typically the body of a fileName
-     * @param string $charset Charset of the a fileName (defaults to utf-8)
+     * @param string $charset Charset of the a fileName (defaults to current charset; depending on context)
      * @return string Output string with any characters not matching [.a-zA-Z0-9_-] is substituted by '_' and trailing dots removed
      * @throws Exception\InvalidFileNameException
      */
-    public function sanitizeFileName($fileName, $charset = 'utf-8')
+    public function sanitizeFileName($fileName, $charset = '')
     {
         // Handle UTF-8 characters
         if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['UTF8filesystem']) {
             // Allow ".", "-", 0-9, a-z, A-Z and everything beyond U+C0 (latin capital letter a with grave)
             $cleanFileName = preg_replace('/[' . self::UNSAFE_FILENAME_CHARACTER_EXPRESSION . ']/u', '_', trim($fileName));
         } else {
-            $fileName = $this->getCharsetConversion()->specCharsToASCII($charset, $fileName);
+            // Define character set
+            if (!$charset) {
+                if (TYPO3_MODE === 'FE') {
+                    $charset = $GLOBALS['TSFE']->renderCharset;
+                } else {
+                    // default for Backend
+                    $charset = 'utf-8';
+                }
+            }
+            // If a charset was found, convert fileName
+            if ($charset) {
+                $fileName = $this->getCharsetConversion()->specCharsToASCII($charset, $fileName);
+            }
             // Replace unwanted characters by underscores
             $cleanFileName = preg_replace('/[' . self::UNSAFE_FILENAME_CHARACTER_EXPRESSION . '\\xC0-\\xFF]/', '_', trim($fileName));
         }
@@ -359,35 +373,40 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
         $items = $this->retrieveFileAndFoldersInPath($realPath, $recursive, $includeFiles, $includeDirs, $sort, $sortRev);
         $iterator = new \ArrayIterator($items);
         if ($iterator->count() === 0) {
-            return array();
+            return [];
         }
-        $iterator->seek($start);
 
         // $c is the counter for how many items we still have to fetch (-1 is unlimited)
         $c = $numberOfItems > 0 ? $numberOfItems : - 1;
-        $items = array();
+        $items = [];
         while ($iterator->valid() && ($numberOfItems === 0 || $c > 0)) {
             // $iteratorItem is the file or folder name
             $iteratorItem = $iterator->current();
             // go on to the next iterator item now as we might skip this one early
             $iterator->next();
 
-            if (
-                !$this->applyFilterMethodsToDirectoryItem(
-                    $filterMethods,
-                    $iteratorItem['name'],
-                    $iteratorItem['identifier'],
-                    $this->getParentFolderIdentifierOfIdentifier($iteratorItem['identifier'])
-                )
-            ) {
-                continue;
+            try {
+                if (
+                    !$this->applyFilterMethodsToDirectoryItem(
+                        $filterMethods,
+                        $iteratorItem['name'],
+                        $iteratorItem['identifier'],
+                        $this->getParentFolderIdentifierOfIdentifier($iteratorItem['identifier'])
+                    )
+                ) {
+                    continue;
+                }
+                if ($start > 0) {
+                    $start--;
+                } else {
+                    $items[$iteratorItem['identifier']] = $iteratorItem['identifier'];
+                    // Decrement item counter to make sure we only return $numberOfItems
+                    // we cannot do this earlier in the method (unlike moving the iterator forward) because we only add the
+                    // item here
+                    --$c;
+                }
+            } catch (Exception\InvalidPathException $e) {
             }
-
-            $items[$iteratorItem['identifier']] = $iteratorItem['identifier'];
-            // Decrement item counter to make sure we only return $numberOfItems
-            // we cannot do this earlier in the method (unlike moving the iterator forward) because we only add the
-            // item here
-            --$c;
         }
         return $items;
     }
@@ -407,7 +426,7 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
     {
         foreach ($filterMethods as $filter) {
             if (is_callable($filter)) {
-                $result = call_user_func($filter, $itemName, $itemIdentifier, $parentIdentifier, array(), $this);
+                $result = call_user_func($filter, $itemName, $itemIdentifier, $parentIdentifier, [], $this);
                 // We have to use -1 as the „don't include“ return value, as call_user_func() will return FALSE
                 // If calling the method succeeded and thus we can't use that as a return value.
                 if ($result === -1) {
@@ -448,7 +467,7 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
      * @param bool $sortRev TRUE to indicate reverse sorting (last to first)
      * @return array of FileIdentifiers
      */
-    public function getFilesInFolder($folderIdentifier, $start = 0, $numberOfItems = 0, $recursive = false, array $filenameFilterCallbacks = array(), $sort = '', $sortRev = false)
+    public function getFilesInFolder($folderIdentifier, $start = 0, $numberOfItems = 0, $recursive = false, array $filenameFilterCallbacks = [], $sort = '', $sortRev = false)
     {
         return $this->getDirectoryItemList($folderIdentifier, $start, $numberOfItems, $filenameFilterCallbacks, true, false, $recursive, $sort, $sortRev);
     }
@@ -461,7 +480,7 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
      * @param array $filenameFilterCallbacks callbacks for filtering the items
      * @return int Number of files in folder
      */
-    public function countFilesInFolder($folderIdentifier, $recursive = false, array $filenameFilterCallbacks = array())
+    public function countFilesInFolder($folderIdentifier, $recursive = false, array $filenameFilterCallbacks = [])
     {
         return count($this->getFilesInFolder($folderIdentifier, 0, 0, $recursive, $filenameFilterCallbacks));
     }
@@ -482,7 +501,7 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
      * @param bool $sortRev TRUE to indicate reverse sorting (last to first)
      * @return array of Folder Identifier
      */
-    public function getFoldersInFolder($folderIdentifier, $start = 0, $numberOfItems = 0, $recursive = false, array $folderNameFilterCallbacks = array(), $sort = '', $sortRev = false)
+    public function getFoldersInFolder($folderIdentifier, $start = 0, $numberOfItems = 0, $recursive = false, array $folderNameFilterCallbacks = [], $sort = '', $sortRev = false)
     {
         return $this->getDirectoryItemList($folderIdentifier, $start, $numberOfItems, $folderNameFilterCallbacks, false, true, $recursive, $sort, $sortRev);
     }
@@ -495,7 +514,7 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
      * @param array   $folderNameFilterCallbacks callbacks for filtering the items
      * @return int Number of folders in folder
      */
-    public function countFoldersInFolder($folderIdentifier, $recursive = false, array $folderNameFilterCallbacks = array())
+    public function countFoldersInFolder($folderIdentifier, $recursive = false, array $folderNameFilterCallbacks = [])
     {
         return count($this->getFoldersInFolder($folderIdentifier, 0, 0, $recursive, $folderNameFilterCallbacks));
     }
@@ -522,13 +541,14 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
         if ($recursive) {
             $iterator = new \RecursiveIteratorIterator(
                 new \RecursiveDirectoryIterator($path, $iteratorMode),
-                \RecursiveIteratorIterator::SELF_FIRST
+                \RecursiveIteratorIterator::SELF_FIRST,
+                \RecursiveIteratorIterator::CATCH_GET_CHILD
             );
         } else {
             $iterator = new \RecursiveDirectoryIterator($path, $iteratorMode);
         }
 
-        $directoryEntries = array();
+        $directoryEntries = [];
         while ($iterator->valid()) {
             /** @var $entry \SplFileInfo */
             $entry = $iterator->current();
@@ -543,11 +563,11 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
             if ($entry->isDir()) {
                 $entryIdentifier .= '/';
             }
-            $entryArray = array(
+            $entryArray = [
                 'identifier' => $entryIdentifier,
                 'name' => $entryName,
                 'type' => $entry->isDir() ? 'dir' : 'file'
-            );
+            ];
             $directoryEntries[$entryIdentifier] = $entryArray;
             $iterator->next();
         }
@@ -569,7 +589,7 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
      */
     protected function sortDirectoryEntries($directoryEntries, $sort = '', $sortRev = false)
     {
-        $entriesToSort = array();
+        $entriesToSort = [];
         foreach ($directoryEntries as $entryArray) {
             $dir      = pathinfo($entryArray['name'], PATHINFO_DIRNAME) . '/';
             $fullPath = $this->getAbsoluteBasePath() . $entryArray['identifier'];
@@ -626,15 +646,15 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
      * @param array $propertiesToExtract array of properties which should be returned, if empty all will be extracted
      * @return array
      */
-    protected function extractFileInformation($filePath, $containerPath, array $propertiesToExtract = array())
+    protected function extractFileInformation($filePath, $containerPath, array $propertiesToExtract = [])
     {
         if (empty($propertiesToExtract)) {
-            $propertiesToExtract = array(
+            $propertiesToExtract = [
                 'size', 'atime', 'atime', 'mtime', 'ctime', 'mimetype', 'name',
                 'identifier', 'identifier_hash', 'storage', 'folder_hash'
-            );
+            ];
         }
-        $fileInformation = array();
+        $fileInformation = [];
         foreach ($propertiesToExtract as $property) {
             $fileInformation[$property] = $this->getSpecificFileInformation($filePath, $containerPath, $property);
         }
@@ -967,7 +987,7 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
      */
     protected function createIdentifierMap(array $filesAndFolders, $sourceFolderIdentifier, $targetFolderIdentifier)
     {
-        $identifierMap = array();
+        $identifierMap = [];
         $identifierMap[$sourceFolderIdentifier] = $targetFolderIdentifier;
         foreach ($filesAndFolders as $oldItem) {
             if ($oldItem['type'] == 'dir') {
@@ -1040,7 +1060,8 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
         /** @var $iterator \RecursiveDirectoryIterator */
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($sourceFolderPath),
-            \RecursiveIteratorIterator::SELF_FIRST
+            \RecursiveIteratorIterator::SELF_FIRST,
+            \RecursiveIteratorIterator::CATCH_GET_CHILD
         );
         // Rewind the iterator as this is important for some systems e.g. Windows
         $iterator->rewind();
@@ -1176,7 +1197,7 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
     {
         $folderPath = $this->getAbsolutePath($folderIdentifier);
         $recycleDirectory = $this->getRecycleDirectory($folderPath);
-        if (!empty($recycleDirectory)) {
+        if (!empty($recycleDirectory) && $folderPath !== $recycleDirectory) {
             $result = $this->recycleFileOrFolder($folderPath, $recycleDirectory);
         } else {
             $result = GeneralUtility::rmdir($folderPath, $deleteRecursively);
@@ -1243,10 +1264,10 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
         if ($permissionBits === false) {
             throw new Exception\ResourcePermissionsUnavailableException('Error while fetching permissions for ' . $path, 1319455097);
         }
-        return array(
+        return [
             'r' => (bool)is_readable($path),
             'w' => (bool)is_writable($path)
-        );
+        ];
     }
 
     /**
@@ -1339,6 +1360,27 @@ class LocalDriver extends AbstractHierarchicalFilesystemDriver
             throw new \RuntimeException('Setting contents of file "' . $fileIdentifier . '" failed.', 1325419305);
         }
         return $result;
+    }
+
+    /**
+     * Gets the charset conversion object.
+     *
+     * @return \TYPO3\CMS\Core\Charset\CharsetConverter
+     */
+    protected function getCharsetConversion()
+    {
+        if (!isset($this->charsetConversion)) {
+            if (TYPO3_MODE === 'FE') {
+                $this->charsetConversion = $GLOBALS['TSFE']->csConvObj;
+            } elseif (is_object($GLOBALS['LANG'])) {
+                // BE assumed:
+                $this->charsetConversion = $GLOBALS['LANG']->csConvObj;
+            } else {
+                // The object may not exist yet, so we need to create it now. Happens in the Install Tool for example.
+                $this->charsetConversion = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Charset\CharsetConverter::class);
+            }
+        }
+        return $this->charsetConversion;
     }
 
     /**

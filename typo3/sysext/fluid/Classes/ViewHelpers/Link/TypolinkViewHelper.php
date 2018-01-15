@@ -68,17 +68,17 @@ class TypolinkViewHelper extends AbstractViewHelper
      *
      * @return string
      */
-    public function render($parameter, $target = '', $class = '', $title = '', $additionalParams = '', $additionalAttributes = array())
+    public function render($parameter, $target = '', $class = '', $title = '', $additionalParams = '', $additionalAttributes = [])
     {
         return static::renderStatic(
-            array(
+            [
                 'parameter' => $parameter,
                 'target' => $target,
                 'class' => $class,
                 'title' => $title,
                 'additionalParams' => $additionalParams,
                 'additionalAttributes' => $additionalAttributes
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
@@ -105,7 +105,7 @@ class TypolinkViewHelper extends AbstractViewHelper
         $typolinkParameter = self::createTypolinkParameterArrayFromArguments($parameter, $target, $class, $title, $additionalParams);
 
         // array(param1 -> value1, param2 -> value2) --> param1="value1" param2="value2" for typolink.ATagParams
-        $extraAttributes = array();
+        $extraAttributes = [];
         foreach ($additionalAttributes as $attributeName => $attributeValue) {
             $extraAttributes[] = $attributeName . '="' . htmlspecialchars($attributeValue) . '"';
         }
@@ -117,15 +117,15 @@ class TypolinkViewHelper extends AbstractViewHelper
         if ($parameter) {
             /** @var ContentObjectRenderer $contentObject */
             $contentObject = GeneralUtility::makeInstance(ContentObjectRenderer::class);
-            $contentObject->start(array(), '');
+            $contentObject->start([], '');
             $content = $contentObject->stdWrap(
                 $content,
-                array(
-                    'typolink.' => array(
+                [
+                    'typolink.' => [
                         'parameter' => $typolinkParameter,
                         'ATagParams' => $aTagParams,
-                    )
-                )
+                    ]
+                ]
             );
         }
 
@@ -158,10 +158,8 @@ class TypolinkViewHelper extends AbstractViewHelper
 
         // Combine classes if given in both "parameter" string and "class" argument
         if ($class) {
-            if ($typolinkConfiguration['class']) {
-                $typolinkConfiguration['class'] .= ' ';
-            }
-            $typolinkConfiguration['class'] .= $class;
+            $classes = explode(' ', trim($typolinkConfiguration['class']) . ' ' . trim($class));
+            $typolinkConfiguration['class'] = implode(' ', array_unique(array_filter($classes)));
         }
 
         // Override title if given in title argument

@@ -1,18 +1,25 @@
 <?php
 namespace TYPO3\CMS\Fluid\Tests\Unit\Core\Widget;
 
-/*
- * This file is part of the TYPO3 CMS project.
- *
- * It is free software; you can redistribute it and/or modify it under
- * the terms of the GNU General Public License, either version 2
- * of the License, or any later version.
- *
- * For the full copyright and license information, please read the
- * LICENSE.txt file that was distributed with this source code.
- *
- * The TYPO3 project - inspiring people to share!
- */
+/*                                                                        *
+ * This script is backported from the FLOW3 package "TYPO3.Fluid".        *
+ *                                                                        *
+ * It is free software; you can redistribute it and/or modify it under    *
+ * the terms of the GNU Lesser General Public License, either version 3   *
+ *  of the License, or (at your option) any later version.                *
+ *                                                                        *
+ *                                                                        *
+ * This script is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHAN-    *
+ * TABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser       *
+ * General Public License for more details.                               *
+ *                                                                        *
+ * You should have received a copy of the GNU Lesser General Public       *
+ * License along with the script.                                         *
+ * If not, see http://www.gnu.org/licenses/lgpl.html                      *
+ *                                                                        *
+ * The TYPO3 project - inspiring people to share!                         *
+ *                                                                        */
 use TYPO3\CMS\Extbase\Mvc\Dispatcher;
 use TYPO3\CMS\Extbase\Mvc\Web\Request;
 use TYPO3\CMS\Extbase\Mvc\Web\Response;
@@ -35,7 +42,7 @@ class WidgetRequestHandlerTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     protected function setUp()
     {
-        $this->widgetRequestHandler = $this->getAccessibleMock(\TYPO3\CMS\Fluid\Core\Widget\WidgetRequestHandler::class, array('dummy'), array(), '', false);
+        $this->widgetRequestHandler = $this->getAccessibleMock(\TYPO3\CMS\Fluid\Core\Widget\WidgetRequestHandler::class, ['dummy'], [], '', false);
     }
 
     /**
@@ -61,7 +68,7 @@ class WidgetRequestHandlerTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function priorityIsHigherThanDefaultRequestHandler()
     {
-        $defaultWebRequestHandler = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Web\AbstractRequestHandler::class, array('handleRequest'), array(), '', false);
+        $defaultWebRequestHandler = $this->getMock(\TYPO3\CMS\Extbase\Mvc\Web\AbstractRequestHandler::class, ['handleRequest'], [], '', false);
         $this->assertTrue($this->widgetRequestHandler->getPriority() > $defaultWebRequestHandler->getPriority());
     }
 
@@ -72,11 +79,11 @@ class WidgetRequestHandlerTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     {
         $handler = new WidgetRequestHandler();
         $request = $this->getMock(Request::class);
-        $requestBuilder = $this->getMock(WidgetRequestBuilder::class, array('build'));
+        $requestBuilder = $this->getMock(WidgetRequestBuilder::class, ['build']);
         $requestBuilder->expects($this->once())->method('build')->willReturn($request);
         $objectManager = $this->getMock(ObjectManagerInterface::class);
         $objectManager->expects($this->once())->method('get')->willReturn($this->getMock(Response::class));
-        $requestDispatcher = $this->getMock(Dispatcher::class, array('dispatch'), array(), '', false);
+        $requestDispatcher = $this->getMock(Dispatcher::class, ['dispatch'], [], '', false);
         $requestDispatcher->expects($this->once())->method('dispatch')->with($request);
         $this->inject($handler, 'widgetRequestBuilder', $requestBuilder);
         $this->inject($handler, 'dispatcher', $requestDispatcher);

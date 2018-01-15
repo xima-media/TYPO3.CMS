@@ -14,11 +14,9 @@ namespace TYPO3\CMS\Backend\Domain\Repository\Module;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Backend\Module\ModuleLoader;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
-use TYPO3\CMS\Core\Imaging\IconRegistry;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -51,7 +49,7 @@ class BackendModuleRepository implements \TYPO3\CMS\Core\SingletonInterface
      * @param array $excludeGroupNames
      * @return \SplObjectStorage
      */
-    public function loadAllowedModules(array $excludeGroupNames = array())
+    public function loadAllowedModules(array $excludeGroupNames = [])
     {
         if (empty($excludeGroupNames)) {
             return $this->moduleStorage->getEntries();
@@ -166,7 +164,7 @@ class BackendModuleRepository implements \TYPO3\CMS\Core\SingletonInterface
             $entry->setLink($module['path']);
         }
         if (!empty($module['description']) && is_string($module['description'])) {
-            $entry->setDescription($this->getLanguageService()->sL($module['description']));
+            $entry->setDescription($module['description']);
         }
         if (!empty($module['icon'])) {
             $entry->setIcon($module['icon']);
@@ -193,23 +191,25 @@ class BackendModuleRepository implements \TYPO3\CMS\Core\SingletonInterface
      */
     protected function createMenuEntriesForTbeModulesExt()
     {
-        foreach ($GLOBALS['TBE_MODULES_EXT'] as $mainModule => $tbeModuleExt) {
-            list($main) = explode('_', $mainModule);
-            $mainEntry = $this->findByModuleName($main);
-            if ($mainEntry === false) {
-                continue;
-            }
+        if (isset($GLOBALS['TBE_MODULES_EXT'])) {
+            foreach ((array)$GLOBALS['TBE_MODULES_EXT'] as $mainModule => $tbeModuleExt) {
+                list($main) = explode('_', $mainModule);
+                $mainEntry = $this->findByModuleName($main);
+                if ($mainEntry === false) {
+                    continue;
+                }
 
-            $subEntries = $mainEntry->getChildren();
-            if (empty($subEntries)) {
-                continue;
-            }
-            $matchingSubEntry = $this->findByModuleName($mainModule);
-            if ($matchingSubEntry !== false) {
-                if (isset($tbeModuleExt['MOD_MENU']) && isset($tbeModuleExt['MOD_MENU']['function'])) {
-                    foreach ($tbeModuleExt['MOD_MENU']['function'] as $subModule) {
-                        $entry = $this->createEntryFromRawData($subModule);
-                        $matchingSubEntry->addChild($entry);
+                $subEntries = $mainEntry->getChildren();
+                if (empty($subEntries)) {
+                    continue;
+                }
+                $matchingSubEntry = $this->findByModuleName($mainModule);
+                if ($matchingSubEntry !== false) {
+                    if (isset($tbeModuleExt['MOD_MENU']) && isset($tbeModuleExt['MOD_MENU']['function'])) {
+                        foreach ($tbeModuleExt['MOD_MENU']['function'] as $subModule) {
+                            $entry = $this->createEntryFromRawData($subModule);
+                            $matchingSubEntry->addChild($entry);
+                        }
                     }
                 }
             }
@@ -235,13 +235,12 @@ class BackendModuleRepository implements \TYPO3\CMS\Core\SingletonInterface
     public function getRawModuleMenuData()
     {
         // Loads the backend modules available for the logged in user.
-        /** @var ModuleLoader $moduleLoader */
-        $moduleLoader = GeneralUtility::makeInstance(ModuleLoader::class);
+        $moduleLoader = GeneralUtility::makeInstance(\TYPO3\CMS\Backend\Module\ModuleLoader::class);
         $moduleLoader->observeWorkspaces = true;
         $moduleLoader->load($GLOBALS['TBE_MODULES']);
         $loadedModules = $moduleLoader->modules;
 
-        $modules = array();
+        $modules = [];
 
         // Unset modules that are meant to be hidden from the menu.
         $loadedModules = $this->removeHiddenModules($loadedModules);
@@ -252,30 +251,29 @@ class BackendModuleRepository implements \TYPO3\CMS\Core\SingletonInterface
                 $moduleLink = $moduleData['script'];
             }
             $moduleLink = GeneralUtility::resolveBackPath($moduleLink);
-            $moduleLabels = $moduleLoader->getLabelsForModule($moduleName);
             $moduleKey = 'modmenu_' . $moduleName;
-            $modules[$moduleKey] = array(
+            $modules[$moduleKey] = [
                 'name' => $moduleName,
-                'title' => $moduleLabels['title'],
+                'title' => $GLOBALS['LANG']->moduleLabels['tabs'][$moduleName . '_tab'],
                 'onclick' => 'top.goToModule(' . GeneralUtility::quoteJSvalue($moduleName) . ');',
-                'icon' => $this->getModuleIcon($moduleKey, $moduleData),
+                'icon' => $this->getModuleIcon($moduleName . '_tab', $moduleData),
                 'link' => $moduleLink,
-                'description' => $moduleLabels['shortdescription']
-            );
+                'description' => $GLOBALS['LANG']->moduleLabels['labels'][$moduleKey . 'label']
+            ];
             if (!is_array($moduleData['sub']) && $moduleData['script'] !== $dummyScript) {
                 // Work around for modules with own main entry, but being self the only submodule
-                $modules[$moduleKey]['subitems'][$moduleKey] = array(
+                $modules[$moduleKey]['subitems'][$moduleKey] = [
                     'name' => $moduleName,
-                    'title' => $moduleLabels['title'],
+                    'title' => $GLOBALS['LANG']->moduleLabels['tabs'][$moduleName . '_tab'],
                     'onclick' => 'top.goToModule(' . GeneralUtility::quoteJSvalue($moduleName) . ');',
-                    'icon' => $this->getModuleIcon($moduleKey, $moduleData),
+                    'icon' => $this->getModuleIcon($moduleName . '_tab', $moduleData),
                     'link' => $moduleLink,
                     'originalLink' => $moduleLink,
-                    'description' => $moduleLabels['shortdescription'],
+                    'description' => $GLOBALS['LANG']->moduleLabels['labels'][$moduleKey . 'label'],
                     'navigationFrameScript' => null,
                     'navigationFrameScriptParam' => null,
                     'navigationComponentId' => null
-                );
+                ];
             } elseif (is_array($moduleData['sub'])) {
                 foreach ($moduleData['sub'] as $submoduleName => $submoduleData) {
                     if (isset($submoduleData['script'])) {
@@ -283,23 +281,22 @@ class BackendModuleRepository implements \TYPO3\CMS\Core\SingletonInterface
                     } else {
                         $submoduleLink = BackendUtility::getModuleUrl($submoduleData['name']);
                     }
-                    $submoduleKey = $moduleName . '_' . $submoduleName;
-                    $submoduleLabels = $moduleLoader->getLabelsForModule($submoduleKey);
-                    $submoduleDescription = $submoduleLabels['shortdescription'];
+                    $submoduleKey = $moduleName . '_' . $submoduleName . '_tab';
+                    $submoduleDescription = $GLOBALS['LANG']->moduleLabels['labels'][$submoduleKey . 'label'];
                     $originalLink = $submoduleLink;
                     $navigationFrameScript = $submoduleData['navFrameScript'];
-                    $modules[$moduleKey]['subitems'][$submoduleKey] = array(
+                    $modules[$moduleKey]['subitems'][$submoduleKey] = [
                         'name' => $moduleName . '_' . $submoduleName,
-                        'title' => $submoduleLabels['title'],
+                        'title' => $GLOBALS['LANG']->moduleLabels['tabs'][$submoduleKey],
                         'onclick' => 'top.goToModule(' . GeneralUtility::quoteJSvalue($moduleName . '_' . $submoduleName) . ');',
-                        'icon' => $this->getModuleIcon($moduleKey, $submoduleData),
+                        'icon' => $this->getModuleIcon($submoduleKey, $submoduleData),
                         'link' => $submoduleLink,
                         'originalLink' => $originalLink,
                         'description' => $submoduleDescription,
                         'navigationFrameScript' => $navigationFrameScript,
                         'navigationFrameScriptParam' => $submoduleData['navFrameScriptParam'],
                         'navigationComponentId' => $submoduleData['navigationComponentId']
-                    );
+                    ];
                     // if the main module has a navframe script, inherit to the submodule,
                     // but only if it is not disabled explicitly (option is set to FALSE)
                     if ($moduleData['navFrameScript'] && $submoduleData['inheritNavigationComponentFromMainModule'] !== false) {
@@ -344,7 +341,7 @@ class BackendModuleRepository implements \TYPO3\CMS\Core\SingletonInterface
     }
 
     /**
-     * gets the module icon
+     * gets the module icon and its size
      *
      * @param string $moduleKey Module key
      * @param array $moduleData the compiled data associated with it
@@ -352,15 +349,53 @@ class BackendModuleRepository implements \TYPO3\CMS\Core\SingletonInterface
      */
     protected function getModuleIcon($moduleKey, $moduleData)
     {
-        $iconIdentifier = !(empty($moduleData['iconIdentifier']))
-            ? $moduleData['iconIdentifier']
-            : 'module-icon-' . $moduleKey;
-        $iconRegistry = GeneralUtility::makeInstance(IconRegistry::class);
-        if ($iconRegistry->isRegistered($iconIdentifier)) {
+        $icon = '';
+
+        // add as a sprite icon
+        if (!empty($moduleData['iconIdentifier'])) {
             $iconFactory = GeneralUtility::makeInstance(IconFactory::class);
-            return $iconFactory->getIcon($iconIdentifier)->render();
-        } else {
-            return '';
+            $icon = $iconFactory->getIcon($moduleData['iconIdentifier'])->render();
+        } elseif (!empty($GLOBALS['LANG']->moduleLabels['tabs_images'][$moduleKey])) {
+            $imageReference = $GLOBALS['LANG']->moduleLabels['tabs_images'][$moduleKey];
+            $iconFileRelative = $this->getModuleIconRelative($imageReference);
+            if (!empty($iconFileRelative)) {
+                $iconTitle = $GLOBALS['LANG']->moduleLabels['tabs'][$moduleKey];
+                $iconSizes = @getimagesize($this->getModuleIconAbsolute($imageReference));
+                $icon = '<img src="' . $iconFileRelative . '" ' . $iconSizes[3] . ' title="' . htmlspecialchars($iconTitle) . '" alt="' . htmlspecialchars($iconTitle) . '" />';
+            }
         }
+        return $icon;
+    }
+
+    /**
+     * Returns the filename readable for the script from PATH_typo3.
+     * That means absolute names are just returned while relative names are
+     * prepended with the path pointing back to typo3/ dir
+     *
+     * @param string $iconFilename Icon filename
+     * @return string Icon filename with absolute path
+     * @see getModuleIconRelative()
+     */
+    protected function getModuleIconAbsolute($iconFilename)
+    {
+        if (!GeneralUtility::isAbsPath($iconFilename)) {
+            $iconFilename = $GLOBALS['BACK_PATH'] . $iconFilename;
+        }
+        return $iconFilename;
+    }
+
+    /**
+     * Returns relative path to the icon filename for use in img-tags
+     *
+     * @param string $iconFilename Icon filename
+     * @return string Icon filename with relative path
+     * @see getModuleIconAbsolute()
+     */
+    protected function getModuleIconRelative($iconFilename)
+    {
+        if (GeneralUtility::isAbsPath($iconFilename)) {
+            $iconFilename = '../' . \TYPO3\CMS\Core\Utility\PathUtility::stripPathSitePrefix($iconFilename);
+        }
+        return $iconFilename;
     }
 }

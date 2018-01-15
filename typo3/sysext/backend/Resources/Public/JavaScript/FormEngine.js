@@ -21,39 +21,33 @@
  */
 
 // add legacy functions to be accessible in the global scope
-var setFormValueOpenBrowser
-	,setFormValueFromBrowseWin
-	,setHiddenFromList
-	,setFormValueManipulate
-	,setFormValue_getFObj;
+var setFormValueOpenBrowser,
+	setFormValueFromBrowseWin,
+	setHiddenFromList,
+	setFormValueManipulate,
+	setFormValue_getFObj;
 
 /**
  * Module: TYPO3/CMS/Backend/FormEngine
  */
 define(['jquery',
+		'TYPO3/CMS/Backend/FormEngineValidation',
 		'TYPO3/CMS/Backend/Modal',
 		'TYPO3/CMS/Backend/Severity'
-	   ], function ($, Modal, Severity) {
+	   ], function ($, FormEngineValidation, Modal, Severity) {
 
 	/**
 	 *
-	 * @type {{formName: *, openedPopupWindow: null, legacyFieldChangedCb: Function, browserUrl: string}}
+	 * @type {{Validation: object, formName: *, backPath: *, openedPopupWindow: window, legacyFieldChangedCb: Function, browserUrl: string}}
 	 * @exports TYPO3/CMS/Backend/FormEngine
 	 */
 	var FormEngine = {
-		formName: TYPO3.settings.FormEngine.formName
-		,openedPopupWindow: null
-		,legacyFieldChangedCb: function() { !$.isFunction(TYPO3.settings.FormEngine.legacyFieldChangedCb) || TYPO3.settings.FormEngine.legacyFieldChangedCb(); }
-		,browserUrl: ''
-		,isDirty: false
-	};
-
-	/**
-	 *
-	 * @param {String} browserUrl
-	 */
-	FormEngine.setBrowserUrl = function(browserUrl) {
-		FormEngine.browserUrl = browserUrl;
+		Validation: FormEngineValidation,
+		formName: TYPO3.settings.FormEngine.formName,
+		backPath: TYPO3.settings.FormEngine.backPath,
+		openedPopupWindow: null,
+		legacyFieldChangedCb: function() { !$.isFunction(TYPO3.settings.FormEngine.legacyFieldChangedCb) || TYPO3.settings.FormEngine.legacyFieldChangedCb(); },
+		browserUrl: ''
 	};
 
 	// functions to connect the db/file browser with this document and the formfields on it!
@@ -67,9 +61,9 @@ define(['jquery',
 	 * @param {Number} height height of the window
 	 */
 	FormEngine.openPopupWindow = setFormValueOpenBrowser = function(mode, params, width, height) {
-		var url = FormEngine.browserUrl + '&mode=' + mode + '&bparams=' + params;
-		width = width ? width : TYPO3.settings.Popup.PopupWindow.width;
-		height = height ? height : TYPO3.settings.Popup.PopupWindow.height;
+		var url = FormEngine.backPath + FormEngine.browserUrl + '&mode=' + mode + '&bparams=' + params;
+		width = width ? width : top.TYPO3.configuration.PopupWindow.width;
+		height = height ? height : top.TYPO3.configuration.PopupWindow.height;
 		FormEngine.openedPopupWindow = window.open(url, 'Typo3WinBrowser', 'height=' + height + ',width=' + width + ',status=0,menubar=0,resizable=1,scrollbars=1');
 		FormEngine.openedPopupWindow.focus();
 	};
@@ -91,9 +85,11 @@ define(['jquery',
 		exclusiveValues = String(exclusiveValues);
 
 		var $fieldEl,
-			$originalFieldEl = $fieldEl = FormEngine.getFieldElement(fieldName),
+			$originalFieldEl,
 			isMultiple = false,
 			isList = false;
+
+		$originalFieldEl = $fieldEl = FormEngine.getFieldElement(fieldName);
 
 		if ($originalFieldEl.length === 0 || value === '--div--') {
 			return;
@@ -569,8 +565,9 @@ define(['jquery',
 		var $selected = $fieldEl.find(':selected');
 
 		$selected.each(function() {
+			var $value = $(this).attr('value').replace(/([ #;?%&,.+*~\':"!^$[\]()=>|\/@])/g, '\\$1');
 			$availableFieldEl
-				.find('option[value="' + $(this).attr('value') + '"]')
+				.find('option[value="' + $value + '"]')
 				.removeClass('hidden')
 				.prop('disabled', false);
 		});
@@ -586,17 +583,10 @@ define(['jquery',
 	 * as it using deferrer methods only
 	 */
 	FormEngine.initializeEvents = function() {
-
-		FormEngine.initializeRemainingCharacterViews();
-		FormEngine.initializeSelectCheckboxes();
-
-		$(document).on('change', 'input,textarea,select', function() {
-			// Keep track of input fields to set the dirty state
-			FormEngine.isDirty = $(document).find('.has-change').length > 0;
-		}).on('click', '.t3js-btn-moveoption-top, .t3js-btn-moveoption-up, .t3js-btn-moveoption-down, .t3js-btn-moveoption-bottom, .t3js-btn-removeoption', function(evt) {
+		// track the arrows "Up", "Down", "Clear" etc in multi-select boxes
+		$(document).on('click', '.t3js-btn-moveoption-top, .t3js-btn-moveoption-up, .t3js-btn-moveoption-down, .t3js-btn-moveoption-bottom, .t3js-btn-removeoption', function(evt) {
 			evt.preventDefault();
 
-			// track the arrows "Up", "Down", "Clear" etc in multi-select boxes
 			var $el = $(this)
 					,fieldName = $el.data('fieldname')
 					,$listFieldEl = FormEngine.getFieldElement(fieldName, '_list');
@@ -914,10 +904,13 @@ define(['jquery',
 				Suggest($('.t3-form-suggest'));
 			});
 		}
-		// apply DatePicker to all date time fields
-		require(['TYPO3/CMS/Backend/DateTimePicker'], function(DateTimePicker) {
-			DateTimePicker.initialize();
-		});
+
+		// Apply DatePicker to all date time fields
+		if ($('.t3js-datetimepicker').length) {
+			require(['TYPO3/CMS/Backend/DateTimePicker'], function(DateTimePicker) {
+				DateTimePicker.initialize();
+			});
+		}
 
 		FormEngine.convertTextareasResizable();
 		FormEngine.convertTextareasEnableTab();
@@ -927,7 +920,7 @@ define(['jquery',
 	 * Show modal to confirm closing the document without saving
 	 */
 	FormEngine.preventExitIfNotSaved = function() {
-		if (FormEngine.isDirty) {
+		if ($('.has-change').length > 0) {
 			var title = TYPO3.lang['label.confirm.close_without_save.title'] || 'Do you want to quit without saving?';
 			var content = TYPO3.lang['label.confirm.close_without_save.content'] || 'You have currently unsaved changes. Are you sure that you want to discard all changes?';
 			var $modal = Modal.confirm(title, content, Severity.warning, [
@@ -952,7 +945,7 @@ define(['jquery',
 				}
 			});
 		} else {
-			FormEngine.closeDocument()
+			FormEngine.closeDocument();
 		}
 	};
 
@@ -989,13 +982,27 @@ define(['jquery',
 	};
 
 	/**
-	 * initialize function, always require possible post-render hooks return the main object
+	 * Main init function called from outside
+	 *
+	 * Sets some options and registers the DOMready handler to initialize further things
+	 *
+	 * @param {String} browserUrl
+	 * @param {Number} mode
 	 */
+	FormEngine.initialize = function(browserUrl, mode) {
+		FormEngine.browserUrl = browserUrl;
+		FormEngine.Validation.setUsMode(mode);
 
-	// the functions are both using delegates, thus no need to be called again
-	FormEngine.initializeEvents();
-	FormEngine.SelectBoxFilter.initializeEvents();
-	FormEngine.reinitialize();
+		$(function() {
+			FormEngine.initializeEvents();
+			FormEngine.SelectBoxFilter.initializeEvents();
+			FormEngine.initializeRemainingCharacterViews();
+			FormEngine.initializeSelectCheckboxes();
+			FormEngine.Validation.initialize();
+			FormEngine.reinitialize();
+			$('#t3js-ui-block').remove();
+		});
+	};
 
 	// load required modules to hook in the post initialize function
 	if (undefined !== TYPO3.settings.RequireJS && undefined !== TYPO3.settings.RequireJS.PostInitializationModules['TYPO3/CMS/Backend/FormEngine']) {

@@ -47,11 +47,49 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
     /**
      * @var array
      */
-    public $conf = array();
+    public $conf = [];
 
     /***********************************
      * Rendering of Content Elements:
      ***********************************/
+
+    /**
+     * Rendering the "Bulletlist" type content element, called from TypoScript (tt_content.bullets.20)
+     *
+     * @param string $content Content input. Not used, ignore.
+     * @param array $conf TypoScript configuration
+     * @return string HTML output.
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, is done by default in pure TypoScript
+     */
+    public function render_bullets($content, $conf)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        // Look for hook before running default code for function
+        if ($hookObj = $this->hookRequest('render_bullets')) {
+            return $hookObj->render_bullets($content, $conf);
+        } else {
+            // Get bodytext field content, returning blank if empty:
+            $field = isset($conf['field']) && trim($conf['field']) ? trim($conf['field']) : 'bodytext';
+            $content = trim($this->cObj->data[$field]);
+            if ($content === '') {
+                return '';
+            }
+            // Split into single lines:
+            $lines = GeneralUtility::trimExplode(LF, $content);
+            foreach ($lines as &$val) {
+                $val = '<li>' . $this->cObj->stdWrap($val, $conf['innerStdWrap.']) . '</li>';
+            }
+            unset($val);
+            // Set header type:
+            $type = (int)$this->cObj->data['layout'];
+            // Compile list:
+            $out = '
+				<ul class="csc-bulletlist csc-bulletlist-' . $type . '">' . implode('', $lines) . '
+				</ul>';
+            // Return value
+            return $out;
+        }
+    }
 
     /**
      * Rendering the "Table" type content element, called from TypoScript (tt_content.table.20)
@@ -108,7 +146,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
             $rCount = count($rows);
             foreach ($rows as $k => $v) {
                 $cells = str_getcsv($v, $delimiter, $quotedInput);
-                $newCells = array();
+                $newCells = [];
                 for ($a = 0; $a < $cols; $a++) {
                     if (trim($cells[$a]) === '') {
                         $cells[$a] = ' ';
@@ -180,6 +218,157 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
     }
 
     /**
+     * Rendering the "Filelinks" type content element, called from TypoScript (tt_content.uploads.20)
+     *
+     * @param string $content Content input. Not used, ignore.
+     * @param array $conf TypoScript configuration
+     * @return string HTML output.
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, is done by default in pure TypoScript
+     */
+    public function render_uploads($content, $conf)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        // Look for hook before running default code for function
+        if ($hookObj = $this->hookRequest('render_uploads')) {
+            return $hookObj->render_uploads($content, $conf);
+        } else {
+            // Loading language-labels
+            $this->pi_loadLL();
+            $out = '';
+            // Set layout type:
+            $type = (int)$this->cObj->data['layout'];
+            // See if the file path variable is set, this takes precedence
+            $filePathConf = $this->cObj->stdWrap($conf['filePath'], $conf['filePath.']);
+            if ($filePathConf) {
+                $fileList = $this->cObj->filelist($filePathConf);
+                list($path) = explode('|', $filePathConf);
+            } else {
+                // Get the list of files from the field
+                $field = trim($conf['field']) ?: 'media';
+                $fileList = $this->cObj->data[$field];
+                $path = 'uploads/media/';
+                if (
+                    is_array($GLOBALS['TCA']['tt_content']['columns'][$field]) &&
+                    !empty($GLOBALS['TCA']['tt_content']['columns'][$field]['config']['uploadfolder'])
+                ) {
+                    // In TCA-Array folders are saved without trailing slash, so $path.$fileName won't work
+                    $path = $GLOBALS['TCA']['tt_content']['columns'][$field]['config']['uploadfolder'] . '/';
+                }
+            }
+            $path = trim($path);
+            // Explode into an array:
+            $fileArray = GeneralUtility::trimExplode(',', $fileList, true);
+            // If there were files to list...:
+            if (!empty($fileArray)) {
+                // Get the descriptions for the files (if any):
+                $descriptions = GeneralUtility::trimExplode(LF, $this->cObj->data['imagecaption']);
+                // Get the titles for the files (if any)
+                $titles = GeneralUtility::trimExplode(LF, $this->cObj->data['titleText']);
+                // Get the alternative text for icons/thumbnails
+                $altTexts = GeneralUtility::trimExplode(LF, $this->cObj->data['altText']);
+                // Add the target to linkProc when explicitly set
+                if ($this->cObj->data['target']) {
+                    $conf['linkProc.']['target'] = $this->cObj->data['target'];
+                    unset($conf['linkProc.']['target.']);
+                }
+                // Adding hardcoded TS to linkProc configuration:
+                $conf['linkProc.']['path.']['current'] = 1;
+                if ($conf['linkProc.']['combinedLink']) {
+                    $conf['linkProc.']['icon'] = $type > 0 ? 1 : 0;
+                } else {
+                    // Always render icon - is inserted by PHP if needed.
+                    $conf['linkProc.']['icon'] = 1;
+                    // Temporary, internal split-token!
+                    $conf['linkProc.']['icon.']['wrap'] = ' | //**//';
+                    // ALways link the icon
+                    $conf['linkProc.']['icon_link'] = 1;
+                }
+                $conf['linkProc.']['icon_image_ext_list'] = $type == 2 || $type == 3 ? $GLOBALS['TYPO3_CONF_VARS']['GFX']['imagefile_ext'] : '';
+                // If the layout is type 2 or 3 we will render an image based icon if possible.
+                if ($conf['labelStdWrap.']) {
+                    $conf['linkProc.']['labelStdWrap.'] = $conf['labelStdWrap.'];
+                }
+                if ($conf['useSpacesInLinkText'] || $conf['stripFileExtensionFromLinkText']) {
+                    $conf['linkProc.']['removePrependedNumbers'] = 0;
+                }
+                // Traverse the files found:
+                $filesData = [];
+                foreach ($fileArray as $key => $fileName) {
+                    $absPath = GeneralUtility::getFileAbsFileName(GeneralUtility::resolveBackPath($path . $fileName));
+                    if (@is_file($absPath)) {
+                        $fI = pathinfo($fileName);
+                        $filesData[$key] = [];
+                        $currentPath = $path;
+                        if (GeneralUtility::isFirstPartOfStr($fileName, '../../')) {
+                            $currentPath = '';
+                            $fileName = substr($fileName, 6);
+                        }
+                        $filesData[$key]['filename'] = $fileName;
+                        $filesData[$key]['path'] = $currentPath;
+                        $filesData[$key]['filesize'] = filesize($absPath);
+                        $filesData[$key]['fileextension'] = strtolower($fI['extension']);
+                        $filesData[$key]['description'] = trim($descriptions[$key]);
+                        $filesData[$key]['titletext'] = trim($titles[$key]);
+                        $filesData[$key]['alttext'] = trim($altTexts[$key]);
+                        $conf['linkProc.']['title'] = trim($titles[$key]);
+                        if (isset($altTexts[$key]) && !empty($altTexts[$key])) {
+                            $altText = trim($altTexts[$key]);
+                        } else {
+                            $altText = sprintf($this->pi_getLL('uploads.icon'), $fileName);
+                        }
+                        $conf['linkProc.']['altText'] = ($conf['linkProc.']['iconCObject.']['altText'] = $altText);
+                        $this->cObj->setCurrentVal($currentPath);
+                        $this->frontendController->register['ICON_REL_PATH'] = $currentPath . $fileName;
+                        $this->frontendController->register['filename'] = $filesData[$key]['filename'];
+                        $this->frontendController->register['path'] = $filesData[$key]['path'];
+                        $this->frontendController->register['fileSize'] = $filesData[$key]['filesize'];
+                        $this->frontendController->register['fileExtension'] = $filesData[$key]['fileextension'];
+                        $this->frontendController->register['description'] = $filesData[$key]['description'];
+                        $this->frontendController->register['titleText'] = $filesData[$key]['titletext'];
+                        $this->frontendController->register['altText'] = $filesData[$key]['alttext'];
+
+                        $filesData[$key]['linkedFilenameParts'] = $this->beautifyFileLink(
+                            explode('//**//', $this->cObj->filelink($fileName, $conf['linkProc.'])),
+                            $fileName,
+                            $conf['useSpacesInLinkText'],
+                            $conf['stripFileExtensionFromLinkText']
+                        );
+                    }
+                }
+                // optionSplit applied to conf to allow differnt settings per file
+                $splitConf = $this->frontendController->tmpl->splitConfArray($conf, count($filesData));
+                // Now, lets render the list!
+                $outputEntries = [];
+                foreach ($filesData as $key => $fileData) {
+                    $this->frontendController->register['linkedIcon'] = $fileData['linkedFilenameParts'][0];
+                    $this->frontendController->register['linkedLabel'] = $fileData['linkedFilenameParts'][1];
+                    $this->frontendController->register['filename'] = $fileData['filename'];
+                    $this->frontendController->register['path'] = $fileData['path'];
+                    $this->frontendController->register['description'] = $fileData['description'];
+                    $this->frontendController->register['fileSize'] = $fileData['filesize'];
+                    $this->frontendController->register['fileExtension'] = $fileData['fileextension'];
+                    $this->frontendController->register['titleText'] = $fileData['titletext'];
+                    $this->frontendController->register['altText'] = $fileData['alttext'];
+                    $outputEntries[] = $this->cObj->cObjGetSingle($splitConf[$key]['itemRendering'], $splitConf[$key]['itemRendering.']);
+                }
+                if (isset($conf['outerWrap'])) {
+                    // Wrap around the whole content
+                    $outerWrap = $this->cObj->stdWrap($conf['outerWrap'], $conf['outerWrap.']);
+                } else {
+                    // Table tag params
+                    $tableTagParams = $this->getTableAttributes($conf, $type);
+                    $tableTagParams['class'] = 'csc-uploads csc-uploads-' . $type;
+                    $outerWrap = '<table ' . GeneralUtility::implodeAttributes($tableTagParams) . '>|</table>';
+                }
+                // Compile it all into table tags:
+                $out = $this->cObj->wrap(implode('', $outputEntries), $outerWrap);
+            }
+            // Return value
+            return $out;
+        }
+    }
+
+    /**
      * Returns an array containing width relations for $colCount columns.
      *
      * Tries to use "colRelations" setting given by TS.
@@ -191,7 +380,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
      */
     protected function getImgColumnRelations($conf, $colCount)
     {
-        $relations = array();
+        $relations = [];
         $equalRelations = array_fill(0, $colCount, 1);
         $colRelationsTypoScript = trim($this->cObj->stdWrap($conf['colRelations'], $conf['colRelations.']));
         if ($colRelationsTypoScript) {
@@ -199,7 +388,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
             $relationParts = explode(':', $colRelationsTypoScript);
             // Enough columns defined?
             if (count($relationParts) >= $colCount) {
-                $out = array();
+                $out = [];
                 for ($a = 0; $a < $colCount; $a++) {
                     $currentRelationValue = (int)$relationParts[$a];
                     if ($currentRelationValue >= 1) {
@@ -235,7 +424,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
      */
     protected function getImgColumnWidths($conf, $colCount, $netW)
     {
-        $columnWidths = array();
+        $columnWidths = [];
         $colRelations = $this->getImgColumnRelations($conf, $colCount);
         $accumWidth = 0;
         $accumDesiredWidth = 0;
@@ -293,7 +482,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
         if (!$imgList) {
             // No images, that's easy
             if ($restoreRegisters) {
-                $this->cObj->cObjGetSingle('RESTORE_REGISTER', array());
+                $this->cObj->cObjGetSingle('RESTORE_REGISTER', []);
             }
             return $content;
         }
@@ -301,7 +490,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
         if (empty($imgs)) {
             // The imgList was not empty but did only contain empty values
             if ($restoreRegisters) {
-                $this->cObj->cObjGetSingle('RESTORE_REGISTER', array());
+                $this->cObj->cObjGetSingle('RESTORE_REGISTER', []);
             }
             return $content;
         }
@@ -395,9 +584,9 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
         // EqualHeight
         $equalHeight = (int)$this->cObj->stdWrap($conf['equalH'], $conf['equalH.']);
         if ($equalHeight) {
-            $relations_cols = array();
+            $relations_cols = [];
             // contains the individual width of all images after scaling to $equalHeight
-            $imgWidths = array();
+            $imgWidths = [];
             for ($a = 0; $a < $imgCount; $a++) {
                 $imgKey = $a + $imgStart;
 
@@ -423,14 +612,14 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
             }
         }
         // Fetches pictures
-        $splitArr = array();
+        $splitArr = [];
         $splitArr['imgObjNum'] = $conf['imgObjNum'];
         $splitArr = $this->frontendController->tmpl->splitConfArray($splitArr, $imgCount);
         // Contains the width of every image row
-        $imageRowsFinalWidths = array();
+        $imageRowsFinalWidths = [];
         // Array index of $imgsTag will be the same as in $imgs, but $imgsTag only contains the images that are actually shown
-        $imgsTag = array();
-        $origImages = array();
+        $imgsTag = [];
+        $origImages = [];
         $rowIdx = 0;
         for ($a = 0; $a < $imgCount; $a++) {
             $imgKey = $a + $imgStart;
@@ -509,10 +698,10 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
             $customRendering = '';
             if (isset($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['css_styled_content']['pi1_hooks']['render_singleMediaElement'])
                 && is_array($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['css_styled_content']['pi1_hooks']['render_singleMediaElement'])) {
-                $hookParameters = array(
+                $hookParameters = [
                     'file' => $totalImagePath,
                     'imageConfiguration' => $imgConf
-                );
+                ];
 
                 foreach ($GLOBALS['TYPO3_CONF_VARS']['EXTCONF']['css_styled_content']['pi1_hooks']['render_singleMediaElement'] as $reference) {
                     $customRendering = \TYPO3\CMS\Core\Utility\GeneralUtility::callUserFunction($reference, $hookParameters, $this);
@@ -562,7 +751,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
                 $imgsTag[$imgKey] = $this->cObj->cObjGetSingle('IMAGE', $imgConf);
             } else {
                 // currentValKey !!!
-                $imgsTag[$imgKey] = $this->cObj->cObjGetSingle('IMAGE', array('file' => $totalImagePath));
+                $imgsTag[$imgKey] = $this->cObj->cObjGetSingle('IMAGE', ['file' => $totalImagePath]);
             }
             // Restore our ATagParams
             $this->frontendController->ATagParams = $oldATagParms;
@@ -592,7 +781,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
         }
         // Edit icons:
         if (!is_array($conf['editIcons.'])) {
-            $conf['editIcons.'] = array();
+            $conf['editIcons.'] = [];
         }
         $editIconsHTML = $conf['editIcons'] && $this->frontendController->beUserLogin ? $this->cObj->editIcons('', $conf['editIcons'], $conf['editIcons.']) : '';
         // If noRows, we need multiple imagecolumn wraps
@@ -615,33 +804,33 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
             if (isset($conf['addClassesCol.'])) {
                 $addClassesCol = $this->cObj->stdWrap($addClassesCol, $conf['addClassesCol.']);
             }
-            $addClassesColConf = $this->frontendController->tmpl->splitConfArray(array('addClassesCol' => $addClassesCol), $colCount);
+            $addClassesColConf = $this->frontendController->tmpl->splitConfArray(['addClassesCol' => $addClassesCol], $colCount);
             // Apply optionSplit to the list of classes that we want to add to each image
             $addClassesImage = $conf['addClassesImage'];
             if (isset($conf['addClassesImage.'])) {
                 $addClassesImage = $this->cObj->stdWrap($addClassesImage, $conf['addClassesImage.']);
             }
-            $addClassesImageConf = $this->frontendController->tmpl->splitConfArray(array('addClassesImage' => $addClassesImage), $imagesInColumns);
-            $rows = array();
+            $addClassesImageConf = $this->frontendController->tmpl->splitConfArray(['addClassesImage' => $addClassesImage], $imagesInColumns);
+            $rows = [];
             $currentImage = 0;
             // Set the class for the caption (split or global)
-            $classCaptionAlign = array(
+            $classCaptionAlign = [
                 'center' => 'csc-textpic-caption-c',
                 'right' => 'csc-textpic-caption-r',
                 'left' => 'csc-textpic-caption-l'
-            );
+            ];
             $captionAlign = $this->cObj->stdWrap($conf['captionAlign'], $conf['captionAlign.']);
             // Iterate over the rows
             for ($rowCounter = 1; $rowCounter <= $rowCount; $rowCounter++) {
-                $rowColumns = array();
+                $rowColumns = [];
                 // Iterate over the columns
                 for ($columnCounter = 1; $columnCounter <= $colCount; $columnCounter++) {
-                    $columnImages = array();
+                    $columnImages = [];
                     // Iterate over the amount of images allowed in a column
                     for ($imagesCounter = 1; $imagesCounter <= $imagesInColumns; $imagesCounter++) {
                         $image = null;
                         $splitCaption = null;
-                        $imageMarkers = ($captionMarkers = array());
+                        $imageMarkers = ($captionMarkers = []);
                         $single = '&nbsp;';
                         // Set the key of the current image
                         $imageKey = $currentImage + $imgStart;
@@ -681,7 +870,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
                     }
                     $rowColumn = $this->cObj->stdWrap(implode(LF, $columnImages), $conf['columnStdWrap.']);
                     // Start filling the markers for columnStdWrap
-                    $columnMarkers = array();
+                    $columnMarkers = [];
                     if ($addClassesColConf[$columnCounter - 1]['addClassesCol']) {
                         $columnMarkers['classes'] = ' ' . $addClassesColConf[$columnCounter - 1]['addClassesCol'];
                     }
@@ -696,13 +885,13 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
                 }
                 $row = $this->cObj->stdWrap(implode(LF, $rowColumns), $rowConfiguration);
                 // Start filling the markers for columnStdWrap
-                $rowMarkers = array();
+                $rowMarkers = [];
                 $rows[] = $this->cObj->substituteMarkerArray($row, $rowMarkers, '###|###', 1, 1);
             }
             $images = $this->cObj->stdWrap(implode(LF, $rows), $conf['allStdWrap.']);
             // Start filling the markers for allStdWrap
-            $allMarkers = array();
-            $classes = array();
+            $allMarkers = [];
+            $classes = [];
             // Add the global caption to the allStdWrap marker array if set
             if ($globalCaption) {
                 $allMarkers['caption'] = $globalCaption;
@@ -749,7 +938,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
             if (isset($conf['addClassesImage.'])) {
                 $addClassesImage = $this->cObj->stdWrap($addClassesImage, $conf['addClassesImage.']);
             }
-            $addClassesImageConf = $this->frontendController->tmpl->splitConfArray(array('addClassesImage' => $addClassesImage), $colCount);
+            $addClassesImageConf = $this->frontendController->tmpl->splitConfArray(['addClassesImage' => $addClassesImage], $colCount);
             // Render the images
             $images = '';
             for ($c = 0; $c < $imageWrapCols; $c++) {
@@ -835,11 +1024,11 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
             }
             // CSS-classes
             $captionClass = '';
-            $classCaptionAlign = array(
+            $classCaptionAlign = [
                 'center' => 'csc-textpic-caption-c',
                 'right' => 'csc-textpic-caption-r',
                 'left' => 'csc-textpic-caption-l'
-            );
+            ];
             $captionAlign = $this->cObj->stdWrap($conf['captionAlign'], $conf['captionAlign.']);
             if ($captionAlign) {
                 $captionClass = $classCaptionAlign[$captionAlign];
@@ -879,21 +1068,21 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
         }
 
         $output = str_replace(
-            array(
+            [
                 '###TEXT###',
                 '###IMAGES###',
                 '###CLASSES###'
-            ),
-            array(
+            ],
+            [
                 $content,
                 $images,
                 $class
-            ),
+            ],
             $this->cObj->cObjGetSingle($conf['layout'], $conf['layout.'])
         );
 
         if ($restoreRegisters) {
-            $this->cObj->cObjGetSingle('RESTORE_REGISTER', array());
+            $this->cObj->cObjGetSingle('RESTORE_REGISTER', []);
         }
 
         return $output;
@@ -940,7 +1129,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
         if (method_exists($this, 'hookRequest') && ($hookObject = $this->hookRequest('renderSpace'))) {
             return $hookObject->renderSpace($content, $configuration);
         }
-        if (isset($configuration['space']) && in_array($configuration['space'], array('before', 'after'))) {
+        if (isset($configuration['space']) && in_array($configuration['space'], ['before', 'after'])) {
             $constant = (int)$configuration['constant'];
             if ($configuration['space'] === 'before') {
                 $value = $constant + $this->cObj->data['spaceBefore'];
@@ -967,6 +1156,34 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
      ************************************/
 
     /**
+     * Returns a link text string which replaces underscores in filename with
+     * blanks.
+     *
+     * Has the possibility to cut off FileType.
+     *
+     * @param array $links
+     * @param string $fileName
+     * @param bool $useSpaces
+     * @param bool $cutFileExtension
+     * @return array modified array with new link text
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, is done by default in pure TypoScript
+     */
+    protected function beautifyFileLink(array $links, $fileName, $useSpaces = false, $cutFileExtension = false)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        $linkText = $fileName;
+        if ($useSpaces) {
+            $linkText = str_replace('_', ' ', $linkText);
+        }
+        if ($cutFileExtension) {
+            $pos = strrpos($linkText, '.');
+            $linkText = substr($linkText, 0, $pos);
+        }
+        $links[1] = str_replace('>' . $fileName . '<', '>' . htmlspecialchars($linkText) . '<', $links[1]);
+        return $links;
+    }
+
+    /**
      * Returns table attributes for uploads / tables.
      *
      * @param array $conf TypoScript configuration array
@@ -982,7 +1199,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
         $cellPadding = $this->cObj->data['table_cellpadding'] ? (int)$this->cObj->data['table_cellpadding'] : $tableTagParams_conf['cellpadding'];
         $summary = trim(htmlspecialchars($this->pi_getFFvalue($this->cObj->data['pi_flexform'], 'acctables_summary')));
         // Create table attributes and classes array:
-        $tableTagParams = ($classes = array());
+        $tableTagParams = ($classes = []);
         // Table attributes for all doctypes except HTML5
         if ($this->frontendController->config['config']['doctype'] !== 'html5') {
             $tableTagParams['border'] = $border;
@@ -1042,7 +1259,7 @@ class CssStyledContentController extends \TYPO3\CMS\Frontend\Plugin\AbstractPlug
     protected function addPageStyle($selector, $declaration)
     {
         if (!isset($this->frontendController->tmpl->setup['plugin.']['tx_cssstyledcontent.']['_CSS_PAGE_STYLE'])) {
-            $this->frontendController->tmpl->setup['plugin.']['tx_cssstyledcontent.']['_CSS_PAGE_STYLE'] = array();
+            $this->frontendController->tmpl->setup['plugin.']['tx_cssstyledcontent.']['_CSS_PAGE_STYLE'] = [];
         }
         if (!isset($this->frontendController->tmpl->setup['plugin.']['tx_cssstyledcontent.']['_CSS_PAGE_STYLE'][$selector])) {
             $this->frontendController->tmpl->setup['plugin.']['tx_cssstyledcontent.']['_CSS_PAGE_STYLE'][$selector] = TAB . $selector . ' { ' . $declaration . ' }';

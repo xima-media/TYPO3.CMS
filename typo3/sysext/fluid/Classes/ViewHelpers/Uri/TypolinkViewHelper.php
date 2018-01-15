@@ -57,10 +57,10 @@ class TypolinkViewHelper extends AbstractViewHelper
     public function render($parameter, $additionalParams = '')
     {
         return static::renderStatic(
-            array(
+            [
                 'parameter' => $parameter,
                 'additionalParams' => $additionalParams
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
@@ -82,9 +82,9 @@ class TypolinkViewHelper extends AbstractViewHelper
         if ($parameter) {
             $contentObject = GeneralUtility::makeInstance(ContentObjectRenderer::class);
             $content = $contentObject->typoLink_URL(
-                array(
+                [
                     'parameter' => self::createTypolinkParameterArrayFromArguments($parameter, $additionalParams),
-                )
+                ]
             );
         }
 

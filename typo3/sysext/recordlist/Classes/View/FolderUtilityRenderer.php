@@ -64,16 +64,15 @@ class FolderUtilityRenderer
         $lang = $this->getLanguageService();
 
         $formAction = BackendUtility::getModuleUrl('tce_file');
-        $markup = array();
+        $markup = [];
         $markup[] = '<div class="element-browser-section element-browser-createfolder">';
         $markup[] = '<form action="' . htmlspecialchars($formAction)
             . '" method="post" name="editform" enctype="multipart/form-data">';
-        $markup[] = '<h3>' . htmlspecialchars($lang->sL('LLL:EXT:lang/locallang_core.xlf:create_folder.title')) . ':</h3>';
-        $markup[] = '<p><strong>' . htmlspecialchars($lang->getLL('path')) . ':</strong>'
+        $markup[] = '<h3>' . $lang->sL('LLL:EXT:lang/locallang_core.xlf:create_folder.title', true) . ':</h3>';
+        $markup[] = '<p><strong>' . $lang->getLL('path', true) . ':</strong>'
             . htmlspecialchars($folderObject->getIdentifier()) . '</p>';
 
         $a = 1;
-        $markup[] = '<div class="row form-group"><div class="col-xs-8">';
         $markup[] = '<input class="form-control" type="text" name="file[newfolder][' . $a . '][data]" />';
         $markup[] = '<input type="hidden" name="file[newfolder][' . $a . '][target]" value="'
             . htmlspecialchars($folderObject->getCombinedIdentifier()) . '" />';
@@ -86,11 +85,10 @@ class FolderUtilityRenderer
             )
         );
         $markup[] = '<input type="hidden" name="redirect" value="' . htmlspecialchars($redirectValue) . '" />';
-        $markup[] = '</div><div class="col-xs-4">';
         $markup[] = '<input class="btn btn-default" type="submit" name="submit" value="'
-            . htmlspecialchars($lang->sL('LLL:EXT:lang/locallang_core.xlf:create_folder.submit')) . '" />';
+            . $lang->sL('LLL:EXT:lang/locallang_core.xlf:create_folder.submit', true) . '" />';
 
-        $markup[] = '</div></div></form>';
+        $markup[] = '   </form>';
         $markup[] = '</div>';
 
         return implode(LF, $markup);
@@ -122,7 +120,7 @@ class FolderUtilityRenderer
         $header = $folderObject->getIdentifier();
         $lang = $this->getLanguageService();
         // Create a list of allowed file extensions with the readable format "youtube, vimeo" etc.
-        $fileExtList = array();
+        $fileExtList = [];
         foreach ($allowedExtensions as $fileExt) {
             if (GeneralUtility::verifyFilenameAgainstDenyPattern('.' . $fileExt)) {
                 $fileExtList[] = '<span class="label label-success">'
@@ -131,12 +129,12 @@ class FolderUtilityRenderer
         }
         $formAction = BackendUtility::getModuleUrl('tce_file');
         $combinedIdentifier = $folderObject->getCombinedIdentifier();
-        $markup = array();
+        $markup = [];
         $markup[] = '<div class="element-browser-section element-browser-upload">';
         $markup[] = '   <form action="' . htmlspecialchars($formAction)
             . '" method="post" name="editform" enctype="multipart/form-data">';
-        $markup[] = '   <h3>' . htmlspecialchars($lang->sL('LLL:EXT:lang/locallang_core.xlf:file_upload.php.pagetitle')) . ':</h3>';
-        $markup[] = '   <p><strong>' . htmlspecialchars($lang->getLL('path')) . ':</strong>' . htmlspecialchars($header) . '</p>';
+        $markup[] = '   <h3>' . $lang->sL('LLL:EXT:lang/locallang_core.xlf:file_upload.php.pagetitle', true) . ':</h3>';
+        $markup[] = '   <p><strong>' . $lang->getLL('path', true) . ':</strong>' . htmlspecialchars($header) . '</p>';
         // Traverse the number of upload fields:
         for ($a = 1; $a <= $count; $a++) {
             $markup[] = '<div class="form-group">';
@@ -157,7 +155,7 @@ class FolderUtilityRenderer
         if (!empty($fileExtList)) {
             $markup[] = '<div class="form-group">';
             $markup[] = '    <label>';
-            $markup[] = htmlspecialchars($lang->sL('LLL:EXT:lang/locallang_core.xlf:cm.allowedFileExtensions')) . '<br/>';
+            $markup[] = $lang->sL('LLL:EXT:lang/locallang_core.xlf:cm.allowedFileExtensions', true) . '<br/>';
             $markup[] = '    </label>';
             $markup[] = '    <div class="form-control">';
             $markup[] = implode(' ', $fileExtList);
@@ -168,11 +166,11 @@ class FolderUtilityRenderer
         $markup[] = '<div class="checkbox">';
         $markup[] = '    <label>';
         $markup[] = '    <input type="checkbox" name="overwriteExistingFiles" id="overwriteExistingFiles" value="1" />';
-        $markup[] = htmlspecialchars($lang->sL('LLL:EXT:lang/locallang_misc.xlf:overwriteExistingFiles'));
+        $markup[] = $lang->sL('LLL:EXT:lang/locallang_misc.xlf:overwriteExistingFiles', true);
         $markup[] = '    </label>';
         $markup[] = '</div>';
         $markup[] = '<input class="btn btn-default" type="submit" name="submit" value="'
-            . htmlspecialchars($lang->sL('LLL:EXT:lang/locallang_core.xlf:file_upload.php.submit')) . '" />';
+            . $lang->sL('LLL:EXT:lang/locallang_core.xlf:file_upload.php.submit', true) . '" />';
 
         $markup[] = '   </form>';
         $markup[] = '</div>';
@@ -181,7 +179,7 @@ class FolderUtilityRenderer
 
         // Add online media
         // Create a list of allowed file extensions in a readable format "youtube, vimeo" etc.
-        $fileExtList = array();
+        $fileExtList = [];
         $onlineMediaFileExt = OnlineMediaHelperRegistry::getInstance()->getSupportedFileExtensions();
         foreach ($onlineMediaFileExt as $fileExt) {
             if (GeneralUtility::verifyFilenameAgainstDenyPattern('.' . $fileExt)
@@ -194,24 +192,22 @@ class FolderUtilityRenderer
         if (!empty($fileExtList)) {
             $formAction = BackendUtility::getModuleUrl('online_media');
 
-            $markup = array();
+            $markup = [];
             $markup[] = '<div class="element-browser-section element-browser-mediaurls">';
             $markup[] = '   <form action="' . htmlspecialchars($formAction)
                 . '" method="post" name="editform1" id="typo3-addMediaForm" enctype="multipart/form-data">';
-            $markup[] = '<h3>' . htmlspecialchars($lang->sL('LLL:EXT:lang/locallang_core.xlf:online_media.new_media')) . ':</h3>';
-            $markup[] = '<p><strong>' . htmlspecialchars($lang->getLL('path')) . ':</strong>' . htmlspecialchars($header) . '</p>';
-            $markup[] = '<div class="row form-group"><div class="col-xs-8">';
+            $markup[] = '<h3>' . $lang->sL('LLL:EXT:lang/locallang_core.xlf:online_media.new_media', true) . ':</h3>';
+            $markup[] = '<p><strong>' . $lang->getLL('path', true) . ':</strong>' . htmlspecialchars($header) . '</p>';
+            $markup[] = '<div class="form-group">';
             $markup[] = '<input type="hidden" name="file[newMedia][0][target]" value="'
                 . htmlspecialchars($folderObject->getCombinedIdentifier()) . '" />';
             $markup[] = '<input type="hidden" name="file[newMedia][0][allowed]" value="'
                 . htmlspecialchars(implode(',', $allowedExtensions)) . '" />';
             $markup[] = '<input type="text" name="file[newMedia][0][url]" class="form-control" placeholder="'
-                . htmlspecialchars($lang->sL('LLL:EXT:lang/locallang_core.xlf:online_media.new_media.placeholder')) . '" />';
-            $markup[] = '</div><div class="col-xs-4">';
+                . $lang->sL('LLL:EXT:lang/locallang_core.xlf:online_media.new_media.placeholder', true) . '" />';
             $markup[] = '<button class="btn btn-default">'
-                . htmlspecialchars($lang->sL('LLL:EXT:lang/locallang_core.xlf:online_media.new_media.submit')) . '</button>';
-
-            $markup[] = '</div></div>';
+                . $lang->sL('LLL:EXT:lang/locallang_core.xlf:online_media.new_media.submit', true) . '</button>';
+            $markup[] = '</div>';
             $markup[] = '<div class="form-group">';
             $markup[] = '    <label>';
             $markup[] = $lang->sL('LLL:EXT:lang/locallang_core.xlf:online_media.new_media.allowedProviders') . '<br/>';
@@ -221,6 +217,7 @@ class FolderUtilityRenderer
             $markup[] = '    </div>';
             $markup[] = '</div>';
             $markup[] = '<input type="hidden" name="redirect" value="' . htmlspecialchars($redirectValue) . '" />';
+            $markup[] = '</div>';
             $markup[] = '</form>';
             $markup[] = '</div>';
 

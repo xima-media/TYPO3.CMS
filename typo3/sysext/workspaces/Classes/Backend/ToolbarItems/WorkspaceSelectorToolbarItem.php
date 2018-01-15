@@ -72,7 +72,7 @@ class WorkspaceSelectorToolbarItem implements ToolbarItemInterface
             return '';
         }
 
-        return '<span title="' . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:toolbarItems.workspace')) . '">'
+        return '<span title="' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:toolbarItems.workspace', true) . '">'
             . $this->iconFactory->getIcon('apps-toolbar-menu-workspace', Icon::SIZE_SMALL)->render('inline') . '</span>';
     }
 
@@ -89,11 +89,11 @@ class WorkspaceSelectorToolbarItem implements ToolbarItemInterface
         $index = 0;
         $activeWorkspace = (int)$backendUser->workspace;
         $stateCheckedIcon = $this->iconFactory->getIcon('status-status-checked', Icon::SIZE_SMALL)->render();
-        $stateUncheckedIcon = '<span title="' . htmlspecialchars($languageService->getLL('bookmark_inactive')) . '">' . $this->iconFactory->getIcon('empty-empty', Icon::SIZE_SMALL)->render() . '</span>';
-        $workspaceSections = array(
-            'top' => array(),
-            'items' => array(),
-        );
+        $stateUncheckedIcon = '<span title="' . $languageService->getLL('bookmark_inactive', true) . '">' . $this->iconFactory->getIcon('empty-empty', Icon::SIZE_SMALL)->render() . '</span>';
+        $workspaceSections = [
+            'top' => [],
+            'items' => [],
+        ];
 
         foreach ($this->availableWorkspaces as $workspaceId => $label) {
             $workspaceId = (int)$workspaceId;
@@ -101,7 +101,7 @@ class WorkspaceSelectorToolbarItem implements ToolbarItemInterface
             $classValue = ($workspaceId === $activeWorkspace ? ' class="selected"' : '');
             $sectionName = ($index++ === 0 ? 'top' : 'items');
             $workspaceSections[$sectionName][] = '<li' . $classValue . '>'
-                . '<a href="' . htmlspecialchars(\TYPO3\CMS\Backend\Utility\BackendUtility::getModuleUrl('main', array('changeWorkspace' => $workspaceId))) . '" data-workspaceid="' . $workspaceId . '" class="dropdown-list-link tx-workspaces-switchlink">'
+                . '<a href="' . htmlspecialchars(\TYPO3\CMS\Backend\Utility\BackendUtility::getModuleUrl('main', ['changeWorkspace' => $workspaceId])) . '" data-workspaceid="' . $workspaceId . '" class="dropdown-list-link tx-workspaces-switchlink">'
                 . $iconState . ' ' . htmlspecialchars($label)
                 . '</a></li>';
         }
@@ -111,21 +111,21 @@ class WorkspaceSelectorToolbarItem implements ToolbarItemInterface
             // if there is at least one icon on top and if the access rights are there
             if ($backendUser->check('modules', 'web_WorkspacesWorkspaces')) {
                 $workspaceSections['top'][] = '<li><a target="content" data-module="web_WorkspacesWorkspaces" class="dropdown-list-link tx-workspaces-modulelink">'
-                    . $stateUncheckedIcon . ' ' . htmlspecialchars($languageService->getLL('bookmark_workspace'))
+                    . $stateUncheckedIcon . ' ' . $languageService->getLL('bookmark_workspace', true)
                     . '</a></li>';
             }
         } else {
             // no items on top (= no workspace to work in)
-            $workspaceSections['top'][] = '<li>' . $stateUncheckedIcon . ' ' . htmlspecialchars($languageService->getLL('bookmark_noWSfound')) . '</li>';
+            $workspaceSections['top'][] = '<li>' . $stateUncheckedIcon . ' ' . $languageService->getLL('bookmark_noWSfound', true) . '</li>';
         }
 
-        $workspaceMenu = array(
+        $workspaceMenu = [
             '<ul class="dropdown-list">' ,
                 implode(LF, $workspaceSections['top']),
                 (!empty($workspaceSections['items']) ? '<li class="divider"></li>' : ''),
                 implode(LF, $workspaceSections['items']),
             '</ul>'
-        );
+        ];
 
         return implode(LF, $workspaceMenu);
     }
@@ -137,7 +137,7 @@ class WorkspaceSelectorToolbarItem implements ToolbarItemInterface
      */
     public function getAdditionalAttributes()
     {
-        return array();
+        return [];
     }
 
     /**

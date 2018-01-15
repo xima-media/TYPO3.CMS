@@ -33,9 +33,9 @@ class IsExtensionLoadedViewHelper extends AbstractViewHelper
     public function render($extensionKey)
     {
         return static::renderStatic(
-            array(
+            [
                 'extensionKey' => $extensionKey
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

@@ -53,7 +53,7 @@ class FrontendController extends ActionController
      *
      * @var array
      */
-    protected $typoscript = array();
+    protected $typoscript = [];
 
     /**
      * TRUE if the validation of the form should be skipped
@@ -109,7 +109,7 @@ class FrontendController extends ActionController
             // If there are more forms at a page we have to skip
             // the validation of not submitted forms
             $this->skipValidation = true;
-            $this->request->setArgument('model', array());
+            $this->request->setArgument('model', []);
         }
     }
 
@@ -120,16 +120,11 @@ class FrontendController extends ActionController
      */
     protected function initializeShowAction()
     {
-        // set validation errors
         $validationResults = $this->request->getOriginalRequestMappingResults()->forProperty('model');
-        if (!$validationResults->hasErrors()) {
-            // If there are errors, the rules already build
-                // but if there are errors, we need to build the rules here,
-                // because of the mandatory message rendering
-            $this->validationBuilder->buildRules();
-            return;
+        $this->validationBuilder->buildRules();
+        if ($validationResults->hasErrors()) {
+            $this->formBuilder->setValidationErrors($validationResults);
         }
-        $this->formBuilder->setValidationErrors($validationResults);
     }
 
     /**
@@ -222,10 +217,10 @@ class FrontendController extends ActionController
         $this->skipForeignFormProcessing();
 
         if ($this->request->hasArgument('confirmation-true')) {
-            $this->forward('process', null, null, array($this->configuration->getPrefix() => $this->request->getArgument('model')));
+            $this->forward('process', null, null, [$this->configuration->getPrefix() => $this->request->getArgument('model')]);
         } else {
             $this->sessionUtility->destroySession();
-            $this->forward('show', null, null, array('incomingData' => $this->request->getArgument('model')));
+            $this->forward('show', null, null, ['incomingData' => $this->request->getArgument('model')]);
         }
     }
 
@@ -243,7 +238,7 @@ class FrontendController extends ActionController
 
         $this->controllerContext->setValidationElement($model);
         $form = $this->formBuilder->buildModel();
-        $postProcessorTypoScript = array();
+        $postProcessorTypoScript = [];
         if (isset($this->typoscript['postProcessor.'])) {
             $postProcessorTypoScript = $this->typoscript['postProcessor.'];
         }
@@ -258,7 +253,7 @@ class FrontendController extends ActionController
         // @todo What is happening here?
         $content = $postProcessor->process();
         $this->sessionUtility->destroySession();
-        $this->forward('afterProcess', null, null, array('postProcessorContent' => $content));
+        $this->forward('afterProcess', null, null, ['postProcessorContent' => $content]);
     }
 
     /**
@@ -317,7 +312,7 @@ class FrontendController extends ActionController
      * @throws \TYPO3\CMS\Extbase\Mvc\Exception\NoSuchArgumentException
      * @throws \TYPO3\CMS\Extbase\Validation\Exception\NoSuchValidatorException
      */
-    protected function setDynamicValidation(array $toValidate = array())
+    protected function setDynamicValidation(array $toValidate = [])
     {
         // build custom validation chain
         /** @var \TYPO3\CMS\Extbase\Validation\ValidatorResolver $validatorResolver */

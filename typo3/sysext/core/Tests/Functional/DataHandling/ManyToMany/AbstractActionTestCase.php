@@ -43,7 +43,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
         $this->importScenarioDataSet('LiveDefaultPages');
         $this->importScenarioDataSet('LiveDefaultElements');
 
-        $this->setUpFrontendRootPage(1, array('typo3/sysext/core/Tests/Functional/Fixtures/Frontend/JsonRenderer.ts'));
+        $this->setUpFrontendRootPage(1, ['typo3/sysext/core/Tests/Functional/Fixtures/Frontend/JsonRenderer.ts']);
         $this->backendUser->workspace = 0;
     }
 
@@ -53,68 +53,68 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
 
     /**
      * @test
-     * @see DataSet/Assertion/addCategoryRelation.csv
+     * @see DataSet/addCategoryRelation.csv
      */
     public function addCategoryRelation()
     {
         $this->actionService->modifyReferences(
-            self::TABLE_Content, self::VALUE_ContentIdFirst, 'categories', array(self::VALUE_CategoryIdFirst, self::VALUE_CategoryIdSecond, 31)
+            self::TABLE_Content, self::VALUE_ContentIdFirst, 'categories', [self::VALUE_CategoryIdFirst, self::VALUE_CategoryIdSecond, 31]
         );
     }
 
     /**
      * @test
-     * @see DataSet/Assertion/deleteCategoryRelation.csv
+     * @see DataSet/deleteCategoryRelation.csv
      */
     public function deleteCategoryRelation()
     {
         $this->actionService->modifyReferences(
-            self::TABLE_Content, self::VALUE_ContentIdFirst, 'categories', array(self::VALUE_CategoryIdFirst)
+            self::TABLE_Content, self::VALUE_ContentIdFirst, 'categories', [self::VALUE_CategoryIdFirst]
         );
     }
 
     /**
      * @test
-     * @see DataSet/Assertion/changeCategoryRelationSorting.csv
+     * @see DataSet/changeCategoryRelationSorting.csv
      */
     public function changeCategoryRelationSorting()
     {
         $this->actionService->modifyReferences(
-            self::TABLE_Content, self::VALUE_ContentIdFirst, 'categories', array(self::VALUE_CategoryIdSecond, self::VALUE_CategoryIdFirst)
+            self::TABLE_Content, self::VALUE_ContentIdFirst, 'categories', [self::VALUE_CategoryIdSecond, self::VALUE_CategoryIdFirst]
         );
     }
 
     /**
      * @test
-     * @see DataSet/Assertion/modifyCategoryRecordOfCategoryRelation.csv
+     * @see DataSet/modifyCategoryRecordOfCategoryRelation.csv
      */
     public function modifyCategoryOfRelation()
     {
-        $this->actionService->modifyRecord(self::TABLE_Category, self::VALUE_CategoryIdFirst, array('title' => 'Testing #1'));
+        $this->actionService->modifyRecord(self::TABLE_Category, self::VALUE_CategoryIdFirst, ['title' => 'Testing #1']);
     }
 
     /**
      * @test
-     * @see DataSet/Assertion/modifyContentRecordOfCategoryRelation.csv
+     * @see DataSet/modifyContentRecordOfCategoryRelation.csv
      */
     public function modifyContentOfRelation()
     {
-        $this->actionService->modifyRecord(self::TABLE_Content, self::VALUE_ContentIdFirst, array('header' => 'Testing #1'));
+        $this->actionService->modifyRecord(self::TABLE_Content, self::VALUE_ContentIdFirst, ['header' => 'Testing #1']);
     }
 
     /**
      * @test
-     * @see DataSet/Assertion/modifyBothRecordsOfCategoryRelation.csv
+     * @see DataSet/modifyBothRecordsOfCategoryRelation.csv
      */
     public function modifyBothsOfRelation()
     {
-        $this->actionService->modifyRecord(self::TABLE_Category, self::VALUE_CategoryIdFirst, array('title' => 'Testing #1'));
-        $this->actionService->modifyRecord(self::TABLE_Content, self::VALUE_ContentIdFirst, array('header' => 'Testing #1'));
+        $this->actionService->modifyRecord(self::TABLE_Category, self::VALUE_CategoryIdFirst, ['title' => 'Testing #1']);
+        $this->actionService->modifyRecord(self::TABLE_Content, self::VALUE_ContentIdFirst, ['header' => 'Testing #1']);
     }
 
     /**
      * @test
-     * @see DataSet/Assertion/deleteContentRecordOfCategoryRelation.csv
+     * @see DataSet/deleteContentRecordOfCategoryRelation.csv
      */
     public function deleteContentOfRelation()
     {
@@ -123,7 +123,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
 
     /**
      * @test
-     * @see DataSet/Assertion/deleteCategoryRecordOfCategoryRelation.csv
+     * @see DataSet/deleteCategoryRecordOfCategoryRelation.csv
      */
     public function deleteCategoryOfRelation()
     {
@@ -132,7 +132,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
 
     /**
      * @test
-     * @see DataSet/Assertion/copyContentRecordOfCategoryRelation.csv
+     * @see DataSet/copyContentRecordOfCategoryRelation.csv
      */
     public function copyContentOfRelation()
     {
@@ -142,7 +142,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
 
     /**
      * @test
-     * @see DataSet/Assertion/copyCategoryRecordOfCategoryRelation.csv
+     * @see DataSet/copyCategoryRecordOfCategoryRelation.csv
      */
     public function copyCategoryOfRelation()
     {
@@ -151,7 +151,25 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
 
     /**
      * @test
-     * @see DataSet/Assertion/localizeContentRecordOfCategoryRelation.csv
+     * @see DataSet/copyContentToLanguageOfRelation.csv
+     */
+    public function copyContentToLanguageOfRelation()
+    {
+        $this->actionService->copyRecordToLanguage(self::TABLE_Content, self::VALUE_ContentIdLast, self::VALUE_LanguageId);
+    }
+
+    /**
+     * @test
+     * @see DataSet/copyCategoryToLanguageOfRelation.csv
+     */
+    public function copyCategoryToLanguageOfRelation()
+    {
+        $this->actionService->copyRecordToLanguage(self::TABLE_Category, self::VALUE_CategoryIdFirst, self::VALUE_LanguageId);
+    }
+
+    /**
+     * @test
+     * @see DataSet/localizeContentRecordOfCategoryRelation.csv
      */
     public function localizeContentOfRelation()
     {
@@ -160,7 +178,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
 
     /**
      * @test
-     * @see DataSet/Assertion/localizeCategoryRecordOfCategoryRelation.csv
+     * @see DataSet/localizeCategoryRecordOfCategoryRelation.csv
      */
     public function localizeCategoryOfRelation()
     {
@@ -169,7 +187,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
 
     /**
      * @test
-     * @see DataSet/Assertion/moveContentRecordOfCategoryRelationToDifferentPage.csv
+     * @see DataSet/moveContentRecordOfCategoryRelationToDifferentPage.csv
      */
     public function moveContentOfRelationToDifferentPage()
     {
@@ -178,7 +196,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
 
     /**
      * @test
-     * @see DataSet/Assertion/copyPage.csv
+     * @see DataSet/copyPage.csv
      */
     public function copyPage()
     {

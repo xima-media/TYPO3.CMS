@@ -14,9 +14,7 @@ namespace TYPO3\CMS\Workspaces\Service;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Backend\Backend\Avatar\Avatar;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
  * Service for history
@@ -31,7 +29,7 @@ class HistoryService implements \TYPO3\CMS\Core\SingletonInterface
     /**
      * @var array
      */
-    protected $historyObjects = array();
+    protected $historyObjects = [];
 
     /**
      * @var \TYPO3\CMS\Core\Utility\DiffUtility
@@ -55,7 +53,7 @@ class HistoryService implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function getHistory($table, $id)
     {
-        $history = array();
+        $history = [];
         $i = 0;
         foreach ((array)$this->getHistoryObject($table, $id)->changeLog as $entry) {
             if ($i++ > 20) {
@@ -81,17 +79,11 @@ class HistoryService implements \TYPO3\CMS\Core\SingletonInterface
         } else {
             $differences = $this->getDifferences($entry);
         }
-
-        /** @var Avatar $avatar */
-        $avatar = GeneralUtility::makeInstance(Avatar::class);
-        $beUserRecord = BackendUtility::getRecord('be_users', $entry['user']);
-
-        return array(
+        return [
             'datetime' => htmlspecialchars(BackendUtility::datetime($entry['tstamp'])),
             'user' => htmlspecialchars($this->getUserName($entry['user'])),
-            'user_avatar' => $avatar->render($beUserRecord),
             'differences' => $differences
-        );
+        ];
     }
 
     /**
@@ -103,7 +95,7 @@ class HistoryService implements \TYPO3\CMS\Core\SingletonInterface
      */
     protected function getDifferences(array $entry)
     {
-        $differences = array();
+        $differences = [];
         $tableName = $entry['tablename'];
         if (is_array($entry['newRecord'])) {
             $fields = array_keys($entry['newRecord']);
@@ -115,10 +107,10 @@ class HistoryService implements \TYPO3\CMS\Core\SingletonInterface
                         BackendUtility::getProcessedValue($tableName, $field, $entry['newRecord'][$field], 0, true)
                     );
                     if (!empty($fieldDifferences)) {
-                        $differences[] = array(
-                            'label' => $this->getLanguageService()->sL((string)BackendUtility::getItemLabel($tableName, $field)),
+                        $differences[] = [
+                            'label' => $this->getLanguageService()->sl((string)BackendUtility::getItemLabel($tableName, $field)),
                             'html' => nl2br(trim($fieldDifferences)),
-                        );
+                        ];
                     }
                 }
             }
@@ -169,6 +161,7 @@ class HistoryService implements \TYPO3\CMS\Core\SingletonInterface
     {
         if (!isset($this->differencesObject)) {
             $this->differencesObject = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Utility\DiffUtility::class);
+            $this->differencesObject->stripTags = false;
         }
         return $this->differencesObject;
     }

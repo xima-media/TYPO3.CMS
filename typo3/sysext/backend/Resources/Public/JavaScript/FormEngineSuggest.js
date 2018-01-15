@@ -22,7 +22,7 @@ define(['jquery', 'jquery/autocomplete'], function ($) {
 			field = $searchField.data('field'),
 			uid = $searchField.data('uid'),
 			pid = $searchField.data('pid'),
-			newRecordRow = $searchField.data('recorddata'),
+			newRecordRow = $searchField.attr('data-recorddata'),
 			minimumCharacters = $searchField.data('minchars'),
 			url = TYPO3.settings.ajaxUrls['record_suggest'],
 			params = {
@@ -64,6 +64,7 @@ define(['jquery', 'jquery/autocomplete'], function ($) {
 			showNoSuggestionNotice: true,
 			noSuggestionNotice: '<div class="autocomplete-info">No results</div>',
 			minLength: minimumCharacters,
+			preventBadQueries: false,
 			// put the AJAX results in the right format
 			transformResult: function(response) {
 				return {
@@ -102,7 +103,6 @@ define(['jquery', 'jquery/autocomplete'], function ($) {
 		// set up the events
 		$containerElement.on('click', '.autocomplete-suggestion-link', function(evt) {
 			evt.preventDefault();
-			insertValue(this);
 		});
 	};
 

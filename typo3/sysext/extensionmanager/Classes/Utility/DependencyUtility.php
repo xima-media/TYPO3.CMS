@@ -53,7 +53,7 @@ class DependencyUtility implements \TYPO3\CMS\Core\SingletonInterface
     /**
      * @var array
      */
-    protected $availableExtensions = array();
+    protected $availableExtensions = [];
 
     /**
      * @var string
@@ -63,7 +63,7 @@ class DependencyUtility implements \TYPO3\CMS\Core\SingletonInterface
     /**
      * @var array
      */
-    protected $dependencyErrors = array();
+    protected $dependencyErrors = [];
 
     /**
      * @var bool
@@ -147,7 +147,7 @@ class DependencyUtility implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function checkDependencies(Extension $extension)
     {
-        $this->dependencyErrors = array();
+        $this->dependencyErrors = [];
         $dependencies = $extension->getDependencies();
         foreach ($dependencies as $dependency) {
             /** @var Dependency $dependency */
@@ -170,12 +170,12 @@ class DependencyUtility implements \TYPO3\CMS\Core\SingletonInterface
                     $extensionKey = $identifier;
                 }
                 if (!isset($this->dependencyErrors[$extensionKey])) {
-                    $this->dependencyErrors[$extensionKey] = array();
+                    $this->dependencyErrors[$extensionKey] = [];
                 }
-                $this->dependencyErrors[$extensionKey][] = array(
+                $this->dependencyErrors[$extensionKey][] = [
                     'code' => $e->getCode(),
                     'message' => $e->getMessage()
-                );
+                ];
             }
         }
     }
@@ -335,6 +335,8 @@ class DependencyUtility implements \TYPO3\CMS\Core\SingletonInterface
                                 1430562374
                             );
                         }
+                        // Dependency check is skipped and the local version has to be installed
+                        $this->managementService->markExtensionForInstallation($extensionKey);
                     }
                 }
             } else {
@@ -557,10 +559,10 @@ class DependencyUtility implements \TYPO3\CMS\Core\SingletonInterface
         $lowestVersionInteger = $lowestVersion ? VersionNumberUtility::convertVersionNumberToInteger($lowestVersion) : 0;
         $highestVersion = $dependency->getHighestVersion();
         $highestVersionInteger = $highestVersion ? VersionNumberUtility::convertVersionNumberToInteger($highestVersion) : 0;
-        return array(
+        return [
             'lowestIntegerVersion' => $lowestVersionInteger,
             'highestIntegerVersion' => $highestVersionInteger
-        );
+        ];
     }
 
     /**
@@ -570,7 +572,7 @@ class DependencyUtility implements \TYPO3\CMS\Core\SingletonInterface
     public function findInstalledExtensionsThatDependOnMe($extensionKey)
     {
         $availableAndInstalledExtensions = $this->listUtility->getAvailableAndInstalledExtensionsWithAdditionalInformation();
-        $dependentExtensions = array();
+        $dependentExtensions = [];
         foreach ($availableAndInstalledExtensions as $availableAndInstalledExtensionKey => $availableAndInstalledExtension) {
             if (isset($availableAndInstalledExtension['installed']) && $availableAndInstalledExtension['installed'] === true) {
                 if (is_array($availableAndInstalledExtension['constraints']) && is_array($availableAndInstalledExtension['constraints']['depends']) && array_key_exists($extensionKey, $availableAndInstalledExtension['constraints']['depends'])) {
@@ -589,7 +591,7 @@ class DependencyUtility implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function getExtensionsSuitableForTypo3Version($extensions)
     {
-        $suitableExtensions = array();
+        $suitableExtensions = [];
         /** @var Extension $extension */
         foreach ($extensions as $extension) {
             /** @var Dependency $dependency */
@@ -606,5 +608,37 @@ class DependencyUtility implements \TYPO3\CMS\Core\SingletonInterface
             }
         }
         return $suitableExtensions;
+    }
+
+    /**
+     * Gets a list of various extensions in various versions and returns
+     * a filtered list containing the extension-version combination with
+     * the highest version number.
+     *
+     * @param Extension[] $extensions
+     * @param bool $showUnsuitable
+     *
+     * @return \TYPO3\CMS\Extensionmanager\Domain\Model\Extension[]
+     */
+    public function filterYoungestVersionOfExtensionList(array $extensions, $showUnsuitable)
+    {
+        if (!$showUnsuitable) {
+            $extensions = $this->getExtensionsSuitableForTypo3Version($extensions);
+        }
+        $filteredExtensions = [];
+        foreach ($extensions as $extension) {
+            $extensionKey = $extension->getExtensionKey();
+            if (!array_key_exists($extensionKey, $filteredExtensions)) {
+                $filteredExtensions[$extensionKey] = $extension;
+                continue;
+            } else {
+                $currentVersion = $filteredExtensions[$extensionKey]->getVersion();
+                $newVersion = $extension->getVersion();
+                if (version_compare($newVersion, $currentVersion, '>')) {
+                    $filteredExtensions[$extensionKey] = $extension;
+                }
+            }
+        }
+        return $filteredExtensions;
     }
 }

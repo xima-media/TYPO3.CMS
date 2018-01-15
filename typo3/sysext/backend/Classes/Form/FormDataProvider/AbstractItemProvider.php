@@ -20,12 +20,14 @@ use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Database\DatabaseConnection;
 use TYPO3\CMS\Core\Database\RelationHandler;
 use TYPO3\CMS\Core\Imaging\IconFactory;
+use TYPO3\CMS\Core\Imaging\IconRegistry;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageQueue;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
+use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Lang\LanguageService;
 
 /**
@@ -128,7 +130,7 @@ abstract class AbstractItemProvider
                 ) {
                     $icon = $addItemsArray[$value . '.']['icon'];
                 }
-                $items[] = array($label, $value, $icon);
+                $items[] = [$label, $value, $icon];
             }
         }
         return $items;
@@ -155,11 +157,12 @@ abstract class AbstractItemProvider
         }
 
         $languageService = $this->getLanguageService();
+        $iconRegistry = GeneralUtility::makeInstance(IconRegistry::class);
         $iconFactory = GeneralUtility::makeInstance(IconFactory::class);
 
         $special = $result['processedTca']['columns'][$fieldName]['config']['special'];
         switch (true) {
-            case ($special === 'tables'):
+            case $special === 'tables':
                 foreach ($GLOBALS['TCA'] as $currentTable => $_) {
                     if (!empty($GLOBALS['TCA'][$currentTable]['ctrl']['adminOnly'])) {
                         // Hide "admin only" tables
@@ -177,7 +180,7 @@ abstract class AbstractItemProvider
                     $items[] = [$label, $currentTable, $icon, $helpText];
                 }
                 break;
-            case ($special === 'pagetypes'):
+            case $special === 'pagetypes':
                 if (isset($GLOBALS['TCA']['pages']['columns']['doktype']['config']['items'])
                     && is_array($GLOBALS['TCA']['pages']['columns']['doktype']['config']['items'])
                 ) {
@@ -194,7 +197,7 @@ abstract class AbstractItemProvider
                     }
                 }
                 break;
-            case ($special === 'exclude'):
+            case $special === 'exclude':
                 $excludeArrays = $this->getExcludeFields();
                 foreach ($excludeArrays as $excludeArray) {
                     // If the field comes from a FlexForm, the syntax is more complex
@@ -203,7 +206,7 @@ abstract class AbstractItemProvider
                         // Add header if not yet set for plugin section
                         if (!isset($items[$excludeArray['sectionHeader']])) {
                             // there is no icon handling for plugins - we take the icon from the table
-                            $icon = $iconFactory->mapRecordTypeToIconIdentifier($excludeArray['table'], array());
+                            $icon = $iconFactory->mapRecordTypeToIconIdentifier($excludeArray['table'], []);
                             $items[$excludeArray['sectionHeader']] = [
                                 $excludeArray['sectionHeader'],
                                 '--div--',
@@ -213,7 +216,7 @@ abstract class AbstractItemProvider
                     } else {
                         // Add header if not yet set for table
                         if (!isset($items[$excludeArray['table']])) {
-                            $icon = $iconFactory->mapRecordTypeToIconIdentifier($excludeArray['table'], array());
+                            $icon = $iconFactory->mapRecordTypeToIconIdentifier($excludeArray['table'], []);
                             $items[$excludeArray['table']] = [
                                 $GLOBALS['TCA'][$excludeArray['table']]['ctrl']['title'],
                                 '--div--',
@@ -229,15 +232,15 @@ abstract class AbstractItemProvider
                         $helpText['description'] = $helpTextArray['description'];
                     }
                     // Item configuration:
-                    $items[] = array(
+                    $items[] = [
                         rtrim($excludeArray['origin'] === 'flexForm' ? $excludeArray['fieldLabel'] : $languageService->sL($GLOBALS['TCA'][$excludeArray['table']]['columns'][$excludeArray['fieldName']]['label']), ':') . ' (' . $excludeArray['fieldName'] . ')',
                         $excludeArray['table'] . ':' . $excludeArray['fullField'] ,
                         'empty-empty',
                         $helpText
-                    );
+                    ];
                 }
                 break;
-            case ($special === 'explicitValues'):
+            case $special === 'explicitValues':
                 $theTypes = $this->getExplicitAuthFieldValues();
                 $icons = [
                     'ALLOW' => 'status-status-permission-granted',
@@ -263,7 +266,7 @@ abstract class AbstractItemProvider
                     }
                 }
                 break;
-            case ($special === 'languages'):
+            case $special === 'languages':
                 foreach ($result['systemLanguageRows'] as $language) {
                     if ($language['uid'] !== -1) {
                         $items[] = [
@@ -274,7 +277,7 @@ abstract class AbstractItemProvider
                     }
                 }
                 break;
-            case ($special === 'custom'):
+            case $special === 'custom':
                 $customOptions = $GLOBALS['TYPO3_CONF_VARS']['BE']['customPermOptions'];
                 if (is_array($customOptions)) {
                     foreach ($customOptions as $coKey => $coValue) {
@@ -288,6 +291,28 @@ abstract class AbstractItemProvider
                             foreach ($coValue['items'] as $itemKey => $itemCfg) {
                                 $icon = 'empty-empty';
                                 $helpText = [];
+                                if (!empty($itemCfg[1])) {
+                                    if ($iconRegistry->isRegistered($itemCfg[1])) {
+                                        // Use icon identifier when registered
+                                        $icon = $itemCfg[1];
+                                    } else {
+                                        // @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+                                        GeneralUtility::deprecationLog(
+                                            'Using "EXT:path/to/icon" is deprecated since TYPO3 CMS 7 and removed since'
+                                            . ' version 8. Please register an icon in ext_tables.php with'
+                                            . ' $iconRegistry->registerIcon() and use the icon identifier in customPermOptions.'
+                                        );
+                                        // Generate custom option icon and reuse same identifier
+                                        $icon = 'custom-option-' . md5($itemCfg[1]);
+                                        if ($iconRegistry->isRegistered($icon) === false) {
+                                            $iconRegistry->registerIcon(
+                                                $icon,
+                                                $iconRegistry->detectIconProvider($itemCfg[1]),
+                                                ['source' => $itemCfg[1]]
+                                            );
+                                        }
+                                    }
+                                }
                                 if (!empty($itemCfg[2])) {
                                     $helpText['description'] = $languageService->sL($itemCfg[2]);
                                 }
@@ -302,37 +327,33 @@ abstract class AbstractItemProvider
                     }
                 }
                 break;
-            case ($special === 'modListGroup' || $special === 'modListUser'):
-                /** @var ModuleLoader $loadModules */
+            case $special === 'modListGroup' || $special === 'modListUser':
                 $loadModules = GeneralUtility::makeInstance(ModuleLoader::class);
                 $loadModules->load($GLOBALS['TBE_MODULES']);
                 $modList = $special === 'modListUser' ? $loadModules->modListUser : $loadModules->modListGroup;
                 if (is_array($modList)) {
                     foreach ($modList as $theMod) {
-                        $moduleLabels = $loadModules->getLabelsForModule($theMod);
-                        list($mainModule, $subModule) = explode('_', $theMod, 2);
                         // Icon:
-                        if (!empty($subModule)) {
-                            $icon = $loadModules->modules[$mainModule]['sub'][$subModule]['iconIdentifier'];
-                        } else {
-                            $icon = $loadModules->modules[$theMod]['iconIdentifier'];
+                        $icon = $languageService->moduleLabels['tabs_images'][$theMod . '_tab'];
+                        if ($icon) {
+                            $icon = '../' . PathUtility::stripPathSitePrefix($icon);
                         }
                         // Add help text
                         $helpText = [
-                            'title' => $languageService->sL($moduleLabels['shortdescription']),
-                            'description' => $languageService->sL($moduleLabels['description'])
+                            'title' => $languageService->moduleLabels['labels'][$theMod . '_tablabel'],
+                            'description' => $languageService->moduleLabels['labels'][$theMod . '_tabdescr']
                         ];
 
                         $label = '';
-                        // Add label for main module if this is a submodule
-                        if (!empty($subModule)) {
-                            $mainModuleLabels = $loadModules->getLabelsForModule($mainModule);
-                            $label .= $languageService->sL($mainModuleLabels['title']) . '>';
+                        // Add label for main module:
+                        $pp = explode('_', $theMod);
+                        if (count($pp) > 1) {
+                            $label .= $languageService->moduleLabels['tabs'][$pp[0] . '_tab'] . '>';
                         }
-                        // Add modules own label now
-                        $label .= $languageService->sL($moduleLabels['title']);
+                        // Add modules own label now:
+                        $label .= $languageService->moduleLabels['tabs'][$theMod . '_tab'];
 
-                        // Item configuration
+                        // Item configuration:
                         $items[] = [$label, $theMod, $icon, $helpText];
                     }
                 }
@@ -355,6 +376,7 @@ abstract class AbstractItemProvider
      * @param string $fieldName Current handle field name
      * @param array $items Incoming items
      * @return array Modified item array
+     * @throws \RuntimeException
      */
     protected function addItemsFromFolder(array $result, $fieldName, array $items)
     {
@@ -364,8 +386,14 @@ abstract class AbstractItemProvider
             return $items;
         }
 
-        $fileFolder = $result['processedTca']['columns'][$fieldName]['config']['fileFolder'];
-        $fileFolder = GeneralUtility::getFileAbsFileName($fileFolder);
+        $fileFolderRaw = $result['processedTca']['columns'][$fieldName]['config']['fileFolder'];
+        $fileFolder = GeneralUtility::getFileAbsFileName($fileFolderRaw);
+        if ($fileFolder === '') {
+            throw new \RuntimeException(
+                'Invalid folder given for item processing: ' . $fileFolderRaw . ' for table ' . $result['tableName'] . ', field ' . $fieldName,
+                1479399227
+            );
+        }
         $fileFolder = rtrim($fileFolder, '/') . '/';
 
         if (@is_dir($fileFolder)) {
@@ -383,7 +411,7 @@ abstract class AbstractItemProvider
             foreach ($fileArray as $fileReference) {
                 $fileInformation = pathinfo($fileReference);
                 $icon = GeneralUtility::inList($GLOBALS['TYPO3_CONF_VARS']['GFX']['imagefile_ext'], strtolower($fileInformation['extension']))
-                    ? $fileFolder . $fileReference
+                    ? '../' . PathUtility::stripPathSitePrefix($fileFolder) . $fileReference
                     : '';
                 $items[] = [
                     $fileReference,
@@ -473,14 +501,14 @@ abstract class AbstractItemProvider
                 if ($iconFieldName && $iconPath && $foreignRow[$iconFieldName]) {
                     // Prepare the row icon if available
                     $iParts = GeneralUtility::trimExplode(',', $foreignRow[$iconFieldName], true);
-                    $icon = $iconPath . '/' . trim($iParts[0]);
+                    $icon = '../' . $iconPath . '/' . trim($iParts[0]);
                 } else {
                     // Else, determine icon based on record type, or a generic fallback
                     $icon = $iconFactory->mapRecordTypeToIconIdentifier($foreignTable, $foreignRow);
                 }
                 // Add the item
                 $items[] = [
-                    $labelPrefix . htmlspecialchars(BackendUtility::getRecordTitle($foreignTable, $foreignRow)),
+                    $labelPrefix . BackendUtility::getRecordTitle($foreignTable, $foreignRow),
                     $foreignRow['uid'],
                     $icon
                 ];
@@ -651,6 +679,43 @@ abstract class AbstractItemProvider
     }
 
     /**
+     * Remove items if sys_file_storage is not allowed for non-admin users.
+     *
+     * Used by TcaSelectItems data providers
+     *
+     * @param array $result Result array
+     * @param string $fieldName Current handle field name
+     * @param array $items Incoming items
+     * @return array Modified item array
+     */
+    protected function removeItemsByUserStorageRestriction(array $result, $fieldName, array $items)
+    {
+        $referencedTableName = null;
+        if (isset($result['processedTca']['columns'][$fieldName]['config']['foreign_table'])) {
+            $referencedTableName = $result['processedTca']['columns'][$fieldName]['config']['foreign_table'];
+        }
+        if ($referencedTableName !== 'sys_file_storage') {
+            return $items;
+        }
+
+        $allowedStorageIds = array_map(
+            function (\TYPO3\CMS\Core\Resource\ResourceStorage $storage) {
+                return $storage->getUid();
+            },
+            $this->getBackendUser()->getFileStorages()
+        );
+
+        return array_filter(
+            $items,
+            function (array $item) use ($allowedStorageIds) {
+                $itemValue = isset($item[1]) ? $item[1] : null;
+                return empty($itemValue)
+                    || in_array((int)$itemValue, $allowedStorageIds, true);
+            }
+        );
+    }
+
+    /**
      * Returns an array with the exclude fields as defined in TCA and FlexForms
      * Used for listing the exclude fields in be_groups forms.
      *
@@ -706,7 +771,7 @@ abstract class AbstractItemProvider
                 }
                 // Get all sheets and title
                 foreach ($flexForms as $extIdent => $extConf) {
-                    $extTitle = $languageService->sL(trim($extConf['title']));
+                    $extTitle = $languageService->sl(trim($extConf['title']));
                     // Get all fields in sheet
                     foreach ($extConf['ds']['sheets'] as $sheetName => $sheet) {
                         if (empty($sheet['ROOT']['el']) || !is_array($sheet['ROOT']['el'])) {
@@ -782,7 +847,7 @@ abstract class AbstractItemProvider
                     if (!is_array($dataStructure)) {
                         $file = GeneralUtility::getFileAbsFileName(str_ireplace('FILE:', '', $dataStructure));
                         if ($file && @is_file($file)) {
-                            $dataStructure = file_get_contents($file);
+                            $dataStructure = GeneralUtility::getUrl($file);
                         }
                         $dataStructure = GeneralUtility::xml2array($dataStructure);
                         if (!is_array($dataStructure)) {
@@ -962,6 +1027,7 @@ abstract class AbstractItemProvider
     {
         $database = $this->getDatabaseConnection();
         $localTable = $result['tableName'];
+        $effectivePid = $result['effectivePid'];
 
         $foreignTableClause = '';
         if (!empty($result['processedTca']['columns'][$localFieldName]['config']['foreign_table_where'])
@@ -993,6 +1059,15 @@ abstract class AbstractItemProvider
                 }
                 $foreignTableClause = implode('', $whereClauseParts);
             }
+            if (strpos($foreignTableClause, '###CURRENT_PID###') !== false) {
+                // Use pid from parent page clause if in flex form context
+                if (!empty($result['flexParentDatabaseRow']['pid'])) {
+                    $effectivePid = $result['flexParentDatabaseRow']['pid'];
+                // Use pid from database row if in inline context
+                } elseif (!$effectivePid && !empty($result['databaseRow']['pid'])) {
+                    $effectivePid = $result['databaseRow']['pid'];
+                }
+            }
 
             $siteRootUid = 0;
             foreach ($result['rootline'] as $rootlinePage) {
@@ -1004,7 +1079,6 @@ abstract class AbstractItemProvider
 
             $pageTsConfigId = 0;
             if ($result['pageTsConfig']['flexHack.']['PAGE_TSCONFIG_ID']) {
-                // @deprecated since TYPO3 v8, will be removed in TYPO3 v9 - see also the flexHack part in TcaFlexProcess
                 $pageTsConfigId = (int)$result['pageTsConfig']['flexHack.']['PAGE_TSCONFIG_ID'];
             }
             if ($result['pageTsConfig']['TCEFORM.'][$localTable . '.'][$localFieldName . '.']['PAGE_TSCONFIG_ID']) {
@@ -1013,7 +1087,6 @@ abstract class AbstractItemProvider
 
             $pageTsConfigIdList = 0;
             if ($result['pageTsConfig']['flexHack.']['PAGE_TSCONFIG_IDLIST']) {
-                // @deprecated since TYPO3 v8, will be removed in TYPO3 v9 - see also the flexHack part in TcaFlexProcess
                 $pageTsConfigIdList = $result['pageTsConfig']['flexHack.']['PAGE_TSCONFIG_IDLIST'];
             }
             if ($result['pageTsConfig']['TCEFORM.'][$localTable . '.'][$localFieldName . '.']['PAGE_TSCONFIG_IDLIST']) {
@@ -1030,7 +1103,6 @@ abstract class AbstractItemProvider
 
             $pageTsConfigString = '';
             if ($result['pageTsConfig']['flexHack.']['PAGE_TSCONFIG_STR']) {
-                // @deprecated since TYPO3 v8, will be removed in TYPO3 v9 - see also the flexHack part in TcaFlexProcess
                 $pageTsConfigString = $result['pageTsConfig']['flexHack.']['PAGE_TSCONFIG_STR'];
             }
             if ($result['pageTsConfig']['TCEFORM.'][$localTable . '.'][$localFieldName . '.']['PAGE_TSCONFIG_STR']) {
@@ -1048,7 +1120,7 @@ abstract class AbstractItemProvider
                     '###PAGE_TSCONFIG_STR###'
                 ],
                 [
-                    (int)$result['effectivePid'],
+                    (int)$effectivePid,
                     (int)$result['databaseRow']['uid'],
                     $siteRootUid,
                     $pageTsConfigId,
@@ -1162,6 +1234,9 @@ abstract class AbstractItemProvider
             $newDatabaseValueArray = array_merge($newDatabaseValueArray, $relationHandler->getValueArray());
         }
 
+        if ($fieldConfig['config']['multiple']) {
+            return $newDatabaseValueArray;
+        }
         return array_unique($newDatabaseValueArray);
     }
 

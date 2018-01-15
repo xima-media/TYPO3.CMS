@@ -56,7 +56,7 @@ abstract class BaseTestCase extends \PHPUnit_Framework_TestCase
      * @throws \InvalidArgumentException
      */
     protected function getAccessibleMock(
-        $originalClassName, $methods = array(), array $arguments = array(), $mockClassName = '',
+        $originalClassName, $methods = [], array $arguments = [], $mockClassName = '',
         $callOriginalConstructor = true, $callOriginalClone = true, $callAutoload = true
     ) {
         if ($originalClassName === '') {
@@ -93,8 +93,8 @@ abstract class BaseTestCase extends \PHPUnit_Framework_TestCase
      *
      */
     protected function getAccessibleMockForAbstractClass(
-        $originalClassName, array $arguments = array(), $mockClassName = '',
-        $callOriginalConstructor = true, $callOriginalClone = true, $callAutoload = true, $mockedMethods = array()
+        $originalClassName, array $arguments = [], $mockClassName = '',
+        $callOriginalConstructor = true, $callOriginalClone = true, $callAutoload = true, $mockedMethods = []
     ) {
         if ($originalClassName === '') {
             throw new \InvalidArgumentException('$originalClassName must not be empty.', 1384268260);
@@ -225,11 +225,14 @@ abstract class BaseTestCase extends \PHPUnit_Framework_TestCase
      *
      * @param object $object The object to be invoked
      * @param string $name the name of the method to call
-     * @param mixed $arguments
      * @return mixed
      */
-    protected function callInaccessibleMethod($object, $name, ...$arguments)
+    protected function callInaccessibleMethod($object, $name)
     {
+        // Remove first two arguments ($object and $name)
+        $arguments = func_get_args();
+        array_splice($arguments, 0, 2);
+
         $reflectionObject = new \ReflectionObject($object);
         $reflectionMethod = $reflectionObject->getMethod($name);
         $reflectionMethod->setAccessible(true);

@@ -16,11 +16,7 @@ namespace TYPO3\CMS\Backend\Tree\View;
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Database\Query\Restriction\BackendWorkspaceRestriction;
-use TYPO3\CMS\Core\Database\Query\Restriction\EndTimeRestriction;
-use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
-use TYPO3\CMS\Core\Database\Query\Restriction\StartTimeRestriction;
+use TYPO3\CMS\Core\Database\DatabaseConnection;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
@@ -79,12 +75,12 @@ class PagePositionMap
     /**
      * @var array
      */
-    public $getModConfigCache = array();
+    public $getModConfigCache = [];
 
     /**
      * @var array
      */
-    public $checkNewPageCache = array();
+    public $checkNewPageCache = [];
 
     // Label keys:
     /**
@@ -154,11 +150,15 @@ class PagePositionMap
         // Create page tree, in $this->depth levels.
         $pageTree->getTree($pageinfo['pid'], $this->depth);
         // Initialize variables:
-        $saveLatestUid = array();
+        $saveLatestUid = [];
         $latestInvDepth = $this->depth;
         // Traverse the tree:
-        $lines = array();
+        $lines = [];
         foreach ($pageTree->tree as $cc => $dat) {
+            if ($latestInvDepth > $dat['invertedDepth']) {
+                $margin = 'style="margin-left: ' . ($dat['invertedDepth'] * 16 + 9) . 'px;"';
+                $lines[] = '<ul class="list-tree" ' . $margin . '>';
+            }
             // Make link + parameters.
             $latestInvDepth = $dat['invertedDepth'];
             $saveLatestUid[$latestInvDepth] = $dat;
@@ -169,7 +169,8 @@ class PagePositionMap
                     // 1) It must be allowed to create a new page and 2) If there are subpages there is no need to render a subpage icon here - it'll be done over the subpages...
                     if (!$this->dontPrintPageInsertIcons && $this->checkNewPageInPid($id) && !($prev_dat['invertedDepth'] > $pageTree->tree[$cc]['invertedDepth'])) {
                         end($lines);
-                        $lines[key($lines)] .= '<ul><li><span class="text-nowrap"><a href="#" onclick="' . htmlspecialchars($this->onClickEvent($id, $id, 1)) . '"><i class="t3-icon fa fa-long-arrow-left" title="' . $this->insertlabel() . '"></i></a></span></li></ul>';
+                        $margin = 'style="margin-left: ' . (($dat['invertedDepth'] - 1) * 16 + 9) . 'px;"';
+                        $lines[] = '<ul class="list-tree" ' . $margin . '><li><span class="text-nowrap"><a href="#" onclick="' . htmlspecialchars($this->onClickEvent($id, $id)) . '"><i class="t3-icon fa fa-long-arrow-left" title="' . $this->insertlabel() . '"></i></a></span></li></ul>';
                     }
                 }
                 // If going down
@@ -181,10 +182,13 @@ class PagePositionMap
                     if (!$this->dontPrintPageInsertIcons && $this->checkNewPageInPid($prev_dat['row']['pid'])) {
                         $prevPid = -$prev_dat['row']['uid'];
                         end($lines);
-                        $lines[key($lines)] .= '<ul><li><span class="text-nowrap"><a href="#" onclick="' . htmlspecialchars($this->onClickEvent($prevPid, $prev_dat['row']['pid'], 2)) . '"><i class="t3-icon fa fa-long-arrow-left" title="' . $this->insertlabel() . '"></i></a></span></li></ul>';
+                        $lines[] = '<li><span class="text-nowrap"><a href="#" onclick="' . htmlspecialchars($this->onClickEvent($prevPid, $prev_dat['row']['pid'], 2)) . '"><i class="t3-icon fa fa-long-arrow-left" title="' . $this->insertlabel() . '"></i></a></span></li>';
                     }
                     // Then set the current prevPid
                     $prevPid = -$prev_dat['row']['pid'];
+                    if ($prevPid !== $dat['row']['pid']) {
+                        $lines[] = '</ul>';
+                    }
                 } else {
                     // In on the same level
                     $prevPid = -$prev_dat['row']['uid'];
@@ -207,13 +211,16 @@ class PagePositionMap
         $prev_dat = end($pageTree->tree);
         if ($prev_dat['row']['uid'] == $id) {
             if (!$this->dontPrintPageInsertIcons && $this->checkNewPageInPid($id)) {
-                $lines[] = '<span class="text-nowrap"><a href="#" onclick="' . htmlspecialchars($this->onClickEvent($id, $id, 4)) . '"><i class="t3-icon fa fa-long-arrow-left" title="' . $this->insertlabel() . '"></i></a></span>';
+                $lines[] = '<ul class="list-tree" style="margin-left: 25px"><li><span class="text-nowrap"><a href="#" onclick="' . htmlspecialchars($this->onClickEvent($id, $id, 4)) . '"><i class="t3-icon fa fa-long-arrow-left" title="' . $this->insertlabel() . '"></i></a></span></li></ul>';
             }
         }
         for ($a = $latestInvDepth; $a <= $this->depth; $a++) {
             $dat = $saveLatestUid[$a];
             $prevPid = -$dat['row']['uid'];
             if (!$this->dontPrintPageInsertIcons && $this->checkNewPageInPid($dat['row']['pid'])) {
+                if ($latestInvDepth < $dat['invertedDepth']) {
+                    $lines[] = '</ul>';
+                }
                 $lines[] = '<span class="text-nowrap"><a href="#" onclick="' . htmlspecialchars($this->onClickEvent($prevPid, $dat['row']['pid'], 5)) . '"><i class="t3-icon fa fa-long-arrow-left" title="' . $this->insertlabel() . '"></i></a></span>';
             }
         }
@@ -221,7 +228,11 @@ class PagePositionMap
         $code = '<ul class="list-tree">';
 
         foreach ($lines as $line) {
-            $code .= '<li>' . $line . '</li>';
+            if ((substr($line, 0, 3) === '<ul') || (substr($line, 0, 4) === '</ul')) {
+                $code .= $line;
+            } else {
+                $code .= '<li>' . $line . '</li>';
+            }
         }
 
         $code .= '</ul>';
@@ -274,7 +285,7 @@ class PagePositionMap
      */
     public function insertlabel()
     {
-        return htmlspecialchars($this->getLanguageService()->getLL($this->l_insertNewPageHere));
+        return $this->getLanguageService()->getLL($this->l_insertNewPageHere, 1);
     }
 
     /**
@@ -341,40 +352,19 @@ class PagePositionMap
         $this->R_URI = $R_URI;
         $this->moveUid = $moveUid;
         $colPosArray = GeneralUtility::trimExplode(',', $colPosList, true);
-        $lines = array();
+        $lines = [];
         foreach ($colPosArray as $kk => $vv) {
-            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('tt_content');
-            $queryBuilder->getRestrictions()->add(GeneralUtility::makeInstance(BackendWorkspaceRestriction::class));
-            if ($showHidden) {
-                $queryBuilder->getRestrictions()
-                    ->removeByType(HiddenRestriction::class)
-                    ->removeByType(StartTimeRestriction::class)
-                    ->removeByType(EndTimeRestriction::class);
-            }
-            $queryBuilder
-                ->select('*')
-                ->from('tt_content')
-                ->where(
-                    $queryBuilder->expr()->eq('pid', (int)$pid),
-                    $queryBuilder->expr()->eq('colPos', (int)$vv)
-                )
-                ->orderBy('sorting');
-
-            if ((string)$this->cur_sys_language !== '') {
-                $queryBuilder->andWhere($queryBuilder->expr()->eq('sys_language_uid', (int)$this->cur_sys_language));
-            }
-
-            $res = $queryBuilder->execute();
-            $lines[$vv] = array();
+            $res = $this->getDatabase()->exec_SELECTquery('*', 'tt_content', 'pid=' . (int)$pid . ($showHidden ? '' : BackendUtility::BEenableFields('tt_content')) . ' AND colPos=' . (int)$vv . ((string)$this->cur_sys_language !== '' ? ' AND sys_language_uid=' . (int)$this->cur_sys_language : '') . BackendUtility::deleteClause('tt_content') . BackendUtility::versioningPlaceholderClause('tt_content'), '', 'sorting');
+            $lines[$vv] = [];
             $lines[$vv][] = $this->insertPositionIcon('', $vv, $kk, $moveUid, $pid);
-
-            while ($row = $res->fetch()) {
+            while ($row = $this->getDatabase()->sql_fetch_assoc($res)) {
                 BackendUtility::workspaceOL('tt_content', $row);
                 if (is_array($row)) {
                     $lines[$vv][] = $this->wrapRecordHeader($this->getRecordHeader($row), $row);
                     $lines[$vv][] = $this->insertPositionIcon($row, $vv, $kk, $moveUid, $pid);
                 }
             }
+            $this->getDatabase()->sql_free_result($res);
         }
         return $this->printRecordMap($lines, $colPosArray, $pid);
     }
@@ -420,7 +410,7 @@ class PagePositionMap
                     $head = '';
                     foreach ($tcaItems as $item) {
                         if ($item[1] == $columnKey) {
-                            $head = htmlspecialchars($this->getLanguageService()->sL($item[0]));
+                            $head = $this->getLanguageService()->sL($item[0], true);
                         }
                     }
                     // Render the grid cell
@@ -459,7 +449,7 @@ class PagePositionMap
             $row = '';
             foreach ($colPosArray as $kk => $vv) {
                 $row .= '<td class="col-nowrap col-min" width="' . round(100 / $count) . '%">';
-                $row .= '<p><strong>' . $this->wrapColumnHeader(htmlspecialchars($this->getLanguageService()->sL(BackendUtility::getLabelFromItemlist('tt_content', 'colPos', $vv))), $vv) . '</strong></p>';
+                $row .= '<p><strong>' . $this->wrapColumnHeader($this->getLanguageService()->sL(BackendUtility::getLabelFromItemlist('tt_content', 'colPos', $vv), true), $vv) . '</strong></p>';
                 if (!empty($lines[$vv])) {
                     $row .= '<ul class="list-unstyled">';
                     foreach ($lines[$vv] as $line) {
@@ -519,7 +509,7 @@ class PagePositionMap
             $uid = '';
         }
         $cc = hexdec(substr(md5($uid . '-' . $vv . '-' . $kk), 0, 4));
-        return '<a href="#" onclick="' . htmlspecialchars($this->onClickInsertRecord($row, $vv, $moveUid, $pid, $this->cur_sys_language)) . '">' . '<i class="t3-icon fa fa-long-arrow-left" name="mImgEnd' . $cc . '" title="' . htmlspecialchars($this->getLanguageService()->getLL($this->l_insertNewRecordHere)) . '"></i></a>';
+        return '<a href="#" onclick="' . htmlspecialchars($this->onClickInsertRecord($row, $vv, $moveUid, $pid, $this->cur_sys_language)) . '">' . '<i class="t3-icon fa fa-long-arrow-left" name="mImgEnd' . $cc . '" title="' . $this->getLanguageService()->getLL($this->l_insertNewRecordHere, 1) . '"></i></a>';
     }
 
     /**
@@ -582,7 +572,7 @@ class PagePositionMap
      */
     public function wrapRecordTitle($str, $row)
     {
-        return '<a href="' . htmlspecialchars(GeneralUtility::linkThisScript(array('uid' => (int)$row['uid'], 'moveUid' => ''))) . '">' . $str . '</a>';
+        return '<a href="' . htmlspecialchars(GeneralUtility::linkThisScript(['uid' => (int)$row['uid'], 'moveUid' => ''])) . '">' . $str . '</a>';
     }
 
     /**
@@ -603,5 +593,13 @@ class PagePositionMap
     protected function getLanguageService()
     {
         return $GLOBALS['LANG'];
+    }
+
+    /**
+     * @return DatabaseConnection
+     */
+    protected function getDatabase()
+    {
+        return $GLOBALS['TYPO3_DB'];
     }
 }

@@ -1,27 +1,23 @@
 <?php
 defined('TYPO3_MODE') or die();
 
-// Register as a skin
-$GLOBALS['TBE_STYLES']['skins']['backend'] = array(
-    'name' => 'backend',
-    'stylesheetDirectories' => array(
-        'css' => 'EXT:backend/Resources/Public/Css/'
-    )
-);
-
 if (TYPO3_MODE === 'BE') {
     \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addModule(
         'web',
         'layout',
         'top',
         '',
-        array(
+        [
             'routeTarget' => \TYPO3\CMS\Backend\Controller\PageLayoutController::class . '::mainAction',
             'access' => 'user,group',
             'name' => 'web_layout',
-            'icon' => 'EXT:backend/Resources/Public/Icons/module-page.svg',
-            'labels' => 'LLL:EXT:backend/Resources/Private/Language/locallang_mod.xlf'
-        )
+            'labels' => [
+                'tabs_images' => [
+                    'tab' => 'EXT:backend/Resources/Public/Icons/module-page.svg',
+                ],
+                'll_ref' => 'LLL:EXT:backend/Resources/Private/Language/locallang_mod.xlf',
+            ],
+        ]
     );
 
     // Register BackendLayoutDataProvider for PageTs

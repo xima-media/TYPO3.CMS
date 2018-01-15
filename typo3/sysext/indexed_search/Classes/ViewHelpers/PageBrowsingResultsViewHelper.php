@@ -35,11 +35,11 @@ class PageBrowsingResultsViewHelper extends AbstractViewHelper
     public function render($numberOfResults, $resultsPerPage, $currentPage = 1)
     {
         return static::renderStatic(
-            array(
+            [
                 'numberOfResults' => $numberOfResults,
                 'resultsPerPage' => $resultsPerPage,
                 'currentPage' => $currentPage,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
@@ -60,6 +60,6 @@ class PageBrowsingResultsViewHelper extends AbstractViewHelper
         $firstResultOnPage = $currentPage * $resultsPerPage + 1;
         $lastResultOnPage = $currentPage * $resultsPerPage + $resultsPerPage;
         $label = LocalizationUtility::translate('displayResults', 'IndexedSearch');
-        return sprintf($label, $firstResultOnPage, min(array($numberOfResults, $lastResultOnPage)), $numberOfResults);
+        return sprintf($label, $firstResultOnPage, min([$numberOfResults, $lastResultOnPage]), $numberOfResults);
     }
 }

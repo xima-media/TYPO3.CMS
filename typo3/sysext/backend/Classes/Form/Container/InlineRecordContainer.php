@@ -48,7 +48,7 @@ class InlineRecordContainer extends AbstractContainer
      *
      * @var array
      */
-    protected $inlineData = array();
+    protected $inlineData = [];
 
     /**
      * @var InlineStackProcessor
@@ -60,7 +60,7 @@ class InlineRecordContainer extends AbstractContainer
      *
      * @var array
      */
-    protected $hookObjects = array();
+    protected $hookObjects = [];
 
     /**
      * @var IconFactory
@@ -251,8 +251,6 @@ class InlineRecordContainer extends AbstractContainer
             }
             $message = $this->getLanguageService()->sL($combinationWarningMessage);
             $markup = [];
-            // @TODO: This is not a FlashMessage! The markup must be changed and special CSS
-            // @TODO: should be created, in order to prevent confusion.
             $markup[] = '<div class="alert alert-warning">';
             $markup[] = '    <div class="media">';
             $markup[] = '        <div class="media-left">';
@@ -262,7 +260,7 @@ class InlineRecordContainer extends AbstractContainer
             $markup[] = '            </span>';
             $markup[] = '        </div>';
             $markup[] = '        <div class="media-body">';
-            $markup[] = '            <div class="alert-message">' . htmlspecialchars($message) .  '</div>';
+            $markup[] = '            <div class="alert-message">' . htmlspecialchars($message) . '</div>';
             $markup[] = '        </div>';
             $markup[] = '    </div>';
             $markup[] = '</div>';
@@ -304,7 +302,12 @@ class InlineRecordContainer extends AbstractContainer
         $objectId = $domObjectId . '-' . $foreignTable . '-' . $rec['uid'];
 
         $recordTitle = $data['recordTitle'];
-        if (empty($recordTitle)) {
+        if (!empty($recordTitle)) {
+            // The user function may return HTML, therefore we can't escape it
+            if (empty($data['processedTca']['ctrl']['formattedLabel_userFunc'])) {
+                $recordTitle = BackendUtility::getRecordTitlePrep($recordTitle);
+            }
+        } else {
             $recordTitle = '<em>[' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.no_title')) . ']</em>';
         }
 
@@ -337,7 +340,7 @@ class InlineRecordContainer extends AbstractContainer
                     if (!empty($rec['crop'])) {
                         $imageSetup['crop'] = $rec['crop'];
                     }
-                    $imageSetup = array_merge(array('width' => '45', 'height' => '45c'), $imageSetup);
+                    $imageSetup = array_merge(['width' => '45', 'height' => '45c'], $imageSetup);
                     $processedImage = $fileObject->process(ProcessedFile::CONTEXT_IMAGEPREVIEW, $imageSetup);
                     // Only use a thumbnail if the processing process was successful by checking if image width is set
                     if ($processedImage->getProperty('width')) {
@@ -380,8 +383,8 @@ class InlineRecordContainer extends AbstractContainer
         $languageService = $this->getLanguageService();
         $backendUser = $this->getBackendUserAuthentication();
         // Initialize:
-        $cells = array();
-        $additionalCells = array();
+        $cells = [];
+        $additionalCells = [];
         $isNewItem = substr($rec['uid'], 0, 3) == 'NEW';
         $isParentExisting = MathUtility::canBeInterpretedAsInteger($data['inlineParentUid']);
         $tcaTableCtrl = $GLOBALS['TCA'][$foreignTable]['ctrl'];
@@ -409,7 +412,7 @@ class InlineRecordContainer extends AbstractContainer
             $hookObj->renderForeignRecordHeaderControl_preProcess($data['inlineParentUid'], $foreignTable, $rec, $inlineConfig, $data['isInlineDefaultLanguageRecordInLocalizedParentContext'], $enabledControls);
         }
         if ($data['isInlineDefaultLanguageRecordInLocalizedParentContext']) {
-            $cells['localize.isLocalizable'] = '<span title="' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_misc.xlf:localize.isLocalizable')) . '">'
+            $cells['localize.isLocalizable'] = '<span title="' . $languageService->sL('LLL:EXT:lang/locallang_misc.xlf:localize.isLocalizable', true) . '">'
                 . $this->iconFactory->getIcon('actions-edit-localize-status-low', Icon::SIZE_SMALL)->render()
                 . '</span>';
         }
@@ -423,7 +426,7 @@ class InlineRecordContainer extends AbstractContainer
                 $table = $foreignTable;
             }
             $cells['info'] = '
-				<a class="btn btn-default" href="#" onclick="' . htmlspecialchars(('top.launchView(' . GeneralUtility::quoteJSvalue($table) . ', ' . GeneralUtility::quoteJSvalue($uid) . '); return false;')) . '" title="' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:showInfo')) . '">
+				<a class="btn btn-default" href="#" onclick="' . htmlspecialchars(('top.launchView(' . GeneralUtility::quoteJSvalue($table) . ', ' . GeneralUtility::quoteJSvalue($uid) . '); return false;')) . '" title="' . $languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:showInfo', true) . '">
 					' . $this->iconFactory->getIcon('actions-document-info', Icon::SIZE_SMALL)->render() . '
 				</a>';
         }
@@ -438,7 +441,7 @@ class InlineRecordContainer extends AbstractContainer
                         $style = ' style="' . $inlineConfig['inline']['inlineNewButtonStyle'] . '"';
                     }
                     $cells['new'] = '
-						<a class="btn btn-default inlineNewButton ' . $this->inlineData['config'][$nameObject]['md5'] . '" href="#" onclick="' . htmlspecialchars($onClick) . '" title="' . htmlspecialchars($languageService->sL(('LLL:EXT:lang/locallang_mod_web_list.xlf:new' . ($isPagesTable ? 'Page' : 'Record')))) . '" ' . $style . '>
+						<a class="btn btn-default inlineNewButton ' . $this->inlineData['config'][$nameObject]['md5'] . '" href="#" onclick="' . htmlspecialchars($onClick) . '" title="' . $languageService->sL(('LLL:EXT:lang/locallang_mod_web_list.xlf:new' . ($isPagesTable ? 'Page' : 'Record')), true) . '" ' . $style . '>
 							' . $this->iconFactory->getIcon('actions-' . ($isPagesTable ? 'page' : 'document') . '-new', Icon::SIZE_SMALL)->render() . '
 						</a>';
                 }
@@ -449,14 +452,14 @@ class InlineRecordContainer extends AbstractContainer
                 $onClick = 'return inline.changeSorting(' . GeneralUtility::quoteJSvalue($nameObjectFtId) . ', \'1\')';
                 $style = $inlineConfig['inline']['first'] == $rec['uid'] ? 'style="visibility: hidden;"' : '';
                 $cells['sort.up'] = '
-					<a class="btn btn-default sortingUp" href="#" onclick="' . htmlspecialchars($onClick) . '" ' . $style . ' title="' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:moveUp')) . '">
+					<a class="btn btn-default sortingUp" href="#" onclick="' . htmlspecialchars($onClick) . '" ' . $style . ' title="' . $languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:moveUp', true) . '">
 						' . $this->iconFactory->getIcon('actions-move-up', Icon::SIZE_SMALL)->render() . '
 					</a>';
                 // Down
                 $onClick = 'return inline.changeSorting(' . GeneralUtility::quoteJSvalue($nameObjectFtId) . ', \'-1\')';
                 $style = $inlineConfig['inline']['last'] == $rec['uid'] ? 'style="visibility: hidden;"' : '';
                 $cells['sort.down'] = '
-					<a class="btn btn-default sortingDown" href="#" onclick="' . htmlspecialchars($onClick) . '" ' . $style . ' title="' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:moveDown')) . '">
+					<a class="btn btn-default sortingDown" href="#" onclick="' . htmlspecialchars($onClick) . '" ' . $style . ' title="' . $languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:moveDown', true) . '">
 						' . $this->iconFactory->getIcon('actions-move-down', Icon::SIZE_SMALL)->render() . '
 					</a>';
             }
@@ -472,18 +475,13 @@ class InlineRecordContainer extends AbstractContainer
                     'file = ' . (int)substr($rec['uid_local'], 9) . ' AND sys_language_uid = ' . $sys_language_uid
                 );
                 if ($backendUser->check('tables_modify', 'sys_file_metadata')) {
-                    $url = BackendUtility::getModuleUrl('record_edit', array(
-                        'edit[sys_file_metadata][' . (int)$recordInDatabase['uid'] . ']' => 'edit'
-                    ));
-                    $editOnClick = 'if (top.content.list_frame) {' .
-                        'top.content.list_frame.location.href=' .
-                        GeneralUtility::quoteJSvalue($url . '&returnUrl=') .
-                        '+top.rawurlencode(top.content.list_frame.document.location.pathname+top.content.list_frame.document.location.search)' .
-                        ';' .
-                    '}';
+                    $url = BackendUtility::getModuleUrl('record_edit', [
+                        'edit[sys_file_metadata][' . (int)$recordInDatabase['uid'] . ']' => 'edit',
+                        'returnUrl' => GeneralUtility::getIndpEnv('REQUEST_URI')
+                    ]);
                     $title = $languageService->sL('LLL:EXT:lang/locallang_core.xlf:cm.editMetadata');
                     $cells['editmetadata'] = '
-						<a class="btn btn-default" href="#" class="btn" onclick="' . htmlspecialchars($editOnClick) . '" title="' . htmlspecialchars($title) . '">
+						<a class="btn btn-default" href="' . htmlspecialchars($url) . '" title="' . htmlspecialchars($title) . '">
 							' . $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render() . '
 						</a>';
                 }
@@ -493,7 +491,7 @@ class InlineRecordContainer extends AbstractContainer
                     || !$isPagesTable && $calcPerms & Permission::CONTENT_EDIT
                     || $isSysFileReferenceTable && $calcPerms & Permission::PAGE_EDIT)
             ) {
-                $title = htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:delete'));
+                $title = $languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:delete', true);
                 $icon = $this->iconFactory->getIcon('actions-edit-delete', Icon::SIZE_SMALL)->render();
                 $cells['delete'] = '<a href="#" class="btn btn-default t3js-editform-delete-inline-record" data-objectid="' . htmlspecialchars($nameObjectFtId) . '" title="' . $title . '">' . $icon . '</a>';
             }
@@ -505,14 +503,14 @@ class InlineRecordContainer extends AbstractContainer
                     GeneralUtility::quoteJSvalue($hiddenField) . ')';
                 $className = 't3js-' . $nameObjectFtId . '_disabled';
                 if ($rec[$hiddenField]) {
-                    $title = htmlspecialchars($languageService->sL(('LLL:EXT:lang/locallang_mod_web_list.xlf:unHide' . ($isPagesTable ? 'Page' : ''))));
+                    $title = $languageService->sL(('LLL:EXT:lang/locallang_mod_web_list.xlf:unHide' . ($isPagesTable ? 'Page' : '')), true);
                     $cells['hide.unhide'] = '
 						<a class="btn btn-default hiddenHandle ' . $className . '" href="#" onclick="'
                         . htmlspecialchars($onClick) . '"' . 'title="' . $title . '">' .
                         $this->iconFactory->getIcon('actions-edit-unhide', Icon::SIZE_SMALL)->render() . '
 						</a>';
                 } else {
-                    $title = htmlspecialchars($languageService->sL(('LLL:EXT:lang/locallang_mod_web_list.xlf:hide' . ($isPagesTable ? 'Page' : ''))));
+                    $title = $languageService->sL(('LLL:EXT:lang/locallang_mod_web_list.xlf:hide' . ($isPagesTable ? 'Page' : '')), true);
                     $cells['hide.hide'] = '
 						<a class="btn btn-default hiddenHandle ' . $className . '" href="#" onclick="'
                         . htmlspecialchars($onClick) . '"' . 'title="' . $title . '">' .
@@ -523,7 +521,7 @@ class InlineRecordContainer extends AbstractContainer
             // Drag&Drop Sorting: Sortable handler for script.aculo.us
             if ($enabledControls['dragdrop'] && $permsEdit && $enableManualSorting && $inlineConfig['appearance']['useSortable']) {
                 $additionalCells['dragdrop'] = '
-					<span class="btn btn-default sortableHandle" data-id="' . htmlspecialchars($rec['uid']) . '" title="' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.move')) . '">
+					<span class="btn btn-default sortableHandle" data-id="' . htmlspecialchars($rec['uid']) . '" title="' . $languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.move', true) . '">
 						' . $this->iconFactory->getIcon('actions-move-move', Icon::SIZE_SMALL)->render() . '
 					</span>';
             }
@@ -531,7 +529,7 @@ class InlineRecordContainer extends AbstractContainer
             if ($enabledControls['localize'] && $data['isInlineDefaultLanguageRecordInLocalizedParentContext']) {
                 $onClick = 'inline.synchronizeLocalizeRecords(' . GeneralUtility::quoteJSvalue($nameObjectFt) . ', ' . GeneralUtility::quoteJSvalue($rec['uid']) . ');';
                 $cells['localize'] = '
-					<a class="btn btn-default" href="#" onclick="' . htmlspecialchars($onClick) . '" title="' . htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_misc.xlf:localize')) . '">
+					<a class="btn btn-default" href="#" onclick="' . htmlspecialchars($onClick) . '" title="' . $languageService->sL('LLL:EXT:lang/locallang_misc.xlf:localize', true) . '">
 						' . $this->iconFactory->getIcon('actions-document-localize', Icon::SIZE_SMALL)->render() . '
 					</a>';
             }
@@ -580,7 +578,7 @@ class InlineRecordContainer extends AbstractContainer
      */
     protected function initHookObjects()
     {
-        $this->hookObjects = array();
+        $this->hookObjects = [];
         if (isset($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tceforms_inline.php']['tceformsInlineHook'])) {
             $tceformsInlineHook = &$GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tceforms_inline.php']['tceformsInlineHook'];
             if (is_array($tceformsInlineHook)) {

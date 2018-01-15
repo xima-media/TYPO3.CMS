@@ -14,11 +14,8 @@ namespace TYPO3\CMS\Recycler\Domain\Model;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Recycler\Utility\RecyclerUtility;
 
 /**
@@ -31,7 +28,7 @@ class DeletedRecords
      *
      * @var array
      */
-    protected $deletedRows = array();
+    protected $deletedRows = [];
 
     /**
      * String with the global limit
@@ -45,7 +42,7 @@ class DeletedRecords
      *
      * @var array
      */
-    protected $table = array();
+    protected $table = [];
 
     /**
      * Object from helper class
@@ -124,7 +121,7 @@ class DeletedRecords
         $deletedRecords = $this->loadData($id, $table, $depth, '', $filter)->getDeletedRows();
         $countTotal = 0;
         foreach ($this->table as $tableName) {
-            $countTotal += count($deletedRecords[$tableName]);
+            $countTotal += isset($deletedRecords[$tableName]) ? count($deletedRecords[$tableName]) : 0;
         }
         return $countTotal;
     }
@@ -145,44 +142,19 @@ class DeletedRecords
         if (!array_key_exists('delete', $tcaCtrl)) {
             return;
         }
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable($table);
-        $queryBuilder->getRestrictions()->removeAll();
-
+        $db = $this->getDatabaseConnection();
         // find the 'deleted' field for this table
         $deletedField = RecyclerUtility::getDeletedField($table);
-
         // create the filter WHERE-clause
-        $filterConstraint = null;
-        if (trim($filter) !== '') {
-            $labelConstraint = $queryBuilder->expr()->like(
-                $tcaCtrl['label'],
-                $queryBuilder->quote('%' . $queryBuilder->escapeLikeWildcards($filter) . '%')
-            );
-            if (MathUtility::canBeInterpretedAsInteger($filter)) {
-                $filterConstraint = $queryBuilder->expr()->orX(
-                    $queryBuilder->expr()->eq('uid', (int)$filter),
-                    $queryBuilder->expr()->eq('pid', (int)$filter),
-                    $labelConstraint
-                );
-            } else {
-                $filterConstraint = $labelConstraint;
-            }
+        $filterWhere = '';
+        if (trim($filter) != '') {
+            $filterWhere = ' AND (' . (\TYPO3\CMS\Core\Utility\MathUtility::canBeInterpretedAsInteger($filter) ? 'uid = ' . $filter . ' OR pid = ' . $filter . ' OR ' : '') . $tcaCtrl['label'] . ' LIKE "%' . $this->escapeValueForLike($filter, $table) . '%"' . ')';
         }
 
         // get the limit
         if (!empty($this->limit)) {
             // count the number of deleted records for this pid
-            $deletedCount = $queryBuilder
-                ->count('*')
-                ->from($table)
-                ->where(
-                    $queryBuilder->expr()->neq($deletedField, 0),
-                    $queryBuilder->expr()->eq('pid', (int)$id),
-                    $filterConstraint
-                )
-                ->execute()
-                ->fetchColumn();
-
+            $deletedCount = $db->exec_SELECTcountRows('uid', $table, $deletedField . '<>0 AND pid = ' . $id . $filterWhere);
             // split the limit
             $parts = GeneralUtility::trimExplode(',', $this->limit);
             $offset = $parts[0];
@@ -193,7 +165,7 @@ class DeletedRecords
             if ($result >= 0) {
                 // store the new offset in the limit and go into the next depth
                 $offset = $result;
-                $this->limit = implode(',', array($offset, $rowCount));
+                $this->limit = implode(',', [$offset, $rowCount]);
                 // do NOT query this depth; limit also does not need to be set, we set it anyways
                 $allowQuery = false;
                 $allowDepth = true;
@@ -213,19 +185,19 @@ class DeletedRecords
                 // if the result now is > limit's row count
                 if ($absResult > $rowCount) {
                     // use the limit's row count as the temporary limit
-                    $limit = implode(',', array($tempOffset, $rowCount));
+                    $limit = implode(',', [$tempOffset, $rowCount]);
                     // set the limit's row count to 0
-                    $this->limit = implode(',', array($newOffset, 0));
+                    $this->limit = implode(',', [$newOffset, 0]);
                     // do not go into new depth
                     $allowDepth = false;
                 } else {
                     // if the result now is <= limit's row count
                     // use the result as the temporary limit
-                    $limit = implode(',', array($tempOffset, $absResult));
+                    $limit = implode(',', [$tempOffset, $absResult]);
                     // subtract the result from the row count
                     $newCount = $rowCount - $absResult;
                     // store the new result in the limit's row count
-                    $this->limit = implode(',', array($newOffset, $newCount));
+                    $this->limit = implode(',', [$newOffset, $newCount]);
                     // if the new row count is > 0
                     if ($newCount > 0) {
                         // go into new depth
@@ -246,16 +218,7 @@ class DeletedRecords
         }
         // query for actual deleted records
         if ($allowQuery) {
-            $recordsToCheck = BackendUtility::getRecordsByField(
-                $table,
-                $deletedField,
-                '1',
-                ' AND ' . $queryBuilder->expr()->andX($queryBuilder->expr()->eq('pid', (int)$id), $filterConstraint),
-                '',
-                '',
-                $limit,
-                false
-            );
+            $recordsToCheck = \TYPO3\CMS\Backend\Utility\BackendUtility::getRecordsByField($table, $deletedField, '1', ' AND pid = ' . $id . $filterWhere, '', '', $limit, false);
             if ($recordsToCheck) {
                 $this->checkRecordAccess($table, $recordsToCheck);
             }
@@ -263,26 +226,20 @@ class DeletedRecords
         // go into depth
         if ($allowDepth && $depth >= 1) {
             // check recursively for elements beneath this page
-            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
-            $queryBuilder->getRestrictions()->removeAll();
-            $resPages = $queryBuilder
-                ->select('uid')
-                ->from('pages')
-                ->where($queryBuilder->expr()->eq('pid', (int)$id))
-                ->orderBy('sorting')
-                ->execute();
-
-            while ($row = $resPages->fetch()) {
-                $this->setData($row['uid'], $table, $depth - 1, $tcaCtrl, $filter);
-                // some records might have been added, check if we still have the limit for further queries
-                if (!empty($this->limit)) {
-                    $parts = GeneralUtility::trimExplode(',', $this->limit);
-                    // abort loop if LIMIT 0,0
-                    if ((int)$parts[0] === 0 && (int)$parts[1] === 0) {
-                        $resPages->closeCursor();
-                        break;
+            $resPages = $db->exec_SELECTquery('uid', 'pages', 'pid=' . $id, '', 'sorting');
+            if ($resPages) {
+                while ($rowPages = $db->sql_fetch_assoc($resPages)) {
+                    $this->setData($rowPages['uid'], $table, $depth - 1, $tcaCtrl, $filter);
+                    // some records might have been added, check if we still have the limit for further queries
+                    if (!empty($this->limit)) {
+                        $parts = GeneralUtility::trimExplode(',', $this->limit);
+                        // abort loop if LIMIT 0,0
+                        if ((int)$parts[0] === 0 && (int)$parts[1] === 0) {
+                            break;
+                        }
                     }
                 }
+                $db->sql_free_result($resPages);
             }
         }
         $this->label[$table] = $tcaCtrl['label'];
@@ -319,6 +276,20 @@ class DeletedRecords
         }
     }
 
+    /**
+     * Escapes a value to be used for like in a database query.
+     * There is a special handling for the characters '%' and '_'.
+     *
+     * @param string $value The value to be escaped for like conditions
+     * @param string $tableName The name of the table the query should be used for
+     * @return string The escaped value to be used for like conditions
+     */
+    protected function escapeValueForLike($value, $tableName)
+    {
+        $db = $this->getDatabaseConnection();
+        return $db->escapeStrForLike($db->quoteStr($value, $tableName), $tableName);
+    }
+
     /************************************************************
      * DELETE FUNCTIONS
      ************************************************************/
@@ -353,16 +324,15 @@ class DeletedRecords
      *
      * @param array $recordsArray Representation of the records
      * @param bool $recursive Whether to recursively undelete
-     * @return bool|int
+     * @return bool
      */
     public function undeleteData($recordsArray, $recursive = false)
     {
         $result = false;
-        $affectedRecords = 0;
         $depth = 999;
         if (is_array($recordsArray)) {
-            $this->deletedRows = array();
-            $cmd = array();
+            $this->deletedRows = [];
+            $cmd = [];
             foreach ($recordsArray as $record) {
                 list($table, $uid) = explode(':', $record);
                 // get all parent pages and cover them
@@ -381,11 +351,10 @@ class DeletedRecords
                     }
                 }
                 $cmd[$table][$uid]['undelete'] = 1;
-                $affectedRecords++;
                 if ($table === 'pages' && $recursive) {
                     $this->loadData($uid, '', $depth, '');
                     $childRecords = $this->getDeletedRows();
-                    if (!empty($childRecords)) {
+                    if (count($childRecords) > 0) {
                         foreach ($childRecords as $childTable => $childRows) {
                             foreach ($childRows as $childRow) {
                                 $cmd[$childTable][$childRow['uid']]['undelete'] = 1;
@@ -396,9 +365,9 @@ class DeletedRecords
             }
             if ($cmd) {
                 $tce = GeneralUtility::makeInstance(DataHandler::class);
-                $tce->start(array(), $cmd);
+                $tce->start([], $cmd);
                 $tce->process_cmdmap();
-                $result = $affectedRecords;
+                $result = true;
             }
         }
         return $result;
@@ -411,20 +380,12 @@ class DeletedRecords
      * @param array $pages
      * @return array
      */
-    protected function getDeletedParentPages($uid, &$pages = array())
+    protected function getDeletedParentPages($uid, &$pages = [])
     {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
-        $queryBuilder->getRestrictions()->removeAll();
-        $record = $queryBuilder
-            ->select('uid', 'pid')
-            ->from('pages')
-            ->where(
-                $queryBuilder->expr()->eq('uid', (int)$uid),
-                $queryBuilder->expr()->eq($GLOBALS['TCA']['pages']['ctrl']['delete'], 1)
-            )
-            ->execute()
-            ->fetch();
-        if ($record) {
+        $db = $this->getDatabaseConnection();
+        $res = $db->exec_SELECTquery('uid, pid', 'pages', 'uid=' . (int)$uid . ' AND ' . $GLOBALS['TCA']['pages']['ctrl']['delete'] . '=1');
+        if ($res !== false && $db->sql_num_rows($res) > 0) {
+            $record = $db->sql_fetch_assoc($res);
             $pages[] = $record['uid'];
             if ((int)$record['pid'] !== 0) {
                 $this->getDeletedParentPages($record['pid'], $pages);
@@ -470,5 +431,15 @@ class DeletedRecords
     public function getTable()
     {
         return $this->table;
+    }
+
+    /**
+     * Returns an instance of DatabaseConnection
+     *
+     * @return \TYPO3\CMS\Core\Database\DatabaseConnection
+     */
+    protected function getDatabaseConnection()
+    {
+        return $GLOBALS['TYPO3_DB'];
     }
 }

@@ -45,7 +45,7 @@ namespace TYPO3\CMS\Fluid\ViewHelpers\Be\Security;
  *
  * @api
  */
-class IfAuthenticatedViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\AbstractConditionViewHelper
+class IfAuthenticatedViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\AbstractConditionViewHelper implements \TYPO3\CMS\Fluid\Core\ViewHelper\Facets\CompilableInterface
 {
     /**
      * This method decides if the condition is TRUE or FALSE. It can be overriden in extending viewhelpers to adjust functionality.
@@ -55,7 +55,7 @@ class IfAuthenticatedViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\Abstrac
      */
     protected static function evaluateCondition($arguments = null)
     {
-        return (isset($GLOBALS['BE_USER']) && $GLOBALS['BE_USER']->user['uid'] > 0);
+        return isset($GLOBALS['BE_USER']) && $GLOBALS['BE_USER']->user['uid'] > 0;
     }
 
     /**

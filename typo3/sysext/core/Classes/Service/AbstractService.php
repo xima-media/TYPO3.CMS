@@ -13,8 +13,6 @@ namespace TYPO3\CMS\Core\Service;
  *
  * The TYPO3 project - inspiring people to share!
  */
-use TYPO3\CMS\Core\TimeTracker\TimeTracker;
-use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
  * Parent class for "Services" classes
@@ -24,12 +22,12 @@ abstract class AbstractService
     /**
      * @var array service description array
      */
-    public $info = array();
+    public $info = [];
 
     /**
      * @var array error stack
      */
-    public $error = array();
+    public $error = [];
 
     /**
      * @var bool Defines if debug messages should be written with \TYPO3\CMS\Core\Utility\GeneralUtility::devLog
@@ -67,12 +65,12 @@ abstract class AbstractService
      * @private
      * @var array
      */
-    public $tempFiles = array();
+    public $tempFiles = [];
 
     /**
      * @var array list of registered shutdown functions; should be used to prevent registering the same function multiple times
      */
-    protected $shutdownRegistry = array();
+    protected $shutdownRegistry = [];
 
     /**
      * @var string Prefix for temporary files
@@ -153,7 +151,7 @@ abstract class AbstractService
     public function devLog($msg, $severity = 0, $dataVar = false)
     {
         if ($this->writeDevLog) {
-            GeneralUtility::devLog($msg, $this->info['serviceKey'], $severity, $dataVar);
+            \TYPO3\CMS\Core\Utility\GeneralUtility::devLog($msg, $this->info['serviceKey'], $severity, $dataVar);
         }
     }
 
@@ -166,10 +164,10 @@ abstract class AbstractService
      */
     public function errorPush($errNum = T3_ERR_SV_GENERAL, $errMsg = 'Unspecified error occurred')
     {
-        array_push($this->error, array('nr' => $errNum, 'msg' => $errMsg));
-        /** @var \TYPO3\CMS\Core\TimeTracker\TimeTracker $timeTracker */
-        $timeTracker = GeneralUtility::makeInstance(TimeTracker::class);
-        $timeTracker->setTSlogMessage($errMsg, 2);
+        array_push($this->error, ['nr' => $errNum, 'msg' => $errMsg]);
+        if (is_object($GLOBALS['TT'])) {
+            $GLOBALS['TT']->setTSlogMessage($errMsg, 2);
+        }
     }
 
     /**
@@ -220,7 +218,7 @@ abstract class AbstractService
      */
     public function getErrorMsgArray()
     {
-        $errArr = array();
+        $errArr = [];
         if (!empty($this->error)) {
             foreach ($this->error as $error) {
                 $errArr[] = $error['msg'];
@@ -246,7 +244,7 @@ abstract class AbstractService
      */
     public function resetErrors()
     {
-        $this->error = array();
+        $this->error = [];
     }
 
     /***************************************
@@ -263,7 +261,7 @@ abstract class AbstractService
     public function checkExec($progList)
     {
         $ret = true;
-        $progList = GeneralUtility::trimExplode(',', $progList, true);
+        $progList = \TYPO3\CMS\Core\Utility\GeneralUtility::trimExplode(',', $progList, true);
         foreach ($progList as $prog) {
             if (!\TYPO3\CMS\Core\Utility\CommandUtility::checkCommand($prog)) {
                 // Program not found
@@ -298,7 +296,7 @@ abstract class AbstractService
     public function checkInputFile($absFile)
     {
         $checkResult = false;
-        if (GeneralUtility::isAllowedAbsPath($absFile) && @is_file($absFile)) {
+        if (\TYPO3\CMS\Core\Utility\GeneralUtility::isAllowedAbsPath($absFile) && @is_file($absFile)) {
             if (@is_readable($absFile)) {
                 $checkResult = $absFile;
             } else {
@@ -341,7 +339,7 @@ abstract class AbstractService
         if (!$absFile) {
             $absFile = $this->tempFile($this->prefixId);
         }
-        if ($absFile && GeneralUtility::isAllowedAbsPath($absFile)) {
+        if ($absFile && \TYPO3\CMS\Core\Utility\GeneralUtility::isAllowedAbsPath($absFile)) {
             if ($fd = @fopen($absFile, 'wb')) {
                 @fwrite($fd, $content);
                 @fclose($fd);
@@ -361,7 +359,7 @@ abstract class AbstractService
      */
     public function tempFile($filePrefix)
     {
-        $absFile = GeneralUtility::tempnam($filePrefix);
+        $absFile = \TYPO3\CMS\Core\Utility\GeneralUtility::tempnam($filePrefix);
         if ($absFile) {
             $ret = $absFile;
             $this->registerTempFile($absFile);
@@ -381,7 +379,7 @@ abstract class AbstractService
     public function registerTempFile($absFile)
     {
         if (!isset($this->shutdownRegistry[__METHOD__])) {
-            register_shutdown_function(array($this, 'unlinkTempFiles'));
+            register_shutdown_function([$this, 'unlinkTempFiles']);
             $this->shutdownRegistry[__METHOD__] = true;
         }
         $this->tempFiles[] = $absFile;
@@ -395,9 +393,9 @@ abstract class AbstractService
     public function unlinkTempFiles()
     {
         foreach ($this->tempFiles as $absFile) {
-            GeneralUtility::unlink_tempfile($absFile);
+            \TYPO3\CMS\Core\Utility\GeneralUtility::unlink_tempfile($absFile);
         }
-        $this->tempFiles = array();
+        $this->tempFiles = [];
     }
 
     /***************************************

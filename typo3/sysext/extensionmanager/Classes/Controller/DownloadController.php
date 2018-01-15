@@ -15,7 +15,6 @@ namespace TYPO3\CMS\Extensionmanager\Controller;
  */
 
 use TYPO3\CMS\Core\Messaging\FlashMessage;
-use TYPO3\CMS\Extbase\Mvc\View\JsonView;
 use TYPO3\CMS\Extensionmanager\Domain\Model\Extension;
 
 /**
@@ -52,16 +51,6 @@ class DownloadController extends AbstractController
      * @var \TYPO3\CMS\Extensionmanager\Utility\ConfigurationUtility
      */
     protected $configurationUtility;
-
-    /**
-     * @var JsonView
-     */
-    protected $defaultViewObjectName = JsonView::class;
-
-    /**
-     * @var JsonView
-     */
-    protected $view;
 
     /**
      * @param \TYPO3\CMS\Extensionmanager\Domain\Repository\ExtensionRepository $extensionRepository
@@ -112,14 +101,6 @@ class DownloadController extends AbstractController
     }
 
     /**
-     *
-     */
-    protected function initializeInstallFromTerAction()
-    {
-        $this->defaultViewObjectName = \TYPO3\CMS\Fluid\View\TemplateView::class;
-    }
-
-    /**
      * Check extension dependencies
      *
      * @param \TYPO3\CMS\Extensionmanager\Domain\Model\Extension $extension
@@ -131,12 +112,6 @@ class DownloadController extends AbstractController
         $title = '';
         $hasDependencies = false;
         $hasErrors = false;
-        $dependencyTypes = null;
-        $configuration = [
-            'value' => [
-                'dependencies' => [],
-            ],
-        ];
         if ($this->configurationUtility->getCurrentConfiguration('extensionmanager')['automaticInstallation']['value']) {
             $action = 'installFromTer';
             try {
@@ -147,31 +122,20 @@ class DownloadController extends AbstractController
                     foreach ($dependencyTypes as $dependencyType => $dependencies) {
                         $extensions = '';
                         foreach ($dependencies as $extensionKey => $dependency) {
-                            if (!isset($configuration['value']['dependencies'][$dependencyType])) {
-                                $configuration['value']['dependencies'][$dependencyType] = [];
-                            }
-                            $configuration['value']['dependencies'][$dependencyType][$extensionKey] = [
-                                '_exclude' => [
-                                    'categoryIndexFromStringOrNumber',
-                                ],
-                            ];
-                            $extensions .= $this->translate(
-                                'downloadExtension.dependencies.extensionWithVersion',
-                                array(
+                            $extensions .= $this->translate('downloadExtension.dependencies.extensionWithVersion', [
                                     $extensionKey, $dependency->getVersion()
-                                )
-                            ) . '<br />';
+                                ]) . '<br />';
                         }
-                        $message .= $this->translate(
-                            'downloadExtension.dependencies.typeHeadline',
-                            array(
+                        $message .= $this->translate('downloadExtension.dependencies.typeHeadline',
+                            [
                                 $this->translate('downloadExtension.dependencyType.' . $dependencyType),
                                 $extensions
-                            )
+                            ]
                         );
                     }
                     $title = $this->translate('downloadExtension.dependencies.resolveAutomatically');
                 }
+                $this->view->assign('dependencies', $dependencyTypes);
             } catch (\Exception $e) {
                 $hasErrors = true;
                 $title = $this->translate('downloadExtension.dependencies.errorTitle');
@@ -181,21 +145,12 @@ class DownloadController extends AbstractController
             // if automatic installation is deactivated, no dependency check is needed (download only)
             $action = 'installExtensionWithoutSystemDependencyCheck';
         }
-
-        $url = $this->uriBuilder->uriFor(
-            $action,
-            ['extension' => $extension->getUid(), 'format' => 'json'],
-            'Download'
-        );
-        $this->view->setConfiguration($configuration);
-        $this->view->assign('value', [
-            'dependencies' => $dependencyTypes,
-            'url' => $url,
-            'message' => $message,
-            'hasErrors' => $hasErrors,
-            'hasDependencies' => $hasDependencies,
-            'title' => $title
-        ]);
+        $this->view->assign('extension', $extension)
+            ->assign('action', $action)
+            ->assign('hasDependencies', $hasDependencies)
+            ->assign('hasErrors', $hasErrors)
+            ->assign('message', $message)
+            ->assign('title', $title);
     }
 
     /**
@@ -204,7 +159,7 @@ class DownloadController extends AbstractController
      * @param \TYPO3\CMS\Extensionmanager\Domain\Model\Extension $extension
      * @param string $downloadPath
      */
-    public function installFromTerAction(\TYPO3\CMS\Extensionmanager\Domain\Model\Extension $extension, $downloadPath = 'Local')
+    public function installFromTerAction(\TYPO3\CMS\Extensionmanager\Domain\Model\Extension $extension, $downloadPath)
     {
         list($result, $errorMessages) = $this->installFromTer($extension, $downloadPath);
         $emConfiguration = $this->configurationUtility->getCurrentConfiguration('extensionmanager');
@@ -224,7 +179,7 @@ class DownloadController extends AbstractController
     public function installExtensionWithoutSystemDependencyCheckAction(\TYPO3\CMS\Extensionmanager\Domain\Model\Extension $extension)
     {
         $this->managementService->setSkipDependencyCheck(true);
-        $this->forward('installFromTer', null, null, array('extension' => $extension, 'downloadPath' => 'Local'));
+        $this->forward('installFromTer', null, null, ['extension' => $extension, 'downloadPath' => 'Local']);
     }
 
     /**
@@ -248,7 +203,7 @@ class DownloadController extends AbstractController
                         \TYPO3\CMS\Extbase\Utility\LocalizationUtility::translate(
                             'distribution.error.headline',
                             'extensionmanager',
-                            array($extensionKey)
+                            [$extensionKey]
                         ),
                         \TYPO3\CMS\Core\Messaging\AbstractMessage::ERROR
                     );
@@ -273,7 +228,7 @@ class DownloadController extends AbstractController
                 'show',
                 'Distribution',
                 null,
-                array('extension' => $extension)
+                ['extension' => $extension]
             );
         }
     }
@@ -303,7 +258,7 @@ class DownloadController extends AbstractController
                 $this->managementService->downloadMainExtension($extension);
             }
             $this->addFlashMessage(
-                $this->translate('extensionList.updateFlashMessage.body', array($extensionKey)),
+                $this->translate('extensionList.updateFlashMessage.body', [$extensionKey]),
                 $this->translate('extensionList.updateFlashMessage.title')
             );
         } catch (\Exception $e) {
@@ -325,7 +280,7 @@ class DownloadController extends AbstractController
         $extensionKey = $this->request->getArgument('extension');
         $versionStart = $this->request->getArgument('integerVersionStart');
         $versionStop = $this->request->getArgument('integerVersionStop');
-        $updateComments = array();
+        $updateComments = [];
         /** @var Extension[] $updatableVersions */
         $updatableVersions = $this->extensionRepository->findByVersionRangeAndExtensionKeyOrderedByVersion(
             $extensionKey,
@@ -341,14 +296,9 @@ class DownloadController extends AbstractController
             }
             $updateComments[$updatableVersion->getVersion()] = $updatableVersion->getUpdateComment();
         }
-
-        $this->view->assign('value', [
-            'updateComments' => $updateComments,
-            'url' => $this->uriBuilder->uriFor(
-                'updateExtension',
-                ['extension' => $extensionKey, 'version' => $highestPossibleVersion]
-            )
-        ]);
+        $this->view->assign('updateComments', $updateComments)
+            ->assign('extensionKey', $extensionKey)
+            ->assign('version', $highestPossibleVersion);
     }
 
     /**
@@ -362,7 +312,7 @@ class DownloadController extends AbstractController
     protected function installFromTer(\TYPO3\CMS\Extensionmanager\Domain\Model\Extension $extension, $downloadPath = 'Local')
     {
         $result = false;
-        $errorMessages = array();
+        $errorMessages = [];
         try {
             $this->downloadUtility->setDownloadPath($downloadPath);
             $this->managementService->setAutomaticInstallationEnabled($this->configurationUtility->getCurrentConfiguration('extensionmanager')['automaticInstallation']['value']);
@@ -370,16 +320,16 @@ class DownloadController extends AbstractController
                 $errorMessages = $this->managementService->getDependencyErrors();
             }
         } catch (\TYPO3\CMS\Extensionmanager\Exception\ExtensionManagerException $e) {
-            $errorMessages = array(
-                $extension->getExtensionKey() => array(
-                    array(
+            $errorMessages = [
+                $extension->getExtensionKey() => [
+                    [
                         'code' => $e->getCode(),
                         'message' => $e->getMessage(),
-                    )
-                ),
-            );
+                    ]
+                ],
+            ];
         }
 
-        return array($result, $errorMessages);
+        return [$result, $errorMessages];
     }
 }

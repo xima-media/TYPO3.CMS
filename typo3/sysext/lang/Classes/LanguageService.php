@@ -14,8 +14,6 @@ namespace TYPO3\CMS\Lang;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Charset\CharsetConverter;
-use TYPO3\CMS\Core\Localization\Locales;
 use TYPO3\CMS\Core\Localization\LocalizationFactory;
 use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -38,8 +36,7 @@ class LanguageService
     public $lang = 'default';
 
     /**
-     * Default charset in backend, is always UTF-8, option is not in use anymore, but is kept for third-party extensions
-     * using this option. Will be removed in future versions
+     * Default charset in backend
      *
      * @var string
      */
@@ -55,31 +52,29 @@ class LanguageService
     /**
      * Can contain labels and image references from the backend modules.
      * Relies on \TYPO3\CMS\Backend\Module\ModuleLoader to initialize modules after a global instance of $LANG has been created.
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9 - use ModuleLoader directly instead.
      *
      * @var array
      */
-    public $moduleLabels = array();
+    public $moduleLabels = [];
 
     /**
      * Internal cache for read LL-files
      *
      * @var array
      */
-    public $LL_files_cache = array();
+    public $LL_files_cache = [];
 
     /**
      * Internal cache for ll-labels (filled as labels are requested)
      *
      * @var array
      */
-    public $LL_labels_cache = array();
+    public $LL_labels_cache = [];
 
     /**
      * instance of the "\TYPO3\CMS\Core\Charset\CharsetConverter" class. May be used by any application.
      *
      * @var \TYPO3\CMS\Core\Charset\CharsetConverter
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9. Charset is a singleton, load it via GeneralUtility directly
      */
     public $csConvObj;
 
@@ -87,8 +82,6 @@ class LanguageService
      * instance of the parser factory
      *
      * @var LocalizationFactory
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9, as LocalizationFactory is a singleton, load it via
-     * GeneralUtility directly
      */
     public $parserFactory;
 
@@ -98,21 +91,7 @@ class LanguageService
      *
      * @var array
      */
-    protected $languageDependencies = array();
-
-    /**
-     * LanguageService constructor.
-     */
-    public function __construct()
-    {
-        // Initialize the conversion object
-        $this->csConvObj = GeneralUtility::makeInstance(CharsetConverter::class);
-        // Initialize the localization factory object
-        $this->parserFactory = GeneralUtility::makeInstance(LocalizationFactory::class);
-        if ($GLOBALS['TYPO3_CONF_VARS']['BE']['lang']['debug']) {
-            $this->debugKey = true;
-        }
-    }
+    protected $languageDependencies = [];
 
     /**
      * Initializes the backend language.
@@ -121,22 +100,30 @@ class LanguageService
      * $LANG->init($GLOBALS['BE_USER']->uc['lang']);
      *
      * @throws \RuntimeException
-     * @param string $languageKey The language key (two character string from backend users profile)
+     * @param string $lang The language key (two character string from backend users profile)
      * @return void
      */
-    public function init($languageKey)
+    public function init($lang)
     {
-        // Find the requested language in this list based on the $languageKey
+        // Initialize the conversion object:
+        $this->csConvObj = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Charset\CharsetConverter::class);
+        // Initialize the parser factory object
+        $this->parserFactory = GeneralUtility::makeInstance(LocalizationFactory::class);
+        // Find the requested language in this list based
+        // on the $lang key being inputted to this function.
         /** @var $locales \TYPO3\CMS\Core\Localization\Locales */
-        $locales = GeneralUtility::makeInstance(Locales::class);
+        $locales = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Localization\Locales::class);
         // Language is found. Configure it:
-        if (in_array($languageKey, $locales->getLocales())) {
+        if (in_array($lang, $locales->getLocales())) {
             // The current language key
-            $this->lang = $languageKey;
-            $this->languageDependencies[] = $languageKey;
-            foreach ($locales->getLocaleDependencies($languageKey) as $language) {
+            $this->lang = $lang;
+            $this->languageDependencies[] = $this->lang;
+            foreach ($locales->getLocaleDependencies($this->lang) as $language) {
                 $this->languageDependencies[] = $language;
             }
+        }
+        if ($GLOBALS['TYPO3_CONF_VARS']['BE']['lang']['debug']) {
+            $this->debugKey = true;
         }
     }
 
@@ -144,11 +131,9 @@ class LanguageService
      * Gets the parser factory.
      *
      * @return LocalizationFactory
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
      */
     public function getParserFactory()
     {
-        GeneralUtility::logDeprecatedFunction();
         return $this->parserFactory;
     }
 
@@ -159,15 +144,13 @@ class LanguageService
      * @param string $prefix Module name prefix
      * @return void
      * @see \TYPO3\CMS\Backend\Module\ModuleLoader
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9 - use ModuleLoader instead.
      */
     public function addModuleLabels($arr, $prefix)
     {
-        GeneralUtility::logDeprecatedFunction();
         if (is_array($arr)) {
             foreach ($arr as $k => $larr) {
                 if (!isset($this->moduleLabels[$k])) {
-                    $this->moduleLabels[$k] = array();
+                    $this->moduleLabels[$k] = [];
                 }
                 if (is_array($larr)) {
                     foreach ($larr as $l => $v) {
@@ -189,11 +172,9 @@ class LanguageService
      *
      * @param string $str Input string
      * @return string Output string
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
      */
     public function makeEntities($str)
     {
-        GeneralUtility::logDeprecatedFunction();
         // Convert string back again, but using the full entity conversion:
         return $this->csConvObj->utf8_to_entities($str);
     }
@@ -214,7 +195,7 @@ class LanguageService
      * Mostly used from modules with only one LOCAL_LANG file loaded into the global space.
      *
      * @param string $index Label key
-     * @param bool $hsc DEPRECATED If set, the return value is htmlspecialchar'ed
+     * @param bool $hsc If set, the return value is htmlspecialchar'ed
      * @return string
      */
     public function getLL($index, $hsc = false)
@@ -227,18 +208,11 @@ class LanguageService
      *
      * @param string $index Label key
      * @param array $localLanguage $LOCAL_LANG array to get label key from
-     * @param bool $hsc DEPRECATED If set, the return value is htmlspecialchar'ed
+     * @param bool $hsc If set, the return value is htmlspecialchar'ed
      * @return string
      */
     public function getLLL($index, $localLanguage, $hsc = false)
     {
-        // @deprecated since TYPO3 v8, will be removed in TYPO3 v9
-        if ($hsc) {
-            GeneralUtility::deprecationLog(
-                'Calling getLLL() with argument \'hsc\' has been deprecated.'
-            );
-        }
-
         // Get Local Language. Special handling for all extensions that
         // read PHP LL files and pass arrays here directly.
         if (isset($localLanguage[$this->lang][$index])) {
@@ -266,18 +240,11 @@ class LanguageService
      * Refer to 'Inside TYPO3' for more details
      *
      * @param string $input Label key/reference
-     * @param bool $hsc DEPRECATED If set, the return value is htmlspecialchar'ed
+     * @param bool $hsc If set, the return value is htmlspecialchar'ed
      * @return string
      */
     public function sL($input, $hsc = false)
     {
-        // @deprecated since TYPO3 v8, will be removed in TYPO3 v9
-        if ($hsc) {
-            GeneralUtility::deprecationLog(
-                'Calling sL() with argument \'hsc\' has been deprecated.'
-            );
-        }
-
         $identifier = $input . '_' . (int)$hsc . '_' . (int)$this->debugKey;
         if (isset($this->LL_labels_cache[$this->lang][$identifier])) {
             return $this->LL_labels_cache[$this->lang][$identifier];
@@ -295,6 +262,12 @@ class LanguageService
                 // Getting data if not cached
             if (!isset($this->LL_files_cache[$parts[0]])) {
                 $this->LL_files_cache[$parts[0]] = $this->readLLfile($parts[0]);
+                    // If the current language is found in another file, load that as well:
+                $lFileRef = $this->localizedFileRef($parts[0]);
+                if ($lFileRef && $this->LL_files_cache[$parts[0]][$this->lang] === 'EXT') {
+                    $tempLL = $this->readLLfile($lFileRef);
+                    $this->LL_files_cache[$parts[0]][$this->lang] = $tempLL[$this->lang];
+                }
             }
             $output = $this->getLLL($parts[1], $this->LL_files_cache[$parts[0]]);
         } else {
@@ -323,7 +296,7 @@ class LanguageService
             // and secondly there must be a references to locallang files available in [refs]
         if (is_array($GLOBALS['TCA_DESCR'][$table]) && !isset($GLOBALS['TCA_DESCR'][$table]['columns']) && is_array($GLOBALS['TCA_DESCR'][$table]['refs'])) {
             // Init $TCA_DESCR for $table-key
-            $GLOBALS['TCA_DESCR'][$table]['columns'] = array();
+            $GLOBALS['TCA_DESCR'][$table]['columns'] = [];
                 // Get local-lang for each file in $TCA_DESCR[$table]['refs'] as they are ordered.
             foreach ($GLOBALS['TCA_DESCR'][$table]['refs'] as $llfile) {
                 $localLanguage = $this->includeLLFile($llfile, 0, 1);
@@ -385,7 +358,7 @@ class LanguageService
      */
     public function includeLLFile($fileRef, $setGlobal = true, $mergeLocalOntoDefault = false)
     {
-        $globalLanguage = array();
+        $globalLanguage = [];
             // Get default file
         $localLanguage = $this->readLLfile($fileRef);
         if (is_array($localLanguage) && !empty($localLanguage)) {
@@ -395,6 +368,12 @@ class LanguageService
                 ArrayUtility::mergeRecursiveWithOverrule($globalLanguage, $localLanguage);
             } else {
                 $globalLanguage = $localLanguage;
+            }
+                // Localized addition?
+            $lFileRef = $this->localizedFileRef($fileRef);
+            if ($lFileRef && (string)$globalLanguage[$this->lang] === 'EXT') {
+                $localLanguage = $this->readLLfile($lFileRef);
+                ArrayUtility::mergeRecursiveWithOverrule($globalLanguage, $localLanguage);
             }
                 // Merge local onto default
             if ($mergeLocalOntoDefault && $this->lang !== 'default' && is_array($globalLanguage[$this->lang]) && is_array($globalLanguage['default'])) {
@@ -421,17 +400,21 @@ class LanguageService
      */
     protected function readLLfile($fileRef)
     {
+        // @todo: Usually, an instance of the LocalizationFactory is found in $this->parserFactory.
+        // @todo: This is not the case if $GLOBALS['LANG'] is not used to get hold of this object,
+        // @todo: but the objectManager instead. If then init() is not called, this will fatal ...
+        // @todo: To be sure, we always create an instance here for now.
         /** @var $languageFactory LocalizationFactory */
         $languageFactory = GeneralUtility::makeInstance(LocalizationFactory::class);
 
         if ($this->lang !== 'default') {
             $languages = array_reverse($this->languageDependencies);
         } else {
-            $languages = array('default');
+            $languages = ['default'];
         }
-        $localLanguage = array();
+        $localLanguage = [];
         foreach ($languages as $language) {
-            $tempLL = $languageFactory->getParsedData($fileRef, $language, 'utf-8');
+            $tempLL = $languageFactory->getParsedData($fileRef, $language, $this->charSet);
             $localLanguage['default'] = $tempLL['default'];
             if (!isset($localLanguage[$this->lang])) {
                 $localLanguage[$this->lang] = $localLanguage['default'];
@@ -446,19 +429,34 @@ class LanguageService
     }
 
     /**
+     * Returns localized fileRef (.[langkey].php)
+     *
+     * @param string $fileRef Filename/path of a 'locallang.php' file
+     * @return string Input filename with a '.[lang-key].php' ending added if $this->lang is not 'default'
+     * @deprecated since TYPO3 CMS 7, this method will be removed in CMS 8. Please use XLF files for translation handling.
+     */
+    protected function localizedFileRef($fileRef)
+    {
+        if ($this->lang !== 'default' && substr($fileRef, -4) === '.php') {
+            GeneralUtility::logDeprecatedFunction();
+            return substr($fileRef, 0, -4) . '.' . $this->lang . '.php';
+        } else {
+            return null;
+        }
+    }
+
+    /**
      * Overrides a label.
      *
      * @param string $index
      * @param string $value
      * @param bool $overrideDefault Overrides default language
      * @return void
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
      */
     public function overrideLL($index, $value, $overrideDefault = true)
     {
-        GeneralUtility::logDeprecatedFunction();
         if (!isset($GLOBALS['LOCAL_LANG'])) {
-            $GLOBALS['LOCAL_LANG'] = array();
+            $GLOBALS['LOCAL_LANG'] = [];
         }
         $GLOBALS['LOCAL_LANG'][$this->lang][$index][0]['target'] = $value;
         if ($overrideDefault) {
@@ -476,8 +474,8 @@ class LanguageService
      */
     public function getLabelsWithPrefix($prefix, $strip = '')
     {
-        $extraction = array();
-        $labels = array_merge((array)$GLOBALS['LOCAL_LANG']['default'], (array)$GLOBALS['LOCAL_LANG'][$this->lang]);
+        $extraction = [];
+        $labels = array_merge((array)$GLOBALS['LOCAL_LANG']['default'], (array)$GLOBALS['LOCAL_LANG'][$GLOBALS['LANG']->lang]);
         // Regular expression to strip the selection prefix and possibly something from the label name:
         $labelPattern = '#^' . preg_quote($prefix, '#') . '(' . preg_quote($strip, '#') . ')?#';
         // Iterate through all locallang labels:

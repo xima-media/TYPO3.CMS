@@ -58,9 +58,9 @@ class CropViewHelper extends AbstractViewHelper
     public function render($maxCharacters)
     {
         return static::renderStatic(
-            array(
+            [
                 'maxCharacters' => $maxCharacters,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

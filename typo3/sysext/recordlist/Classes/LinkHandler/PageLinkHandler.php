@@ -97,7 +97,7 @@ class PageLinkHandler extends AbstractLinkHandler implements LinkHandlerInterfac
         $id = $this->linkParts['pageid'];
         $pageRow = BackendUtility::getRecordWSOL('pages', $id);
 
-        return htmlspecialchars($lang->getLL('page'))
+        return $lang->getLL('page', true)
             . ' \'' . htmlspecialchars(GeneralUtility::fixed_lgd_cs($pageRow['title'], $titleLen)) . '\''
             . ' (ID:' . $id . ($this->linkParts['anchor'] ? ', #' . $this->linkParts['anchor'] : '') . ')';
     }
@@ -121,21 +121,24 @@ class PageLinkHandler extends AbstractLinkHandler implements LinkHandlerInterfac
         /** @var ElementBrowserPageTreeView $pageTree */
         $pageTree = GeneralUtility::makeInstance(ElementBrowserPageTreeView::class);
         $pageTree->setLinkParameterProvider($this);
-        $pageTree->ext_showPageId = (bool)$backendUser->getTSConfigVal('options.pageTree.showPageIdWithTitle');
         $pageTree->ext_showNavTitle = (bool)$backendUser->getTSConfigVal('options.pageTree.showNavTitle');
+        $pageTree->ext_showPageId = (bool)$backendUser->getTSConfigVal('options.pageTree.showPageIdWithTitle');
+        $pageTree->ext_showPathAboveMounts = (bool)$backendUser->getTSConfigVal('options.pageTree.showPathAboveMounts');
         $pageTree->addField('nav_title');
         $tree = $pageTree->getBrowsableTree();
 
         return '
-            <div class="link-browser-section link-browser-pagetree">
-                <div class="col-xs-6">
-                    <h3>' . $this->getLanguageService()->getLL('pageTree') . ':</h3>'
-                            . $this->getTemporaryTreeMountCancelNotice() . $tree . '
-                </div>
-                <div class="col-xs-6">' .
-                    $this->expandPage($this->expandPage) . '
-                </div>
-            </div>';
+
+				<!--
+					Wrapper table for page tree / record list:
+				-->
+				<table border="0" cellpadding="0" cellspacing="0" id="typo3-linkPages">
+					<tr>
+						<td class="c-wCell" valign="top"><h3>' . $this->getLanguageService()->getLL('pageTree') . ':</h3>'
+                            . $this->getTemporaryTreeMountCancelNotice() . $tree . '</td>
+						<td class="c-wCell" valign="top">' . $this->expandPage($this->expandPage) . '</td>
+					</tr>
+				</table>';
     }
 
     /**
@@ -174,7 +177,7 @@ class PageLinkHandler extends AbstractLinkHandler implements LinkHandlerInterfac
 
         // Look up tt_content elements from the expanded page:
         $res = $db->exec_SELECTquery(
-            'uid,header,hidden,starttime,endtime,fe_group,CType,colPos,bodytext',
+            '*',
             'tt_content',
             'pid=' . (int)$expPageId . BackendUtility::deleteClause('tt_content')
             . BackendUtility::versioningPlaceholderClause('tt_content'),
@@ -226,8 +229,8 @@ class PageLinkHandler extends AbstractLinkHandler implements LinkHandlerInterfac
         if ((int)$this->getBackendUser()->getSessionData('pageTree_temporaryMountPoint') === 0) {
             return '';
         }
-        $link = '<p><a href="' . htmlspecialchars(GeneralUtility::linkThisScript(array('setTempDBmount' => 0))) . '" class="btn btn-primary">'
-            . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.temporaryDBmount')) . '</a></p>';
+        $link = '<p><a href="' . htmlspecialchars(GeneralUtility::linkThisScript(['setTempDBmount' => 0])) . '" class="btn btn-primary">'
+            . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.temporaryDBmount', true) . '</a></p>';
         return $link;
     }
 
@@ -318,12 +321,12 @@ class PageLinkHandler extends AbstractLinkHandler implements LinkHandlerInterfac
 				<tr>
 					<td>
 						<label>
-							' . htmlspecialchars($this->getLanguageService()->getLL('page_id')) . ':
+							' . $this->getLanguageService()->getLL('page_id', true) . ':
 						</label>
 					</td>
 					<td colspan="3">
 						<input type="text" size="6" name="luid" id="luid" /> <input class="btn btn-default t3js-pageLink" type="submit" value="'
-            . htmlspecialchars($this->getLanguageService()->getLL('setLink')) . '" />
+            . $this->getLanguageService()->getLL('setLink', true) . '" />
 					</td>
 				</tr>';
         }

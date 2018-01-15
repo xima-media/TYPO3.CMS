@@ -13,7 +13,6 @@ namespace TYPO3\CMS\Lang\Controller;
  *
  * The TYPO3 project - inspiring people to share!
  */
-
 use TYPO3\CMS\Backend\Template\Components\ButtonBar;
 use TYPO3\CMS\Backend\Template\Components\Menu\Menu;
 use TYPO3\CMS\Backend\Template\Components\Menu\MenuItem;
@@ -24,11 +23,6 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Mvc\Controller\ActionController;
 use TYPO3\CMS\Extbase\Mvc\Web\Routing\UriBuilder;
 use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
-use TYPO3\CMS\Lang\Domain\Model\Extension;
-use TYPO3\CMS\Lang\Domain\Repository\ExtensionRepository;
-use TYPO3\CMS\Lang\Domain\Repository\LanguageRepository;
-use TYPO3\CMS\Lang\Service\RegistryService;
-use TYPO3\CMS\Lang\Service\TranslationService;
 
 /**
  * Language controller
@@ -68,7 +62,7 @@ class LanguageController extends ActionController
     /**
      * @param \TYPO3\CMS\Lang\Domain\Repository\LanguageRepository $languageRepository
      */
-    public function injectLanguageRepository(LanguageRepository $languageRepository)
+    public function injectLanguageRepository(\TYPO3\CMS\Lang\Domain\Repository\LanguageRepository $languageRepository)
     {
         $this->languageRepository = $languageRepository;
     }
@@ -76,7 +70,7 @@ class LanguageController extends ActionController
     /**
      * @param \TYPO3\CMS\Lang\Domain\Repository\ExtensionRepository $extensionRepository
      */
-    public function injectExtensionRepository(ExtensionRepository $extensionRepository)
+    public function injectExtensionRepository(\TYPO3\CMS\Lang\Domain\Repository\ExtensionRepository $extensionRepository)
     {
         $this->extensionRepository = $extensionRepository;
     }
@@ -84,7 +78,7 @@ class LanguageController extends ActionController
     /**
      * @param \TYPO3\CMS\Lang\Service\TranslationService $translationService
      */
-    public function injectTranslationService(TranslationService $translationService)
+    public function injectTranslationService(\TYPO3\CMS\Lang\Service\TranslationService $translationService)
     {
         $this->translationService = $translationService;
     }
@@ -92,7 +86,7 @@ class LanguageController extends ActionController
     /**
      * @param \TYPO3\CMS\Lang\Service\RegistryService $registryService
      */
-    public function injectRegistryService(RegistryService $registryService)
+    public function injectRegistryService(\TYPO3\CMS\Lang\Service\RegistryService $registryService)
     {
         $this->registryService = $registryService;
     }
@@ -144,16 +138,14 @@ class LanguageController extends ActionController
     public function updateLanguageAction(array $data)
     {
         $numberOfExtensionsToUpdate = 10;
-        $response = array(
+        $response = [
             'success' => false,
             'progress' => 0,
-        );
-        $progress = 0;
+        ];
         if (!empty($data['locale'])) {
             $allCount = 0;
             for ($i = 0; $i < $numberOfExtensionsToUpdate; $i++) {
                 $offset = (int)$data['count'] * $numberOfExtensionsToUpdate + $i;
-                /** @var Extension $extension */
                 $extension = $this->extensionRepository->findOneByOffset($offset);
                 if (empty($extension)) {
                     // No more extensions to update
@@ -193,14 +185,14 @@ class LanguageController extends ActionController
      */
     public function updateTranslationAction(array $data)
     {
-        $response = array('success' => false);
+        $response = ['success' => false];
         if (!empty($data['extension']) && !empty($data['locale'])) {
             $result = $this->translationService->updateTranslation($data['extension'], $data['locale']);
             if (empty($result[$data['extension']][$data['locale']]['error'])) {
-                $response = array(
+                $response = [
                     'success' => true,
                     'result' => $result,
-                );
+                ];
             }
         }
         $this->view->assign('response', $response);
@@ -216,7 +208,7 @@ class LanguageController extends ActionController
      */
     public function activateLanguageAction(array $data)
     {
-        $response = array('success' => false);
+        $response = ['success' => false];
         if (!empty($data['locale'])) {
             $response = $this->languageRepository->activateByLocale($data['locale']);
         }
@@ -231,7 +223,7 @@ class LanguageController extends ActionController
      */
     public function deactivateLanguageAction(array $data)
     {
-        $response = array('success' => false);
+        $response = ['success' => false];
         if (!empty($data['locale'])) {
             $response = $this->languageRepository->deactivateByLocale($data['locale']);
         }
@@ -278,14 +270,14 @@ class LanguageController extends ActionController
         /** @var Menu $menu */
         $menu = GeneralUtility::makeInstance(Menu::class);
         $menu->setIdentifier('_languageMenu');
-        $menu->setLabel($this->getLanguageService()->sL('LLL:EXT:lang/locallang_general.xlf:LGL.language'));
+        $menu->setLabel($this->getLanguageService()->sL('LLL:EXT:lang/locallang_general.xlf:LGL.language', true));
 
         /** @var MenuItem $languageListMenuItem */
         $languageListMenuItem = GeneralUtility::makeInstance(MenuItem::class);
         $action = 'listLanguages';
         $isActive = $this->request->getControllerActionName() === $action ? true : false;
         $languageListMenuItem->setTitle($this->getLanguageService()->sL('LLL:EXT:lang/Resources/Private/Language/locallang.xlf:header.languages'));
-        $uri = $uriBuilder->reset()->uriFor('listLanguages', array(), 'Language');
+        $uri = $uriBuilder->reset()->uriFor('listLanguages', [], 'Language');
         $languageListMenuItem->setHref($uri)->setActive($isActive);
 
         /** @var MenuItem $translationMenuItem */
@@ -293,7 +285,7 @@ class LanguageController extends ActionController
         $action = 'listTranslations';
         $isActive = $this->request->getControllerActionName() === $action ? true : false;
         $translationMenuItem->setTitle($this->getLanguageService()->sL('LLL:EXT:lang/Resources/Private/Language/locallang.xlf:header.translations'));
-        $uri = $uriBuilder->reset()->uriFor('listTranslations', array(), 'Language');
+        $uri = $uriBuilder->reset()->uriFor('listTranslations', [], 'Language');
         $translationMenuItem->setHref($uri)->setActive($isActive);
 
         $menu->addMenuItem($languageListMenuItem);

@@ -64,8 +64,7 @@ class DatabaseRowInitializeNewTest extends UnitTestCase
             'command' => 'new',
             'databaseRow' => 'not-an-array',
         ];
-        $this->expectException(\UnexpectedValueException::class);
-        $this->expectExceptionCode(1444431128);
+        $this->setExpectedException(\UnexpectedValueException::class, $this->anything(), 1444431128);
         $this->subject->addData($input);
     }
 
@@ -520,8 +519,7 @@ class DatabaseRowInitializeNewTest extends UnitTestCase
             'databaseRow' => [],
             'inlineChildChildUid' => 42,
         ];
-        $this->expectException(\UnexpectedValueException::class);
-        $this->expectExceptionCode(1444434102);
+        $this->setExpectedException(\UnexpectedValueException::class, $this->anything(), 1444434102);
         $this->subject->addData($input);
     }
 
@@ -535,8 +533,7 @@ class DatabaseRowInitializeNewTest extends UnitTestCase
             'databaseRow' => [],
             'inlineChildChildUid' => '42',
         ];
-        $this->expectException(\UnexpectedValueException::class);
-        $this->expectExceptionCode(1444434103);
+        $this->setExpectedException(\UnexpectedValueException::class, $this->anything(), 1444434103);
         $this->subject->addData($input);
     }
 
@@ -592,8 +589,7 @@ class DatabaseRowInitializeNewTest extends UnitTestCase
                 ],
             ],
         ];
-        $this->expectException(\UnexpectedValueException::class);
-        $this->expectExceptionCode(1444434104);
+        $this->setExpectedException(\UnexpectedValueException::class, $this->anything(), 1444434104);
         $this->subject->addData($input);
     }
 
@@ -656,8 +652,7 @@ class DatabaseRowInitializeNewTest extends UnitTestCase
             ],
             'isInlineChild' => true,
         ];
-        $this->expectException(\UnexpectedValueException::class);
-        $this->expectExceptionCode(1461598332);
+        $this->setExpectedException(\UnexpectedValueException::class, $this->anything(), 1461598332);
         $this->subject->addData($input);
     }
 

@@ -14,35 +14,29 @@ namespace TYPO3\CMS\Install\ViewHelpers\Format;
  * The TYPO3 project - inspiring people to share!
  */
 
+use TYPO3\CMS\Fluid\Core\Rendering\RenderingContextInterface;
 use TYPO3\CMS\Fluid\Core\ViewHelper\AbstractViewHelper;
-use TYPO3Fluid\Fluid\Core\Rendering\RenderingContextInterface;
+use TYPO3\CMS\Fluid\Core\ViewHelper\Facets\CompilableInterface;
 
 /**
  * Display image magick commands
  *
  * @internal
  */
-class ImageMagickCommandsViewHelper extends AbstractViewHelper
+class ImageMagickCommandsViewHelper extends AbstractViewHelper implements CompilableInterface
 {
-    /**
-     * As this ViewHelper renders HTML, the output must not be escaped.
-     *
-     * @var bool
-     */
-    protected $escapeOutput = false;
-
     /**
      * Display image magick commands
      *
      * @param array $commands Given commands
      * @return string Formatted commands
      */
-    public function render(array $commands = array())
+    public function render(array $commands = [])
     {
         return static::renderStatic(
-            array(
+            [
                 'commands' => $commands,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
@@ -50,7 +44,7 @@ class ImageMagickCommandsViewHelper extends AbstractViewHelper
 
     /**
      * @param array $arguments
-     * @param \Closure $renderChildrenClosure
+     * @param callable $renderChildrenClosure
      * @param RenderingContextInterface $renderingContext
      *
      * @return string
@@ -59,14 +53,14 @@ class ImageMagickCommandsViewHelper extends AbstractViewHelper
     {
         $commands = $arguments['commands'];
 
-        $result = array();
+        $result = [];
         foreach ($commands as $commandGroup) {
-            $result[] = '<strong>Command:</strong>' . LF . htmlspecialchars($commandGroup[1]);
+            $result[] = 'Command: ' . $commandGroup[1];
             // If 3 elements: last one is result
             if (count($commandGroup) === 3) {
-                $result[] = '<strong>Result:</strong>' . LF . htmlspecialchars($commandGroup[2]);
+                $result[] = 'Result: ' . $commandGroup[2];
             }
         }
-        return '<pre><code class="language-bash">' . implode(LF, $result) . '</code></pre>';
+        return '<textarea class="form-control" rows="' . count($result) . '" cols="50">' . implode(LF, $result) . '</textarea>';
     }
 }

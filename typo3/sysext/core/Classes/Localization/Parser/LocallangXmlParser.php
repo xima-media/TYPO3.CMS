@@ -17,6 +17,7 @@ namespace TYPO3\CMS\Core\Localization\Parser;
 use TYPO3\CMS\Core\Localization\Exception\InvalidXmlFileException;
 use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Utility\PathUtility;
 
 /**
  * Parser for XML locallang file.
@@ -53,7 +54,7 @@ class LocallangXmlParser extends AbstractXmlParser
         } catch (InvalidXmlFileException $e) {
             $parsedTarget = $this->getParsedTargetData($this->sourcePath);
         }
-        $LOCAL_LANG = array();
+        $LOCAL_LANG = [];
         $LOCAL_LANG[$languageKey] = $parsedSource;
         ArrayUtility::mergeRecursiveWithOverrule($LOCAL_LANG[$languageKey], $parsedTarget);
         return $LOCAL_LANG;
@@ -65,24 +66,31 @@ class LocallangXmlParser extends AbstractXmlParser
      * @param \SimpleXMLElement $root XML root element
      * @param string $element Target or Source
      * @return array
+     * @throws InvalidXmlFileException
      */
     protected function doParsingFromRootForElement(\SimpleXMLElement $root, $element)
     {
         $bodyOfFileTag = $root->data->languageKey;
-        // Check if the source llxml file contains localized records
-        $localizedBodyOfFileTag = $root->data->xpath('languageKey[@index=\'' . $this->languageKey . '\']');
+        if ($bodyOfFileTag === null) {
+            throw new InvalidXmlFileException('Invalid locallang.xml language file "' . PathUtility::stripPathSitePrefix($this->sourcePath) . '"', 1487944884);
+        }
+
         if ($element === 'source' || $this->languageKey === 'default') {
             $parsedData = $this->getParsedDataForElement($bodyOfFileTag, $element);
         } else {
-            $parsedData = array();
+            $parsedData = [];
         }
-        if ($element === 'target' && isset($localizedBodyOfFileTag[0]) && $localizedBodyOfFileTag[0] instanceof \SimpleXMLElement) {
-            $parsedDataTarget = $this->getParsedDataForElement($localizedBodyOfFileTag[0], $element);
-            $mergedData = $parsedDataTarget + $parsedData;
-            if ($this->languageKey === 'default') {
-                $parsedData = array_intersect_key($mergedData, $parsedData, $parsedDataTarget);
-            } else {
-                $parsedData = array_intersect_key($mergedData, $parsedDataTarget);
+        if ($element === 'target') {
+            // Check if the source llxml file contains localized records
+            $localizedBodyOfFileTag = $root->data->xpath('languageKey[@index=\'' . $this->languageKey . '\']');
+            if (isset($localizedBodyOfFileTag[0]) && $localizedBodyOfFileTag[0] instanceof \SimpleXMLElement) {
+                $parsedDataTarget = $this->getParsedDataForElement($localizedBodyOfFileTag[0], $element);
+                $mergedData = $parsedDataTarget + $parsedData;
+                if ($this->languageKey === 'default') {
+                    $parsedData = array_intersect_key($mergedData, $parsedData, $parsedDataTarget);
+                } else {
+                    $parsedData = array_intersect_key($mergedData, $parsedDataTarget);
+                }
             }
         }
         return $parsedData;
@@ -97,7 +105,7 @@ class LocallangXmlParser extends AbstractXmlParser
      */
     protected function getParsedDataForElement(\SimpleXMLElement $bodyOfFileTag, $element)
     {
-        $parsedData = array();
+        $parsedData = [];
         $children = $bodyOfFileTag->children();
         if ($children->count() === 0) {
             // Check for externally-referenced resource:
@@ -110,9 +118,9 @@ class LocallangXmlParser extends AbstractXmlParser
         /** @var \SimpleXMLElement $translationElement */
         foreach ($children as $translationElement) {
             if ($translationElement->getName() === 'label') {
-                $parsedData[(string)$translationElement['index']][0] = array(
+                $parsedData[(string)$translationElement['index']][0] = [
                     $element => (string)$translationElement
-                );
+                ];
             }
         }
         return $parsedData;
@@ -174,7 +182,11 @@ class LocallangXmlParser extends AbstractXmlParser
             libxml_disable_entity_loader($previousValueOfEntityLoader);
         }
         if (!isset($rootXmlNode) || $rootXmlNode === false) {
-            throw new InvalidXmlFileException('The path provided does not point to existing and accessible well-formed XML file (' . $targetPath . ').', 1278155987);
+            $xmlError = libxml_get_last_error();
+            throw new InvalidXmlFileException(
+                'The path provided does not point to existing and accessible well-formed XML file. Reason: ' . $xmlError->message . ' in ' . $targetPath . ', line ' . $xmlError->line,
+                1278155987
+            );
         }
         return $this->doParsingTargetFromRoot($rootXmlNode);
     }

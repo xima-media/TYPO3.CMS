@@ -182,9 +182,13 @@ class TcaInline extends AbstractDatabaseRecordProvider implements FormDataProvid
             }
             $result['databaseRow'][$fieldName] = implode(',', $connectedUidsOfLocalizedOverlay);
             if ($result['inlineCompileExistingChildren']) {
+                $tableNameWithDefaultRecords = $result['tableName'];
+                if (!empty($GLOBALS['TCA'][$tableNameWithDefaultRecords]['ctrl']['transOrigPointerTable'])) {
+                    $tableNameWithDefaultRecords = $GLOBALS['TCA'][$tableNameWithDefaultRecords]['ctrl']['transOrigPointerTable'];
+                }
                 $connectedUidsOfDefaultLanguageRecord = $this->resolveConnectedRecordUids(
                     $result['processedTca']['columns'][$fieldName]['config'],
-                    $result['tableName'],
+                    $tableNameWithDefaultRecords,
                     $result['defaultLanguageRow']['uid'],
                     $result['defaultLanguageRow'][$fieldName]
                 );
@@ -199,7 +203,7 @@ class TcaInline extends AbstractDatabaseRecordProvider implements FormDataProvid
                     $uidOfDefaultLanguageRecord = $localizedRecord[$fieldNameWithDefaultLanguageUid];
                     if (in_array($uidOfDefaultLanguageRecord, $connectedUidsOfDefaultLanguageRecord)) {
                         // This localized child has a default language record. Remove this record from list of default language records
-                        $connectedUidsOfDefaultLanguageRecord = array_diff($connectedUidsOfDefaultLanguageRecord, array($uidOfDefaultLanguageRecord));
+                        $connectedUidsOfDefaultLanguageRecord = array_diff($connectedUidsOfDefaultLanguageRecord, [$uidOfDefaultLanguageRecord]);
                     }
                     // Compile localized record
                     $compiledChild = $this->compileChild($result, $fieldName, $localizedUid);
@@ -248,6 +252,7 @@ class TcaInline extends AbstractDatabaseRecordProvider implements FormDataProvid
                 // do extra handling of pageTsConfig merged here. Just provide "parent" pageTS as is
                 'pageTsConfig' => $result['pageTsConfig'],
                 'userTsConfig' => $result['userTsConfig'],
+                'databaseRow' => $result['databaseRow'],
                 'processedTca' => [
                     'ctrl' => [],
                     'columns' => [
@@ -397,7 +402,7 @@ class TcaInline extends AbstractDatabaseRecordProvider implements FormDataProvid
                 if ($workspaceVersion !== false) {
                     $versionState = VersionState::cast($workspaceVersion['t3ver_state']);
                     if ($versionState->equals(VersionState::DELETE_PLACEHOLDER)) {
-                        return [];
+                        continue;
                     }
                     $uid = $workspaceVersion['uid'];
                 }

@@ -15,7 +15,6 @@ namespace TYPO3\CMS\Core\TimeTracker;
  */
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
-use TYPO3\CMS\Core\SingletonInterface;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -23,14 +22,8 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  *
  * Is used to register how much time is used with operations in TypoScript
  */
-class TimeTracker implements SingletonInterface
+class TimeTracker
 {
-    /**
-     * If set to true (see constructor) then then the timetracking is enabled
-     * @var bool
-     */
-    protected $isEnabled = false;
-
     /**
      * Is loaded with the millisecond time when this object is created
      *
@@ -49,7 +42,7 @@ class TimeTracker implements SingletonInterface
     /**
      * @var array
      */
-    public $printConf = array(
+    public $printConf = [
         'showParentKeys' => 1,
         'contentLength' => 10000,
         // Determines max length of displayed content before it gets cropped.
@@ -61,27 +54,17 @@ class TimeTracker implements SingletonInterface
         'flag_content' => 0,
         'allTime' => 0,
         'keyLgd' => 40
-    );
-
-    /**
-     * @var array
-     */
-    public $wrapError = [
-        0 => ['', ''],
-        1 => ['<strong>', '</strong>'],
-        2 => ['<strong style="color:#ff6600;">', '</strong>'],
-        3 => ['<strong style="color:#ff0000;">', '</strong>']
     ];
 
     /**
      * @var array
      */
-    public $wrapIcon = [
-        0 => '',
-        1 => 'actions-document-info',
-        2 => 'status-dialog-warning',
-        3 => 'status-dialog-error'
-    ];
+    public $wrapError = [];
+
+    /**
+     * @var array
+     */
+    public $wrapIcon = [];
 
     /**
      * @var int
@@ -91,7 +74,7 @@ class TimeTracker implements SingletonInterface
     /**
      * @var array
      */
-    public $tsStack = array(array());
+    public $tsStack = [[]];
 
     /**
      * @var int
@@ -101,12 +84,12 @@ class TimeTracker implements SingletonInterface
     /**
      * @var array
      */
-    public $tsStackLevelMax = array();
+    public $tsStackLevelMax = [];
 
     /**
      * @var array
      */
-    public $tsStackLog = array();
+    public $tsStackLog = [];
 
     /**
      * @var int
@@ -116,7 +99,7 @@ class TimeTracker implements SingletonInterface
     /**
      * @var array
      */
-    public $currentHashPointer = array();
+    public $currentHashPointer = [];
 
     /**
      * Log entries that take than this number of milliseconds (own time) will be highlighted during log display. Set 0 to disable highlighting.
@@ -130,27 +113,26 @@ class TimeTracker implements SingletonInterface
      * Logging parsing times in the scripts
      *
      *******************************************/
-
     /**
-     * TimeTracker constructor.
-     *
-     * @param bool $isEnabled
-     */
-    public function __construct($isEnabled = true)
-    {
-        $this->isEnabled = $isEnabled;
-    }
-
-    /**
+     * Constructor
      * Sets the starting time
      *
      * @return void
      */
     public function start()
     {
-        if (!$this->isEnabled) {
-            return;
-        }
+        $this->wrapError = [
+            0 => ['', ''],
+            1 => ['<strong>', '</strong>'],
+            2 => ['<strong style="color:#ff6600;">', '</strong>'],
+            3 => ['<strong style="color:#ff0000;">', '</strong>']
+        ];
+        $this->wrapIcon = [
+            0 => '',
+            1 => 'actions-document-info',
+            2 => 'status-dialog-warning',
+            3 => 'status-dialog-error'
+        ];
         $this->starttime = $this->getMilliseconds();
     }
 
@@ -164,22 +146,19 @@ class TimeTracker implements SingletonInterface
      */
     public function push($tslabel, $value = '')
     {
-        if (!$this->isEnabled) {
-            return;
-        }
         array_push($this->tsStack[$this->tsStackPointer], $tslabel);
         array_push($this->currentHashPointer, 'timetracker_' . $this->uniqueCounter++);
         $this->tsStackLevel++;
         $this->tsStackLevelMax[] = $this->tsStackLevel;
         // setTSlog
         $k = end($this->currentHashPointer);
-        $this->tsStackLog[$k] = array(
+        $this->tsStackLog[$k] = [
             'level' => $this->tsStackLevel,
             'tsStack' => $this->tsStack,
             'value' => $value,
             'starttime' => microtime(true),
             'stackPointer' => $this->tsStackPointer
-        );
+        ];
     }
 
     /**
@@ -191,9 +170,6 @@ class TimeTracker implements SingletonInterface
      */
     public function pull($content = '')
     {
-        if (!$this->isEnabled) {
-            return;
-        }
         $k = end($this->currentHashPointer);
         $this->tsStackLog[$k]['endtime'] = microtime(true);
         $this->tsStackLog[$k]['content'] = $content;
@@ -212,9 +188,6 @@ class TimeTracker implements SingletonInterface
      */
     public function setTSlogMessage($content, $num = 0)
     {
-        if (!$this->isEnabled) {
-            return;
-        }
         end($this->currentHashPointer);
         $k = current($this->currentHashPointer);
         // Enlarge the "details" column by adding a span
@@ -234,9 +207,6 @@ class TimeTracker implements SingletonInterface
      */
     public function setTSselectQuery(array $data, $msg = '')
     {
-        if (!$this->isEnabled) {
-            return;
-        }
         end($this->currentHashPointer);
         $k = current($this->currentHashPointer);
         if ($msg !== '') {
@@ -253,11 +223,8 @@ class TimeTracker implements SingletonInterface
      */
     public function incStackPointer()
     {
-        if (!$this->isEnabled) {
-            return;
-        }
         $this->tsStackPointer++;
-        $this->tsStack[$this->tsStackPointer] = array();
+        $this->tsStack[$this->tsStackPointer] = [];
     }
 
     /**
@@ -268,9 +235,6 @@ class TimeTracker implements SingletonInterface
      */
     public function decStackPointer()
     {
-        if (!$this->isEnabled) {
-            return;
-        }
         unset($this->tsStack[$this->tsStackPointer]);
         $this->tsStackPointer--;
     }
@@ -283,9 +247,6 @@ class TimeTracker implements SingletonInterface
      */
     public function getMilliseconds($microtime = null)
     {
-        if (!$this->isEnabled) {
-            return 0;
-        }
         if (!isset($microtime)) {
             $microtime = microtime(true);
         }
@@ -315,9 +276,6 @@ class TimeTracker implements SingletonInterface
      */
     public function printTSlog()
     {
-        if (!$this->isEnabled) {
-            return '';
-        }
         // Calculate times and keys for the tsStackLog
         foreach ($this->tsStackLog as $uniqueId => &$data) {
             $data['endtime'] = $this->getDifferenceToStarttime($data['endtime']);
@@ -329,14 +287,14 @@ class TimeTracker implements SingletonInterface
         }
         unset($data);
         // Create hierarchical array of keys pointing to the stack
-        $arr = array();
+        $arr = [];
         foreach ($this->tsStackLog as $uniqueId => $data) {
             $this->createHierarchyArray($arr, $data['level'], $uniqueId);
         }
         // Parsing the registeret content and create icon-html for the tree
         $this->tsStackLog[$arr['0.'][0]]['content'] = $this->fixContent($arr['0.'], $this->tsStackLog[$arr['0.'][0]]['content'], '', 0, $arr['0.'][0]);
         // Displaying the tree:
-        $outputArr = array();
+        $outputArr = [];
         $outputArr[] = $this->fw('TypoScript Key');
         $outputArr[] = $this->fw('Value');
         if ($this->printConf['allTime']) {
@@ -359,6 +317,9 @@ class TimeTracker implements SingletonInterface
         $flag_content = $this->printConf['flag_content'];
         $flag_queries = $this->printConf['flag_queries'];
         $keyLgd = $this->printConf['keyLgd'];
+        $factor = $this->printConf['factor'];
+        $col = $this->printConf['col'];
+        $highlight_col = $this->printConf['highlight_col'];
         $c = 0;
         foreach ($this->tsStackLog as $uniqueId => $data) {
             if ($this->highlightLongerThan && (int)$data['owntime'] > (int)$this->highlightLongerThan) {
@@ -377,7 +338,7 @@ class TimeTracker implements SingletonInterface
             // Key label:
             $keyLabel = '';
             if (!$flag_tree && $data['stackPointer']) {
-                $temp = array();
+                $temp = [];
                 foreach ($data['tsStack'] as $k => $v) {
                     $temp[] = GeneralUtility::fixed_lgd_cs(implode($v, $k ? '.' : '/'), -$keyLgd);
                 }
@@ -410,7 +371,7 @@ class TimeTracker implements SingletonInterface
                 $item .= '<td class="' . $logRowClass . ' typo3-adminPanel-tsLogTime"> ' . $this->fw($data['owntime']) . '</td>';
             }
             // Messages:
-            $msgArr = array();
+            $msgArr = [];
             $msg = '';
             if ($flag_messages && is_array($data['message'])) {
                 foreach ($data['message'] as $v) {
@@ -547,7 +508,7 @@ class TimeTracker implements SingletonInterface
     protected function createHierarchyArray(&$arr, $pointer, $uniqueId)
     {
         if (!is_array($arr)) {
-            $arr = array();
+            $arr = [];
         }
         if ($pointer > 0) {
             end($arr);

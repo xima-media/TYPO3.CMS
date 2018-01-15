@@ -67,7 +67,9 @@ define(['TYPO3/CMS/Rtehtmlarea/HTMLArea/Plugin/Plugin',
 				cls: 'htmlarea-context-menu',
 				defaultType: 'menuitem',
 				shadow: false,
-				maxHeight: this.editor.iframe.height - this.editor.document.documentElement.clientHeight,
+				// maxHeight is guarded against becoming less than 150px tall by hardcoded boundary. Avoids case of
+				// zero-pixel height when calculating the editor document height fails.
+				maxHeight: Math.max(this.editor.iframe.height - this.editor.document.documentElement.clientHeight, 150),
 				listeners: {
 					itemClick: {
 						fn: this.onItemClick,
@@ -94,8 +96,8 @@ define(['TYPO3/CMS/Rtehtmlarea/HTMLArea/Plugin/Plugin',
 				y: 0
 			};
 			var onMouseUpdate = function(e) {
-				self.mousePosition.x = e.pageX;
-				self.mousePosition.y = e.pageY;
+				self.mousePosition.x = e.clientX;
+				self.mousePosition.y = e.clientY;
 			};
 			Event.on(this.editor.document.documentElement, 'mousemove', onMouseUpdate);
 			Event.on(this.editor.document.documentElement, 'mouseenter', onMouseUpdate);

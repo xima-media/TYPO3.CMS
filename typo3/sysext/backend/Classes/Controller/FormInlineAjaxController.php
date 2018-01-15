@@ -1,5 +1,4 @@
 <?php
-declare (strict_types = 1);
 namespace TYPO3\CMS\Backend\Controller;
 
 /*
@@ -22,6 +21,7 @@ use TYPO3\CMS\Backend\Form\FormDataGroup\InlineParentRecord;
 use TYPO3\CMS\Backend\Form\FormDataGroup\TcaDatabaseRecord;
 use TYPO3\CMS\Backend\Form\InlineStackProcessor;
 use TYPO3\CMS\Backend\Form\NodeFactory;
+use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Localization\LocalizationFactory;
@@ -57,7 +57,6 @@ class FormInlineAjaxController
         $inlineStackProcessor = GeneralUtility::makeInstance(InlineStackProcessor::class);
         $inlineStackProcessor->initializeByParsingDomObjectIdString($domObjectId);
         $inlineStackProcessor->injectAjaxConfiguration($ajaxArguments['context']);
-        $inlineTopMostParent = $inlineStackProcessor->getStructureLevel(0);
 
         // Parent, this table embeds the child table
         $parent = $inlineStackProcessor->getStructureLevel(-1);
@@ -127,30 +126,22 @@ class FormInlineAjaxController
             'inlineParentTableName' => $parent['table'],
             'inlineParentFieldName' => $parent['field'],
             'inlineParentConfig' => $parentConfig,
-            // Fallback to $parentData is probably not needed here.
-            'inlineTopMostParentUid' => $parentData['inlineTopMostParentUid'] ?: $inlineTopMostParent['uid'],
-            'inlineTopMostParentTableName' => $parentData['inlineTopMostParentTableName'] ?: $inlineTopMostParent['table'],
-            'inlineTopMostParentFieldName' => $parentData['inlineTopMostParentFieldName'] ?: $inlineTopMostParent['field'],
         ];
         if ($childChildUid) {
             $formDataCompilerInput['inlineChildChildUid'] = $childChildUid;
         }
         $childData = $formDataCompiler->compile($formDataCompilerInput);
 
-        // Set language of new child record to the language of the parent record:
-        // @todo: To my understanding, the below case can't happen: With localizationMode select, lang overlays
-        // @todo: of children are only created with the "synchronize" button that will trigger a different ajax action.
-        // @todo: The edge case of new page overlay together with localized media field, this code won't kick in either.
-        /**
-        if ($parent['localizationMode'] === 'select' && MathUtility::canBeInterpretedAsInteger($parent['uid'])) {
-            $parentRecord = $inlineRelatedRecordResolver->getRecord($parent['table'], $parent['uid']);
+        // Set language of new child record to the language of the parent record
+        if ($parent['localizationMode'] !== 'keep' && MathUtility::canBeInterpretedAsInteger($parent['uid'])) {
             $parentLanguageField = $GLOBALS['TCA'][$parent['table']]['ctrl']['languageField'];
             $childLanguageField = $GLOBALS['TCA'][$child['table']]['ctrl']['languageField'];
-            if ($parentRecord[$parentLanguageField] > 0) {
-                $record[$childLanguageField] = $parentRecord[$parentLanguageField];
+            if (!empty($parentLanguageField) && !empty($childLanguageField)) {
+                $parentRecord = BackendUtility::getRecord($parent['table'], $parent['uid']);
+                $childData['databaseRow'][$childLanguageField][0] = $parentRecord[$parentLanguageField];
             }
         }
-         */
+
         if ($parentConfig['foreign_selector'] && $parentConfig['appearance']['useCombination']) {
             // We have a foreign_selector. So, we just created a new record on an intermediate table in $childData.
             // Now, if a valid id is given as second ajax parameter, the intermediate row should be connected to an
@@ -353,10 +344,6 @@ class FormInlineAjaxController
                 'vanillaUid' => (int)$parent['uid'],
                 'command' => 'edit',
                 'tableName' => $parent['table'],
-                'databaseRow' => [
-                    // TcaInlineExpandCollapseState needs this
-                    'uid' => (int)$parent['uid'],
-                ],
                 'inlineFirstPid' => $inlineFirstPid,
                 'columnsToProcess' => [
                     $parentFieldName
@@ -382,35 +369,36 @@ class FormInlineAjaxController
                 $parentLanguage = implode(',', $parentLanguage);
             }
 
-            $cmd = array();
+            $cmd = [];
             // Localize a single child element from default language of the parent element
             if (MathUtility::canBeInterpretedAsInteger($type)) {
-                $cmd[$parent['table']][$parent['uid']]['inlineLocalizeSynchronize'] = array(
+                $cmd[$parent['table']][$parent['uid']]['inlineLocalizeSynchronize'] = [
                     'field' => $parent['field'],
                     'language' => $parentLanguage,
-                    'ids' => array($type),
-                );
+                    'ids' => [$type],
+                ];
             // Either localize or synchronize all child elements from default language of the parent element
             } else {
-                $cmd[$parent['table']][$parent['uid']]['inlineLocalizeSynchronize'] = array(
+                $cmd[$parent['table']][$parent['uid']]['inlineLocalizeSynchronize'] = [
                     'field' => $parent['field'],
                     'language' => $parentLanguage,
                     'action' => $type,
-                );
+                ];
             }
 
             /** @var $tce DataHandler */
             $tce = GeneralUtility::makeInstance(DataHandler::class);
-            $tce->start(array(), $cmd);
+            $tce->stripslashes_values = false;
+            $tce->start([], $cmd);
             $tce->process_cmdmap();
 
             $newItemList = $tce->registerDBList[$parent['table']][$parent['uid']][$parentFieldName];
 
-            $jsonArray = array(
+            $jsonArray = [
                 'data' => '',
                 'stylesheetFiles' => [],
                 'scriptCall' => [],
-            );
+            ];
             $nameObject = $inlineStackProcessor->getCurrentStructureDomObjectIdPrefix($inlineFirstPid);
             $nameObjectForeignTable = $nameObject . '-' . $child['table'];
 
@@ -515,7 +503,7 @@ class FormInlineAjaxController
             }
         }
 
-        $response->getBody()->write(json_encode(array()));
+        $response->getBody()->write(json_encode([]));
         return $response;
     }
 
@@ -633,7 +621,7 @@ class FormInlineAjaxController
         }
         if (!empty($childResult['additionalJavaScriptSubmit'])) {
             $additionalJavaScriptSubmit = implode('', $childResult['additionalJavaScriptSubmit']);
-            $additionalJavaScriptSubmit = str_replace(array(CR, LF), '', $additionalJavaScriptSubmit);
+            $additionalJavaScriptSubmit = str_replace([CR, LF], '', $additionalJavaScriptSubmit);
             $jsonResult['scriptCall'][] = 'TBE_EDITOR.addActionChecks("submit", "' . addslashes($additionalJavaScriptSubmit) . '");';
         }
         foreach ($childResult['additionalJavaScriptPost'] as $singleAdditionalJavaScriptPost) {
@@ -782,7 +770,7 @@ class FormInlineAjaxController
     protected function getInlineExpandCollapseStateArrayForTableUid($table, $uid)
     {
         $inlineView = $this->getInlineExpandCollapseStateArray();
-        $result = array();
+        $result = [];
         if (MathUtility::canBeInterpretedAsInteger($uid)) {
             if (!empty($inlineView[$table][$uid])) {
                 $result = $inlineView[$table][$uid];
@@ -828,10 +816,10 @@ class FormInlineAjaxController
      *
      * @param mixed $needle The element to be removed.
      * @param array $haystack The array the element should be removed from.
-     * @param bool $strict Search elements strictly.
+     * @param mixed $strict Search elements strictly.
      * @return array The array $haystack without the $needle
      */
-    protected function removeFromArray($needle, $haystack, $strict = false)
+    protected function removeFromArray($needle, $haystack, $strict = null)
     {
         $pos = array_search($needle, $haystack, $strict);
         if ($pos !== false) {
@@ -892,7 +880,7 @@ class FormInlineAjaxController
      * @param string $domObjectId
      * @return array
      */
-    protected function getParentConfigFromFlexForm(array $parentConfig, string $domObjectId) : array
+    protected function getParentConfigFromFlexForm(array $parentConfig, $domObjectId)
     {
         list($flexFormPath, $foreignTableName) = $this->splitDomObjectId($domObjectId);
 
@@ -963,7 +951,7 @@ class FormInlineAjaxController
      *
      * @return array
      */
-    protected function splitDomObjectId(string $domObjectId) : array
+    protected function splitDomObjectId($domObjectId)
     {
 
         // Substitute FlexForm addition and make parsing a bit easier
@@ -994,7 +982,7 @@ class FormInlineAjaxController
          */
 
         if (preg_match($pattern, $domObjectId, $match)) {
-            return array($match['flexformPath'], $match['tableName']);
+            return [$match['flexformPath'], $match['tableName']];
         }
 
         return [];

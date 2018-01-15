@@ -16,12 +16,14 @@ namespace TYPO3\CMS\Backend\Form\Utility;
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
+use TYPO3\CMS\Core\Database\DatabaseConnection;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\PathUtility;
 use TYPO3\CMS\Core\Utility\StringUtility;
+use TYPO3\CMS\Lang\LanguageService;
 
 /**
  * This is a static, internal and intermediate helper class for various
@@ -42,14 +44,15 @@ class FormEngineUtility
      * @see overrideFieldConf()
      * @var array
      */
-    protected static $allowOverrideMatrix = array(
-        'input' => array('size', 'max', 'readOnly'),
-        'text' => array('cols', 'rows', 'wrap', 'readOnly'),
-        'check' => array('cols', 'showIfRTE', 'readOnly'),
-        'select' => array('size', 'autoSizeMax', 'maxitems', 'minitems', 'readOnly', 'treeConfig'),
-        'group' => array('size', 'autoSizeMax', 'max_size', 'show_thumbs', 'maxitems', 'minitems', 'disable_controls', 'readOnly'),
-        'inline' => array('appearance', 'behaviour', 'foreign_label', 'foreign_selector', 'foreign_unique', 'maxitems', 'minitems', 'size', 'autoSizeMax', 'symmetric_label', 'readOnly'),
-    );
+    protected static $allowOverrideMatrix = [
+        'input' => ['size', 'max', 'readOnly'],
+        'text' => ['cols', 'rows', 'wrap', 'readOnly'],
+        'check' => ['cols', 'showIfRTE', 'readOnly'],
+        'select' => ['size', 'autoSizeMax', 'maxitems', 'minitems', 'readOnly', 'treeConfig'],
+        'group' => ['size', 'autoSizeMax', 'max_size', 'show_thumbs', 'maxitems', 'minitems', 'disable_controls', 'readOnly'],
+        'inline' => ['appearance', 'behaviour', 'foreign_label', 'foreign_selector', 'foreign_unique', 'maxitems', 'minitems', 'size', 'autoSizeMax', 'symmetric_label', 'readOnly'],
+        'imageManipulation' => ['ratios']
+    ];
 
     /**
      * Overrides the TCA field configuration by TSconfig settings.
@@ -97,7 +100,7 @@ class FormEngineUtility
     {
         static $cache;
         if (is_null($cache)) {
-            $cache = array();
+            $cache = [];
         }
         $cacheIdentifier = $table . ':' . $row['uid'];
         if (!isset($cache[$cacheIdentifier])) {
@@ -121,19 +124,33 @@ class FormEngineUtility
     public static function getIconHtml($icon, $alt = '', $title = '')
     {
         $icon = (string)$icon;
-        $absoluteFilePath = GeneralUtility::getFileAbsFileName($icon);
-        if (!empty($absoluteFilePath) && is_file($absoluteFilePath)) {
-            $iconInfo = StringUtility::endsWith($absoluteFilePath, '.svg')
-                ? true
-                : getimagesize($absoluteFilePath);
+        $iconFile = '';
+        $iconInfo = false;
 
-            if ($iconInfo !== false) {
-                return '<img'
-                    . ' src="' . htmlspecialchars(PathUtility::getAbsoluteWebPath($absoluteFilePath)) . '"'
-                    . ' alt="' . htmlspecialchars($alt) . '" '
-                    . ($title ? 'title="' . htmlspecialchars($title) . '"' : '')
-                . ' />';
+        if (StringUtility::beginsWith($icon, 'EXT:')) {
+            $absoluteFilePath = GeneralUtility::getFileAbsFileName($icon);
+            if (!empty($absoluteFilePath) && is_file($absoluteFilePath)) {
+                $iconFile = '../' . PathUtility::stripPathSitePrefix($absoluteFilePath);
+                $iconInfo = (StringUtility::endsWith($absoluteFilePath, '.svg'))
+                    ? true
+                    : getimagesize($absoluteFilePath);
             }
+        } elseif (StringUtility::beginsWith($icon, '../')) {
+            // @TODO: this is special modList, files from folders and selicon
+            $iconFile = GeneralUtility::resolveBackPath($icon);
+            if (is_file(PATH_site . GeneralUtility::resolveBackPath(substr($icon, 3)))) {
+                $iconInfo = (StringUtility::endsWith($icon, '.svg'))
+                    ? true
+                    : getimagesize((PATH_site . GeneralUtility::resolveBackPath(substr($icon, 3))));
+            }
+        }
+
+        if ($iconInfo !== false && is_file(GeneralUtility::resolveBackPath(PATH_typo3 . $iconFile))) {
+            return '<img'
+                . ' src="' . htmlspecialchars($iconFile) . '"'
+                . ' alt="' . htmlspecialchars($alt) . '" '
+                . ($title ? 'title="' . htmlspecialchars($title) . '"' : '')
+            . ' />';
         }
 
         $iconFactory = GeneralUtility::makeInstance(IconFactory::class);
@@ -160,7 +177,7 @@ class FormEngineUtility
                     foreach ($childElements as $childTable => $childRecords) {
                         $uids = array_keys($tce->substNEWwithIDs_table, $childTable);
                         if (!empty($uids)) {
-                            $newExpandedChildren = array();
+                            $newExpandedChildren = [];
                             foreach ($childRecords as $childUid => $state) {
                                 if ($state && in_array($childUid, $uids)) {
                                     $newChildUid = $tce->substNEWwithIDs[$childUid];
@@ -217,6 +234,22 @@ class FormEngineUtility
             }
         }
         return $newRow;
+    }
+
+    /**
+     * @return LanguageService
+     */
+    protected static function getLanguageService()
+    {
+        return $GLOBALS['LANG'];
+    }
+
+    /**
+     * @return DatabaseConnection
+     */
+    protected static function getDatabaseConnection()
+    {
+        return $GLOBALS['TYPO3_DB'];
     }
 
     /**

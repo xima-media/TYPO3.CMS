@@ -14,19 +14,14 @@ namespace TYPO3\CMS\Lang\Service;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Exception;
-use TYPO3\CMS\Core\SingletonInterface;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Extensionmanager\Utility\Connection\TerUtility;
-use TYPO3\CMS\Lang\Exception\Language as LanguageException;
-use TYPO3\CMS\Lang\Exception\XmlParser as XmlParserException;
 
 /**
  * Extends of extensionmanager ter connection to enrich with translation
  * related methods
  */
-class TerService extends TerUtility implements SingletonInterface
+class TerService extends \TYPO3\CMS\Extensionmanager\Utility\Connection\TerUtility implements \TYPO3\CMS\Core\SingletonInterface
 {
     /**
      * Fetches extensions translation status
@@ -40,7 +35,7 @@ class TerService extends TerUtility implements SingletonInterface
         $result = false;
         $extPath = GeneralUtility::strtolower($extensionKey);
         $mirrorUrl .= $extPath[0] . '/' . $extPath[1] . '/' . $extPath . '-l10n/' . $extPath . '-l10n.xml';
-        $remote = GeneralUtility::getUrl($mirrorUrl);
+        $remote = GeneralUtility::getURL($mirrorUrl, 0, [TYPO3_user_agent]);
         if ($remote !== false) {
             $parsed = $this->parseL10nXML($remote);
             $result = $parsed['languagePackIndex'];
@@ -61,8 +56,8 @@ class TerService extends TerUtility implements SingletonInterface
         $parser = xml_parser_create();
         // Disables the functionality to allow external entities to be loaded when parsing the XML, must be kept
         $previousValueOfEntityLoader = libxml_disable_entity_loader(true);
-        $values = array();
-        $index = array();
+        $values = [];
+        $index = [];
         xml_parser_set_option($parser, XML_OPTION_CASE_FOLDING, 0);
         xml_parser_set_option($parser, XML_OPTION_SKIP_WHITE, 0);
             // Parse content
@@ -73,18 +68,18 @@ class TerService extends TerUtility implements SingletonInterface
             $line = xml_get_current_line_number($parser);
             $error = xml_error_string(xml_get_error_code($parser));
             xml_parser_free($parser);
-            throw new XmlParserException('Error in XML parser while decoding l10n XML file. Line ' . $line . ': ' . $error, 1345736517);
+            throw new \TYPO3\CMS\Lang\Exception\XmlParser('Error in XML parser while decoding l10n XML file. Line ' . $line . ': ' . $error, 1345736517);
         } else {
             // Init vars
-            $stack = array(array());
+            $stack = [[]];
             $stacktop = 0;
-            $current = array();
+            $current = [];
             $tagName = '';
             $documentTag = '';
                 // Traverse the parsed XML structure:
             foreach ($values as $val) {
                 // First, process the tag-name (which is used in both cases, whether "complete" or "close")
-                $tagName = (string)($val['tag'] == 'languagepack' && $val['type'] == 'open') ? $val['attributes']['language'] : $val['tag'];
+                $tagName = ($val['tag'] == 'languagepack' && $val['type'] == 'open') ? $val['attributes']['language'] : $val['tag'];
                 if (!$documentTag) {
                     $documentTag = $tagName;
                 }
@@ -94,9 +89,9 @@ class TerService extends TerUtility implements SingletonInterface
                         // Therefore increase the stackpointer and reset the accumulation array
                     case 'open':
                             // Setting blank place holder
-                        $current[$tagName] = array();
+                        $current[$tagName] = [];
                         $stack[$stacktop++] = $current;
-                        $current = array();
+                        $current = [];
                         break;
                         // If the tag is "close" then it is an array which is closing and we decrease the stack pointer.
                     case 'close':
@@ -135,12 +130,12 @@ class TerService extends TerUtility implements SingletonInterface
         try {
             $l10n = $this->fetchTranslation($extensionKey, $language, $mirrorUrl);
             if (is_array($l10n)) {
-                $absolutePathToZipFile = GeneralUtility::getFileAbsFileName('typo3temp/var/transient/' . $extensionKey . '-l10n-' . $language . '.zip');
+                $absolutePathToZipFile = GeneralUtility::getFileAbsFileName('typo3temp/Language/' . $extensionKey . '-l10n-' . $language . '.zip');
                 $relativeLanguagePath = 'l10n' . '/' . $language . '/';
                 $absoluteLanguagePath = GeneralUtility::getFileAbsFileName(PATH_typo3conf . $relativeLanguagePath);
                 $absoluteExtensionLanguagePath = GeneralUtility::getFileAbsFileName(PATH_typo3conf . $relativeLanguagePath . $extensionKey . '/');
                 if (empty($absolutePathToZipFile) || empty($absoluteLanguagePath) || empty($absoluteExtensionLanguagePath)) {
-                    throw new LanguageException('Given path is invalid.', 1352565336);
+                    throw new \TYPO3\CMS\Lang\Exception\Language('Given path is invalid.', 1352565336);
                 }
                 if (!is_dir($absoluteLanguagePath)) {
                     GeneralUtility::mkdir_deep(PATH_typo3conf, $relativeLanguagePath);
@@ -153,7 +148,7 @@ class TerService extends TerUtility implements SingletonInterface
                     $result = true;
                 }
             }
-        } catch (Exception $exception) {
+        } catch (\TYPO3\CMS\Core\Exception $exception) {
             // @todo logging
         }
         return $result;
@@ -190,11 +185,11 @@ class TerService extends TerUtility implements SingletonInterface
             // Nothing to do
         }
 
-        $l10nResponse = GeneralUtility::getUrl($mirrorUrl . $packageUrl);
+        $l10nResponse = GeneralUtility::getURL($mirrorUrl . $packageUrl, 0, [TYPO3_user_agent]);
         if ($l10nResponse === false) {
-            throw new XmlParserException('Error: Translation could not be fetched.', 1345736785);
+            throw new \TYPO3\CMS\Lang\Exception\XmlParser('Error: Translation could not be fetched.', 1345736785);
         } else {
-            return array($l10nResponse);
+            return [$l10nResponse];
         }
     }
 
@@ -229,18 +224,18 @@ class TerService extends TerUtility implements SingletonInterface
                                 $absoluteTargetPath, zip_entry_read($zipEntry, zip_entry_filesize($zipEntry))
                             );
                             if ($return === false) {
-                                throw new LanguageException('Could not write file ' . $zipEntryName, 1345304560);
+                                throw new \TYPO3\CMS\Lang\Exception\Language('Could not write file ' . $zipEntryName, 1345304560);
                             }
                         } else {
-                            throw new LanguageException('Could not write file ' . $zipEntryName, 1352566904);
+                            throw new \TYPO3\CMS\Lang\Exception\Language('Could not write file ' . $zipEntryName, 1352566904);
                         }
                     }
                 } else {
-                    throw new LanguageException('Extension directory missing in zip file!', 1352566905);
+                    throw new \TYPO3\CMS\Lang\Exception\Language('Extension directory missing in zip file!', 1352566905);
                 }
             }
         } else {
-            throw new LanguageException('Unable to open zip file ' . $file, 1345304561);
+            throw new \TYPO3\CMS\Lang\Exception\Language('Unable to open zip file ' . $file, 1345304561);
         }
         return $result;
     }

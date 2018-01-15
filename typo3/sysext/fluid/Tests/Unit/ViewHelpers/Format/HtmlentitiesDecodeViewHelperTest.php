@@ -29,7 +29,7 @@ class HtmlentitiesDecodeViewHelperTest extends UnitTestCase
 
     protected function setUp()
     {
-        $this->viewHelper = $this->getMock(HtmlentitiesDecodeViewHelper::class, array('renderChildren'));
+        $this->viewHelper = $this->getMock(HtmlentitiesDecodeViewHelper::class, ['renderChildren']);
 
         /** @var RenderingContext $renderingContext */
         $renderingContext = $this->getMock(\TYPO3\CMS\Fluid\Tests\Unit\Core\Rendering\RenderingContextFixture::class);

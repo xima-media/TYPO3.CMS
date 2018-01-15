@@ -197,28 +197,28 @@ class PageLayoutController
      *
      * @var array
      */
-    public $MCONF = array();
+    public $MCONF = [];
 
     /**
      * Menu configuration
      *
      * @var array
      */
-    public $MOD_MENU = array();
+    public $MOD_MENU = [];
 
     /**
      * Module settings (session variable)
      *
      * @var array
      */
-    public $MOD_SETTINGS = array();
+    public $MOD_SETTINGS = [];
 
     /**
      * Array of tables to be listed by the Web > Page module in addition to the default tables
      *
      * @var array
      */
-    public $externalTables = array();
+    public $externalTables = [];
 
     /**
      * Module output accumulation
@@ -238,7 +238,7 @@ class PageLayoutController
     /**
      * @var array
      */
-    protected $eRParts = array();
+    protected $eRParts = [];
 
     /**
      * @var string
@@ -275,7 +275,7 @@ class PageLayoutController
      *
      * @var array
      */
-    protected $languagesInColumnCache = array();
+    protected $languagesInColumnCache = [];
 
     /**
      * Caches the amount of content elements as a matrix
@@ -283,7 +283,7 @@ class PageLayoutController
      * @var array
      * @internal
      */
-    public $contentElementCache = array();
+    public $contentElementCache = [];
 
     /**
      * @var IconFactory
@@ -364,17 +364,17 @@ class PageLayoutController
     {
         $lang = $this->getLanguageService();
         // MENU-ITEMS:
-        $this->MOD_MENU = array(
+        $this->MOD_MENU = [
             'tt_content_showHidden' => '',
-            'function' => array(
-                0 => $lang->getLL('m_function_0'),
+            'function' => [
                 1 => $lang->getLL('m_function_1'),
+                0 => $lang->getLL('m_function_0'),
                 2 => $lang->getLL('m_function_2')
-            ),
-            'language' => array(
+            ],
+            'language' => [
                 0 => $lang->getLL('m_default')
-            )
-        );
+            ]
+        ];
         // initialize page/be_user TSconfig settings
         $this->modSharedTSconfig = BackendUtility::getModTSconfig($this->id, 'mod.SHARED');
         $this->modTSconfig = BackendUtility::getModTSconfig($this->id, 'mod.' . $this->moduleName);
@@ -425,11 +425,11 @@ class PageLayoutController
      */
     protected function makeActionMenu()
     {
-        $availableActionArray = array(
+        $availableActionArray = [
             0 => $this->getLanguageService()->getLL('m_function_0'),
             1 => $this->getLanguageService()->getLL('m_function_1'),
             2 => $this->getLanguageService()->getLL('m_function_2')
-        );
+        ];
         // Find if there are ANY languages at all (and if not, remove the language option from function menu).
         $count = $this->getDatabaseConnection()->exec_SELECTcountRows('uid', 'sys_language', $this->getBackendUser()->isAdmin() ? '' : 'hidden=0');
         if (!$count) {
@@ -481,7 +481,8 @@ class PageLayoutController
     {
         if ($this->clear_cache) {
             $tce = GeneralUtility::makeInstance(DataHandler::class);
-            $tce->start(array(), array());
+            $tce->stripslashes_values = false;
+            $tce->start([], []);
             $tce->clear_cacheCmd($this->id);
         }
     }
@@ -507,28 +508,28 @@ class PageLayoutController
                 $message .= '<a class="btn btn-info" href="javascript:top.goToModule(\'web_list\',1);">' . $lang->getLL('goToListModule') . '</a>';
                 $view = GeneralUtility::makeInstance(StandaloneView::class);
                 $view->setTemplatePathAndFilename(GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Templates/InfoBox.html'));
-                $view->assignMultiple(array(
+                $view->assignMultiple([
                     'title' => $title,
                     'message' => $message,
                     'state' => InfoboxViewHelper::STATE_INFO
-                ));
+                ]);
                 $content .= $view->render();
             }
         }
         // If content from different pid is displayed
         if ($this->pageinfo['content_from_pid']) {
             $contentPage = BackendUtility::getRecord('pages', (int)$this->pageinfo['content_from_pid']);
-            $linkToPid = $this->local_linkThisScript(array('id' => $this->pageinfo['content_from_pid']));
+            $linkToPid = $this->local_linkThisScript(['id' => $this->pageinfo['content_from_pid']]);
             $title = BackendUtility::getRecordTitle('pages', $contentPage);
-            $link = '<a href="' . $linkToPid . '">' . htmlspecialchars($title) . ' (PID ' . (int)$this->pageinfo['content_from_pid'] . ')</a>';
+            $link = '<a href="' . htmlspecialchars($linkToPid) . '">' . htmlspecialchars($title) . ' (PID ' . (int)$this->pageinfo['content_from_pid'] . ')</a>';
             $message = sprintf($lang->getLL('content_from_pid_title'), $link);
             $view = GeneralUtility::makeInstance(StandaloneView::class);
             $view->setTemplatePathAndFilename(GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Templates/InfoBox.html'));
-            $view->assignMultiple(array(
+            $view->assignMultiple([
                 'title' => $title,
                 'message' => $message,
                 'state' => InfoboxViewHelper::STATE_INFO
-            ));
+            ]);
             $content .= $view->render();
         }
         return $content;
@@ -542,7 +543,7 @@ class PageLayoutController
     {
         if ($this->current_sys_language > 0) {
             $overlayRecord = $this->getDatabaseConnection()->exec_SELECTgetSingleRow(
-                'title',
+                '*',
                 'pages_language_overlay',
                 'pid = ' . (int)$this->id .
                 ' AND sys_language_uid = ' . (int)$this->current_sys_language .
@@ -552,6 +553,7 @@ class PageLayoutController
                 '',
                 ''
             );
+            BackendUtility::workspaceOL('pages_language_overlay', $overlayRecord);
             return $overlayRecord['title'];
         } else {
             return $this->pageinfo['title'];
@@ -655,7 +657,7 @@ class PageLayoutController
                 $content .= '<form action="' . htmlspecialchars(BackendUtility::getModuleUrl('tce_db', ['prErr' => 1, 'uPT' => 1])) . '" method="post" enctype="multipart/form-data" name="editform" id="PageLayoutController" onsubmit="return TBE_EDITOR.checkSubmit(1);">';
                 $content .= $this->renderQuickEdit();
             } else {
-                $content .= '<form action="' . htmlspecialchars(BackendUtility::getModuleUrl($this->moduleName, array('id' => $this->id, 'imagemode' =>  $this->imagemode))) . '" id="PageLayoutController" method="post">';
+                $content .= '<form action="' . htmlspecialchars(BackendUtility::getModuleUrl($this->moduleName, ['id' => $this->id, 'imagemode' =>  $this->imagemode])) . '" id="PageLayoutController" method="post">';
                 // Page title
                 $content .= '<h1 class="t3js-title-inlineedit">' . htmlspecialchars($this->getLocalizedPageTitle()) . '</h1>';
                 // All other listings
@@ -675,11 +677,11 @@ class PageLayoutController
             $content .= '<h1>' . $GLOBALS['TYPO3_CONF_VARS']['SYS']['sitename'] . '</h1>';
             $view = GeneralUtility::makeInstance(StandaloneView::class);
             $view->setTemplatePathAndFilename(GeneralUtility::getFileAbsFileName('EXT:backend/Resources/Private/Templates/InfoBox.html'));
-            $view->assignMultiple(array(
+            $view->assignMultiple([
                 'title' => $lang->getLL('clickAPage_header'),
                 'message' => $lang->getLL('clickAPage_content'),
                 'state' => InfoboxViewHelper::STATE_INFO
-            ));
+            ]);
             $content .= $view->render();
         }
         // Set content
@@ -701,14 +703,14 @@ class PageLayoutController
         // If a command to edit all records in a column is issue, then select all those elements, and redirect to FormEngine
         if (substr($edit_record, 0, 9) == '_EDIT_COL') {
             $res = $databaseConnection->exec_SELECTquery('*', 'tt_content', 'pid=' . (int)$this->id . ' AND colPos=' . (int)substr($edit_record, 10) . ' AND sys_language_uid=' . (int)$this->current_sys_language . ($this->MOD_SETTINGS['tt_content_showHidden'] ? '' : BackendUtility::BEenableFields('tt_content')) . BackendUtility::deleteClause('tt_content') . BackendUtility::versioningPlaceholderClause('tt_content'), '', 'sorting');
-            $idListA = array();
+            $idListA = [];
             while ($cRow = $databaseConnection->sql_fetch_assoc($res)) {
                 $idListA[] = $cRow['uid'];
             }
-            $url = BackendUtility::getModuleUrl('record_edit', array(
+            $url = BackendUtility::getModuleUrl('record_edit', [
                 'edit[tt_content][' . implode(',', $idListA) . ']' => 'edit',
-                'returnUrl' => $this->local_linkThisScript(array('edit_record' => ''))
-            ));
+                'returnUrl' => $this->local_linkThisScript(['edit_record' => ''])
+            ]);
             HttpUtility::redirect($url);
         }
         // If the former record edited was the creation of a NEW record, this will look up the created records uid:
@@ -727,8 +729,17 @@ class PageLayoutController
         $this->deleteButton = MathUtility::canBeInterpretedAsInteger($this->eRParts[1]) && $edit_record && ($tableName !== 'pages' && $this->EDIT_CONTENT || $tableName === 'pages' && $this->CALC_PERMS & Permission::PAGE_DELETE);
         // If undo-button should be rendered (depends on available items in sys_history)
         $this->undoButton = false;
-        $undoRes = $databaseConnection->exec_SELECTquery('tstamp', 'sys_history', 'tablename=' . $databaseConnection->fullQuoteStr($tableName, 'sys_history') . ' AND recuid=' . (int)$this->eRParts[1], '', 'tstamp DESC', '1');
-        if ($this->undoButtonR = $databaseConnection->sql_fetch_assoc($undoRes)) {
+
+        // if there is no content on a page
+        // the parameter $this->eRParts[1] will be set to e.g. /new/1
+        // which is not an integer value and it will throw an exception here on certain dbms
+        // thus let's check that before as there cannot be a history for a new record
+        $this->undoButtonR = false;
+        if (MathUtility::canBeInterpretedAsInteger($this->eRParts[1])) {
+            $undoRes = $databaseConnection->exec_SELECTquery('tstamp', 'sys_history', 'tablename=' . $databaseConnection->fullQuoteStr($tableName, 'sys_history') . ' AND recuid=' . (int)$this->eRParts[1], '', 'tstamp DESC', '1');
+            $this->undoButtonR = $databaseConnection->sql_fetch_assoc($undoRes);
+        }
+        if ($this->undoButtonR) {
             $this->undoButton = true;
         }
         // Setting up the Return URL for coming back to THIS script (if links take the user to another script)
@@ -762,10 +773,10 @@ class PageLayoutController
             }
 
             // @todo: Hack because DatabaseInitializeNewRow reads from _GP directly
-            $GLOBALS['_GET']['defVals'][$tableName] = array(
+            $GLOBALS['_GET']['defVals'][$tableName] = [
                 'colPos' => (int)$ex_colPos,
                 'sys_language_uid' => (int)$this->current_sys_language
-            );
+            ];
 
             /** @var TcaDatabaseRecord $formDataGroup */
             $formDataGroup = GeneralUtility::makeInstance(TcaDatabaseRecord::class);
@@ -833,7 +844,7 @@ class PageLayoutController
                 }
             } catch (AccessDeniedException $e) {
                 // If no edit access, print error message:
-                $content = '<h2>' . htmlspecialchars($lang->getLL('noAccess')) . '</h2>';
+                $content = '<h2>' . $lang->getLL('noAccess', true) . '</h2>';
                 $content .= '<div>' . $lang->getLL('noAccess_msg') . '<br /><br />' . ($beUser->errorMsg ? 'Reason: ' . $beUser->errorMsg . '<br /><br />' : '') . '</div>';
             }
         } else {
@@ -861,7 +872,7 @@ class PageLayoutController
                 $content .= '<div class="checkbox">';
                 $content .= '<label for="checkTt_content_showHidden">';
                 $content .= BackendUtility::getFuncCheck($this->id, 'SET[tt_content_showHidden]', $this->MOD_SETTINGS['tt_content_showHidden'], '', '', 'id="checkTt_content_showHidden"');
-                $content .= (!$numberOfHiddenElements ? ('<span class="text-muted">' . htmlspecialchars($lang->getLL('hiddenCE')) . '</span>') : htmlspecialchars($lang->getLL('hiddenCE')) . ' (' . $numberOfHiddenElements . ')');
+                $content .= (!$numberOfHiddenElements ? ('<span class="text-muted">' . $lang->getLL('hiddenCE', true) . '</span>') : $lang->getLL('hiddenCE', true) . ' (' . $numberOfHiddenElements . ')');
                 $content .= '</label>';
                 $content .= '</div>';
             }
@@ -905,8 +916,8 @@ class PageLayoutController
         // also fills $dbList->activeTables
         $dbList->getTableMenu($this->id);
         // Initialize other variables:
-        $tableOutput = array();
-        $tableJSOutput = array();
+        $tableOutput = [];
+        $tableJSOutput = [];
         $CMcounter = 0;
         // Traverse the list of table names which has records on this page (that array is populated
         // by the $dblist object during the function getTableMenu()):
@@ -921,7 +932,7 @@ class PageLayoutController
                         <div class="checkbox">
                             <label for="checkTt_content_showHidden">
                                 <input type="checkbox" id="checkTt_content_showHidden" class="checkbox" name="SET[tt_content_showHidden]" value="1" ' . ($this->MOD_SETTINGS['tt_content_showHidden'] ? 'checked="checked"' : '') . ' />
-                                ' . htmlspecialchars($this->getLanguageService()->getLL('hiddenCE')) . ' (<span class="t3js-hidden-counter">' . $numberOfHiddenElements . '</span>)
+                                ' . $this->getLanguageService()->getLL('hiddenCE', true) . ' (<span class="t3js-hidden-counter">' . $numberOfHiddenElements . '</span>)
                             </label>
                         </div>';
                 }
@@ -932,14 +943,14 @@ class PageLayoutController
                 $dbList->tt_contentConfig['showInfo'] = 1;
                 // Setting up the tt_content columns to show:
                 if (is_array($GLOBALS['TCA']['tt_content']['columns']['colPos']['config']['items'])) {
-                    $colList = array();
+                    $colList = [];
                     $tcaItems = GeneralUtility::callUserFunction(BackendLayoutView::class . '->getColPosListItemsParsed', $this->id, $this);
                     foreach ($tcaItems as $temp) {
                         $colList[] = $temp[1];
                     }
                 } else {
                     // ... should be impossible that colPos has no array. But this is the fallback should it make any sense:
-                    $colList = array('1', '0', '2', '3');
+                    $colList = ['1', '0', '2', '3'];
                 }
                 if ($this->colPosList !== '') {
                     $colList = array_intersect(GeneralUtility::intExplode(',', $this->colPosList), $colList);
@@ -970,7 +981,7 @@ class PageLayoutController
             // Generate the list of elements here:
             $dbList->generateList();
             // Adding the list content to the tableOutput variable:
-            $tableOutput[$table] = $h_func .  $dbList->HTMLcode . $h_func_b;
+            $tableOutput[$table] = $h_func . $dbList->HTMLcode . $h_func_b;
             // ... and any accumulated JavaScript goes the same way!
             $tableJSOutput[$table] = $dbList->JScode;
             // Increase global counter:
@@ -987,7 +998,7 @@ class PageLayoutController
         $headerContentHook = $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['cms/layout/db_layout.php']['drawHeaderHook'];
         if (is_array($headerContentHook)) {
             foreach ($headerContentHook as $hook) {
-                $params = array();
+                $params = [];
                 $content .= GeneralUtility::callUserFunction($hook, $params, $this);
             }
         }
@@ -1010,7 +1021,7 @@ class PageLayoutController
         $footerContentHook = $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['cms/layout/db_layout.php']['drawFooterHook'];
         if (is_array($footerContentHook)) {
             foreach ($footerContentHook as $hook) {
-                $params = array();
+                $params = [];
                 $content .= GeneralUtility::callUserFunction($hook, $params, $this);
             }
         }
@@ -1190,7 +1201,7 @@ class PageLayoutController
 
                 // Delete record
                 if ($this->deleteButton) {
-                    $dataAttributes = array();
+                    $dataAttributes = [];
                     $dataAttributes['table'] = $this->eRParts[0];
                     $dataAttributes['uid'] = $this->eRParts[1];
                     $dataAttributes['return-url'] = BackendUtility::getModuleUrl($this->moduleName) . '&id=' . $this->id;
@@ -1211,11 +1222,12 @@ class PageLayoutController
                             GeneralUtility::quoteJSvalue(
                                 BackendUtility::getModuleUrl(
                                     'record_history',
-                                    array(
+                                    [
                                         'element' => $this->eRParts[0] . ':' . $this->eRParts[1],
                                         'revert' => 'ALL_FIELDS',
+                                        'sumUp' => -1,
                                         'returnUrl' => $this->R_URI,
-                                    )
+                                    ]
                                 )
                             ) . '; return false;')
                         ->setTitle(sprintf($lang->getLL('undoLastChange'), BackendUtility::calcAge($GLOBALS['EXEC_TIME'] - $this->undoButtonR['tstamp'], $lang->sL('LLL:EXT:lang/locallang_core.xlf:labels.minutesHoursDaysYears'))))
@@ -1227,10 +1239,10 @@ class PageLayoutController
                             GeneralUtility::quoteJSvalue(
                                 BackendUtility::getModuleUrl(
                                     'record_history',
-                                    array(
+                                    [
                                             'element' => $this->eRParts[0] . ':' . $this->eRParts[1],
                                             'returnUrl' => $this->R_URI,
-                                        )
+                                        ]
                                 ) . '#latest'
                             ) . ');return false;')
                         ->setTitle($lang->getLL('recordHistory'))
@@ -1353,7 +1365,7 @@ class PageLayoutController
         if (is_array($this->contentElementCache[$languageId][$colPos])) {
             return array_keys($this->contentElementCache[$languageId][$colPos]);
         }
-        return array();
+        return [];
     }
 
     /**
@@ -1433,7 +1445,7 @@ class PageLayoutController
 
         // Setting close url/return url for exiting this script:
         // Goes to 'Columns' view if close is pressed (default)
-        $this->closeUrl = $this->local_linkThisScript(array('SET' => array('function' => 1)));
+        $this->closeUrl = $this->local_linkThisScript(['SET' => ['function' => 1]]);
         if ($this->returnUrl) {
             $this->closeUrl = $this->returnUrl;
         }
@@ -1454,7 +1466,7 @@ class PageLayoutController
             $inValue = 'pages_language_overlay:' . $languageOverlayRecord['uid'];
             $isSelected += (int)$edit_record == $inValue;
             $menuItem = $quickEditMenu->makeMenuItem()
-                ->setTitle('[ ' . $lang->getLL('editLanguageHeader') . ' ]')
+                ->setTitle('[ ' . $lang->getLL('editLanguageHeader', true) . ' ]')
                 ->setHref(BackendUtility::getModuleUrl($this->moduleName) . '&id=' . $this->id . '&edit_record=' . $inValue . $retUrlStr)
                 ->setActive($edit_record == $inValue);
             $quickEditMenu->addMenuItem($menuItem);
@@ -1462,7 +1474,7 @@ class PageLayoutController
             $inValue = 'pages:' . $this->id;
             $isSelected += (int)$edit_record == $inValue;
             $menuItem = $quickEditMenu->makeMenuItem()
-                ->setTitle('[ ' . $lang->getLL('editPageProperties') . ' ]')
+                ->setTitle('[ ' . $lang->getLL('editPageProperties', true) . ' ]')
                 ->setHref(BackendUtility::getModuleUrl($this->moduleName) . '&id=' . $this->id . '&edit_record=' . $inValue . $retUrlStr)
                 ->setActive($edit_record == $inValue);
             $quickEditMenu->addMenuItem($menuItem);
@@ -1493,14 +1505,14 @@ class PageLayoutController
                         ->setHref('#');
                     $quickEditMenu->addMenuItem($menuItem);
                     $menuItem = $quickEditMenu->makeMenuItem()
-                        ->setTitle('__' . htmlspecialchars($lang->sL(BackendUtility::getLabelFromItemlist('tt_content', 'colPos', $colPos))) . ':__')
+                        ->setTitle('__' . $lang->sL(BackendUtility::getLabelFromItemlist('tt_content', 'colPos', $colPos)) . ':__')
                         ->setHref(BackendUtility::getModuleUrl($this->moduleName) . '&id=' . $this->id . '&edit_record=_EDIT_COL:' . $colPos . $retUrlStr);
                     $quickEditMenu->addMenuItem($menuItem);
                 }
                 $inValue = 'tt_content:' . $cRow['uid'];
                 $isSelected += (int)$edit_record == $inValue;
                 $menuItem = $quickEditMenu->makeMenuItem()
-                    ->setTitle(htmlspecialchars(GeneralUtility::fixed_lgd_cs(($cRow['header'] ? $cRow['header'] : '[' . $lang->sL('LLL:EXT:lang/locallang_core.xlf:labels.no_title') . '] ' . strip_tags($cRow['bodytext'])), $beUser->uc['titleLen'])))
+                    ->setTitle(GeneralUtility::fixed_lgd_cs(($cRow['header'] ? $cRow['header'] : '[' . $lang->sL('LLL:EXT:lang/locallang_core.xlf:labels.no_title') . '] ' . strip_tags($cRow['bodytext'])), $beUser->uc['titleLen']))
                     ->setHref(BackendUtility::getModuleUrl($this->moduleName) . '&id=' . $this->id . '&edit_record=' . $inValue . $retUrlStr)
                     ->setActive($edit_record == $inValue);
                 $quickEditMenu->addMenuItem($menuItem);
@@ -1513,7 +1525,7 @@ class PageLayoutController
             $inValue = 'tt_content:new/' . $prev . '/' . $colPos;
             $isSelected += (int)$edit_record == $inValue;
             $menuItem = $quickEditMenu->makeMenuItem()
-                ->setTitle('[ ' . $lang->getLL('newLabel') . ' ]')
+                ->setTitle('[ ' . $lang->getLL('newLabel', 1) . ' ]')
                 ->setHref(BackendUtility::getModuleUrl($this->moduleName) . '&id=' . $this->id . '&edit_record=' . $inValue . $retUrlStr)
                 ->setActive($edit_record == $inValue);
             $quickEditMenu->addMenuItem($menuItem);
@@ -1525,7 +1537,7 @@ class PageLayoutController
                 ->setHref('#');
             $quickEditMenu->addMenuItem($menuItem);
             $menuItem = $quickEditMenu->makeMenuItem()
-                ->setTitle('[ ' . $lang->getLL('newLabel') . ' ]')
+                ->setTitle('[ ' . $lang->getLL('newLabel', true) . ' ]')
                 ->setHref(BackendUtility::getModuleUrl($this->moduleName) . '&id=' . $this->id . '&edit_record=' . $edit_record . $retUrlStr)
                 ->setActive($edit_record == $inValue);
             $quickEditMenu->addMenuItem($menuItem);
@@ -1545,7 +1557,7 @@ class PageLayoutController
             $lang = $this->getLanguageService();
             $languageMenu = $this->moduleTemplate->getDocHeaderComponent()->getMenuRegistry()->makeMenu();
             $languageMenu->setIdentifier('languageMenu');
-            $languageMenu->setLabel(htmlspecialchars($lang->sL('LLL:EXT:lang/locallang_general.xlf:LGL.language')));
+            $languageMenu->setLabel($lang->sL('LLL:EXT:lang/locallang_general.xlf:LGL.language', true));
             foreach ($this->MOD_MENU['language'] as $key => $language) {
                 $menuItem = $languageMenu
                     ->makeMenuItem()

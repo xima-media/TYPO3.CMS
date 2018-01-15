@@ -16,7 +16,7 @@
  * Contains all JS functions related to TYPO3 TCEforms/FormEngineValidation
  * @internal
  */
-define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
+define(['jquery'], function ($) {
 
 	/**
 	 * The main FormEngineValidation object
@@ -75,6 +75,7 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 		FormEngineValidation.lastTime = 0;
 		FormEngineValidation.refDate = today;
 		FormEngineValidation.USmode = 0;
+		FormEngineValidation.validate();
 	};
 
 	/**
@@ -131,15 +132,13 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 				$humanReadableField.val(value);
 			}
 		}
+
 		$humanReadableField.data('main-field', fieldName);
 		$humanReadableField.data('config', config);
 		$humanReadableField.on('change', function() {
 			FormEngineValidation.updateInputField($(this).attr('data-formengine-input-name'));
 		});
 		$humanReadableField.on('keyup', FormEngineValidation.validate);
-
-		// add the attribute so that acceptance tests can know when the field initialization has completed
-		$humanReadableField.attr('data-formengine-input-initialized', 'true');
 	};
 
 	/**
@@ -154,11 +153,10 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 		var theString = '';
 		switch (type) {
 			case 'date':
-				var parsedInt = parseInt(value);
-				if (!parsedInt) {
+				if (!parseInt(value)) {
 					return '';
 				}
-				theTime = new Date(parsedInt * 1000);
+				theTime = new Date(parseInt(value) * 1000);
 				if (FormEngineValidation.USmode) {
 					theString = (theTime.getUTCMonth() + 1) + '-' + theTime.getUTCDate() + '-' + this.getYear(theTime);
 				} else {
@@ -173,11 +171,10 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 				break;
 			case 'time':
 			case 'timesec':
-				var parsedInt = parseInt(value);
-				if (!parsedInt && value.toString() !== '0') {
+				if (!parseInt(value) && value.toString() !== '0') {
 					return '';
 				}
-				var theTime = new Date(parsedInt * 1000);
+				var theTime = new Date(parseInt(value) * 1000);
 				var h = theTime.getUTCHours();
 				var m = theTime.getUTCMinutes();
 				var s = theTime.getUTCSeconds();
@@ -233,21 +230,18 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 	 * @returns {String}
 	 */
 	FormEngineValidation.validateField = function($field, value) {
-		value = value || $field.val() || '';
-
-		var rules = $field.data('formengine-validation-rules');
-		var markParent = false;
-		var selected = 0;
-		// keep the original value, validateField should not alter it
-		var returnValue = value;
-		var $relatedField;
-		var minItems;
-		var maxItems;
-
+		value = value || $field.val();
 		if (!$.isArray(value)) {
 			value = FormEngineValidation.ltrim(value);
 		}
 
+		var rules = $field.data('formengine-validation-rules');
+		var markParent = false;
+		var selected = 0;
+		var returnValue = value;
+		var $relatedField;
+		var minItems;
+		var maxItems;
 		$.each(rules, function(k, rule) {
 			switch (rule.type) {
 				case 'required':
@@ -351,6 +345,7 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 				case 'null':
 					// unknown type null, we ignore it
 					break;
+				default:
 			}
 		});
 		if (markParent) {
@@ -401,7 +396,7 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 							special = 0;
 							break;
 					}
-					if (alpha || num || special) {
+					if (alpha || num || theChar == ' ' || special) {
 						newString += theChar;
 					}
 				}
@@ -413,7 +408,7 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 				if (config.is_in) {
 					theValue = '' + value;
 					for (a = 0; a < theValue.length; a++) {
-						var theChar = theValue.substr(a, 1);
+						theChar = theValue.substr(a, 1);
 						if (config.is_in.indexOf(theChar) != -1) {
 							newString += theChar;
 						}
@@ -424,7 +419,15 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 				returnValue = newString;
 				break;
 			case 'nospace':
-				returnValue = '' + value.replace(/ /g, '');
+				theValue = '' + value;
+				newString = '';
+				for (a = 0; a < theValue.length; a++) {
+					var theChar = theValue.substr(a, 1);
+					if (theChar != ' ') {
+						newString += theChar;
+					}
+				}
+				returnValue = newString;
 				break;
 			case 'md5':
 				if (value !== '') {
@@ -448,7 +451,7 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 				}
 				break;
 			case 'trim':
-				returnValue = String(value).trim();
+				returnValue = FormEngineValidation.ltrim(FormEngineValidation.btrim(value));
 				break;
 			case 'datetime':
 				if (value !== '') {
@@ -519,10 +522,34 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 					modified = true;
 				}
 				if (modified) {
-					$field.val(newValue);
+					$field.attr('value', newValue);
+					FormEngineValidation.setCaretPosition($field, 0);
 				}
 			}
 		});
+	};
+
+	/**
+	 * Set the caret position in a text field
+	 *
+	 * @param {Object} $element
+	 * @param {Number} caretPos
+	 */
+	FormEngineValidation.setCaretPosition = function($element, caretPos) {
+		var elem = $element.get(0);
+
+		if (elem.createTextRange) {
+			var range = elem.createTextRange();
+			range.move('character', caretPos);
+			range.select();
+		} else {
+			if (elem.selectionStart) {
+				elem.focus();
+				elem.setSelectionRange(caretPos, caretPos);
+			} else {
+				elem.focus();
+			}
+		}
 	};
 
 	/**
@@ -551,18 +578,16 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 	 * @returns {Number}
 	 */
 	FormEngineValidation.parseInt = function(value) {
-		var theVal = '' + value,
-			returnValue;
-
+		var theVal = '' + value;
 		if (!value) {
 			return 0;
 		}
-
-		returnValue = parseInt(theVal, 10);
-		if (isNaN(returnValue)) {
-			return 0;
+		for (var a = 0; a < theVal.length; a++) {
+			if (theVal.substr(a,1)!='0') {
+				return parseInt(theVal.substr(a,theVal.length)) || 0;
+			}
 		}
-		return returnValue;
+		return 0;
 	};
 
 	/**
@@ -601,7 +626,12 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 		if (!value) {
 			return '';
 		}
-		return theVal.replace(/^\s+/, '');
+		for (var a = 0; a < theVal.length; a++) {
+			if (theVal.substr(a, 1) != ' ') {
+				return theVal.substr(a, theVal.length);
+			}
+		}
+		return '';
 	};
 
 	/**
@@ -614,7 +644,12 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 		if (!value) {
 			return '';
 		}
-		return theVal.replace(/\s+$/, '');
+		for (var a = theVal.length; a > 0; a--) {
+			if (theVal.substr(a-1, 1) != ' ') {
+				return theVal.substr(0, a);
+			}
+		}
+		return '';
 	};
 
 	/**
@@ -1020,17 +1055,5 @@ define(['jquery', 'TYPO3/CMS/Backend/FormEngine'], function ($, FormEngine) {
 		return result;
 	};
 
-	FormEngineValidation.registerReady = function() {
-		$(function() {
-			FormEngineValidation.initialize();
-			// Start first validation after one second, because all fields are initial empty (typo3form.fieldSet)
-			window.setTimeout(function() {
-				FormEngineValidation.validate();
-			}, 1000);
-		});
-	};
-
-	FormEngine.Validation = FormEngineValidation;
-
-	return FormEngine.Validation;
+	return FormEngineValidation;
 });

@@ -41,7 +41,7 @@ class FileDumpController
      */
     public function dumpAction(ServerRequestInterface $request, ResponseInterface $response)
     {
-        $parameters = array('eID' => 'dumpFile');
+        $parameters = ['eID' => 'dumpFile'];
         $t = $this->getGetOrPost($request, 't');
         if ($t) {
             $parameters['t'] = $t;
@@ -57,13 +57,17 @@ class FileDumpController
 
         if (GeneralUtility::hmac(implode('|', $parameters), 'resourceStorageDumpFile') === $this->getGetOrPost($request, 'token')) {
             if (isset($parameters['f'])) {
-                $file = ResourceFactory::getInstance()->getFileObject($parameters['f']);
-                if ($file->isDeleted() || $file->isMissing()) {
+                try {
+                    $file = ResourceFactory::getInstance()->getFileObject($parameters['f']);
+                    if ($file->isDeleted() || $file->isMissing()) {
+                        $file = null;
+                    }
+                } catch (\Exception $e) {
                     $file = null;
                 }
             } else {
                 $file = GeneralUtility::makeInstance(ProcessedFileRepository::class)->findByUid($parameters['p']);
-                if ($file->isDeleted()) {
+                if (!$file || $file->isDeleted()) {
                     $file = null;
                 }
             }

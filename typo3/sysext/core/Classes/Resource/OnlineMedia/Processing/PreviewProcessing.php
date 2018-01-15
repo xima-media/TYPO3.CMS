@@ -15,7 +15,7 @@ namespace TYPO3\CMS\Core\Resource\OnlineMedia\Processing;
  */
 
 use TYPO3\CMS\Core\Imaging\GraphicalFunctions;
-use TYPO3\CMS\Core\Resource\Driver\AbstractDriver;
+use TYPO3\CMS\Core\Resource\Driver\DriverInterface;
 use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\OnlineMedia\Helpers\OnlineMediaHelperRegistry;
 use TYPO3\CMS\Core\Resource\ProcessedFile;
@@ -24,7 +24,6 @@ use TYPO3\CMS\Core\Resource\Processing\LocalImageProcessor;
 use TYPO3\CMS\Core\Resource\Service\FileProcessingService;
 use TYPO3\CMS\Core\Utility\CommandUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Frontend\Imaging\GifBuilder;
 
 /**
@@ -53,13 +52,13 @@ class PreviewProcessing
      * Create static image preview for Online Media item when possible
      *
      * @param FileProcessingService $fileProcessingService
-     * @param AbstractDriver $driver
+     * @param DriverInterface $driver
      * @param ProcessedFile $processedFile
      * @param File $file
      * @param string $taskType
      * @param array $configuration
      */
-    public function processFile(FileProcessingService $fileProcessingService, AbstractDriver $driver, ProcessedFile $processedFile, File $file, $taskType, array $configuration)
+    public function processFile(FileProcessingService $fileProcessingService, DriverInterface $driver, ProcessedFile $processedFile, File $file, $taskType, array $configuration)
     {
         if ($taskType !== 'Image.Preview' && $taskType !== 'Image.CropScaleMask') {
             return;
@@ -78,13 +77,10 @@ class PreviewProcessing
         if (empty($temporaryFileName) || !file_exists($temporaryFileName)) {
             return;
         }
-        $temporaryFileNameForResizedThumb = uniqid(PATH_site . 'typo3temp/var/transient/online_media_' . $file->getHashedIdentifier()) . '.jpg';
+        $temporaryFileNameForResizedThumb = uniqid(PATH_site . 'typo3temp/online_media_' . $file->getHashedIdentifier()) . '.jpg';
+        $configuration = $processedFile->getProcessingConfiguration();
         switch ($taskType) {
             case 'Image.Preview':
-                // Merge custom configuration with default configuration
-                $configuration = array_merge(array('width' => 64, 'height' => 64), $configuration);
-                $configuration['width'] = MathUtility::forceIntegerInRange($configuration['width'], 1, 1000);
-                $configuration['height'] = MathUtility::forceIntegerInRange($configuration['height'], 1, 1000);
                 $this->resizeImage($temporaryFileName, $temporaryFileNameForResizedThumb, $configuration);
                 break;
 
@@ -92,20 +88,18 @@ class PreviewProcessing
                 $this->cropScaleImage($temporaryFileName, $temporaryFileNameForResizedThumb, $configuration);
                 break;
         }
-        GeneralUtility::unlink_tempfile($temporaryFileName);
         if (is_file($temporaryFileNameForResizedThumb)) {
             $processedFile->setName($this->getTargetFileName($processedFile));
             list($width, $height) = getimagesize($temporaryFileNameForResizedThumb);
             $processedFile->updateProperties(
-                array(
+                [
                     'width' => $width,
                     'height' => $height,
                     'size' => filesize($temporaryFileNameForResizedThumb),
                     'checksum' => $processedFile->getTask()->getConfigurationChecksum()
-                )
+                ]
             );
             $processedFile->updateWithLocalFile($temporaryFileNameForResizedThumb);
-            GeneralUtility::unlink_tempfile($temporaryFileNameForResizedThumb);
 
             /** @var ProcessedFileRepository $processedFileRepository */
             $processedFileRepository = GeneralUtility::makeInstance(ProcessedFileRepository::class);
@@ -131,7 +125,7 @@ class PreviewProcessing
     protected function resizeImage($originalFileName, $temporaryFileName, $configuration)
     {
         // Create the temporary file
-        if (empty($GLOBALS['TYPO3_CONF_VARS']['GFX']['processor_enabled'])) {
+        if (empty($GLOBALS['TYPO3_CONF_VARS']['GFX']['im'])) {
             return;
         }
 
@@ -145,7 +139,7 @@ class PreviewProcessing
             $parameters = '-sample ' . $arguments['width'] . 'x' . $arguments['height'] . ' '
                 . $arguments['originalFileName'] . '[0] ' . $arguments['temporaryFileName'];
 
-            $cmd = CommandUtility::imageMagickCommand('convert', $parameters) . ' 2>&1';
+            $cmd = GeneralUtility::imageMagickCommand('convert', $parameters) . ' 2>&1';
             CommandUtility::exec($cmd);
         }
 
@@ -213,7 +207,7 @@ class PreviewProcessing
         if (!empty($configuration['useSample'])) {
             $gifBuilder->scalecmd = '-sample';
         }
-        $options = array();
+        $options = [];
         if (!empty($configuration['maxWidth'])) {
             $options['maxW'] = $configuration['maxWidth'];
         }

@@ -106,14 +106,14 @@ class Export extends ImportExport
      *
      * @var array
      */
-    protected $recordTypesIncludeFields = array();
+    protected $recordTypesIncludeFields = [];
 
     /**
      * Default array of fields to be included in the export
      *
      * @var array
      */
-    protected $defaultRecordIncludeFields = array('uid', 'pid');
+    protected $defaultRecordIncludeFields = ['uid', 'pid'];
 
     /**
      * @var bool
@@ -165,7 +165,7 @@ class Export extends ImportExport
         // Version of file format
         $this->dat['header']['XMLversion'] = '1.0';
         // Initialize meta data array (to put it in top of file)
-        $this->dat['header']['meta'] = array();
+        $this->dat['header']['meta'] = [];
         // Add list of tables to consider static
         $this->dat['header']['relStaticTables'] = $this->relStaticTables;
         // The list of excluded records
@@ -174,7 +174,6 @@ class Export extends ImportExport
         $this->dat['header']['softrefCfg'] = $this->softrefCfg;
         // List of extensions the import depends on.
         $this->dat['header']['extensionDependencies'] = $this->extensionDependencies;
-        $this->dat['header']['charset'] = 'utf-8';
     }
 
     /**
@@ -201,7 +200,7 @@ class Export extends ImportExport
      */
     public function setMetaData($title, $description, $notes, $packager_username, $packager_name, $packager_email)
     {
-        $this->dat['header']['meta'] = array(
+        $this->dat['header']['meta'] = [
             'title' => $title,
             'description' => $description,
             'notes' => $notes,
@@ -210,7 +209,7 @@ class Export extends ImportExport
             'packager_email' => $packager_email,
             'TYPO3_version' => TYPO3_version,
             'created' => strftime('%A %e. %B %Y', $GLOBALS['EXEC_TIME'])
-        );
+        ];
     }
 
     /**
@@ -308,15 +307,12 @@ class Export extends ImportExport
     public function export_addRecord($table, $row, $relationLevel = 0)
     {
         BackendUtility::workspaceOL($table, $row);
-        if ($this->excludeDisabledRecords && !$this->isActive($table, $row['uid'])) {
-            return;
-        }
         if ((string)$table !== '' && is_array($row) && $row['uid'] > 0 && !$this->excludeMap[$table . ':' . $row['uid']]) {
             if ($this->checkPID($table === 'pages' ? $row['uid'] : $row['pid'])) {
                 if (!isset($this->dat['records'][$table . ':' . $row['uid']])) {
                     // Prepare header info:
                     $row = $this->filterRecordFields($table, $row);
-                    $headerInfo = array();
+                    $headerInfo = [];
                     $headerInfo['uid'] = $row['uid'];
                     $headerInfo['pid'] = $row['pid'];
                     $headerInfo['title'] = GeneralUtility::fixed_lgd_cs(BackendUtility::getRecordTitle($table, $row), 40);
@@ -338,7 +334,7 @@ class Export extends ImportExport
                         $relations = $this->fixFileIDsInRelations($relations);
                         $relations = $this->removeSoftrefsHavingTheSameDatabaseRelation($relations);
                         // Data:
-                        $this->dat['records'][$table . ':' . $row['uid']] = array();
+                        $this->dat['records'][$table . ':' . $row['uid']] = [];
                         $this->dat['records'][$table . ':' . $row['uid']]['data'] = $row;
                         $this->dat['records'][$table . ':' . $row['uid']]['rels'] = $relations;
                         // Add information about the relations in the record in the header:
@@ -404,7 +400,7 @@ class Export extends ImportExport
      */
     protected function removeSoftrefsHavingTheSameDatabaseRelation($relations)
     {
-        $fixedRelations = array();
+        $fixedRelations = [];
         foreach ($relations as $field => $relation) {
             $newRelation = $relation;
             if (isset($newRelation['type']) && $newRelation['type'] === 'db') {
@@ -448,9 +444,9 @@ class Export extends ImportExport
         // Traverse all "rels" registered for "records"
         if (!is_array($this->dat['records'])) {
             $this->error('There were no records available.');
-            return array();
+            return [];
         }
-        $addR = array();
+        $addR = [];
         foreach ($this->dat['records'] as $k => $value) {
             if (!is_array($this->dat['records'][$k])) {
                 continue;
@@ -479,10 +475,10 @@ class Export extends ImportExport
                                 foreach ($elements as $el) {
                                     if ($el['subst']['type'] === 'db' && $this->includeSoftref($el['subst']['tokenID'])) {
                                         list($tempTable, $tempUid) = explode(':', $el['subst']['recordRef']);
-                                        $fI = array(
+                                        $fI = [
                                             'table' => $tempTable,
                                             'id' => $tempUid
-                                        );
+                                        ];
                                         $this->export_addDBRelations_registerRelation($fI, $addR, $el['subst']['tokenID']);
                                     }
                                 }
@@ -496,10 +492,10 @@ class Export extends ImportExport
                         foreach ($elements as $el) {
                             if ($el['subst']['type'] === 'db' && $this->includeSoftref($el['subst']['tokenID'])) {
                                 list($tempTable, $tempUid) = explode(':', $el['subst']['recordRef']);
-                                $fI = array(
+                                $fI = [
                                     'table' => $tempTable,
                                     'id' => $tempUid
-                                );
+                                ];
                                 $this->export_addDBRelations_registerRelation($fI, $addR, $el['subst']['tokenID']);
                             }
                         }
@@ -604,12 +600,12 @@ class Export extends ImportExport
                                         $ID = md5($el['subst']['relFileName']);
                                         if ($ID_absFile) {
                                             if (!$this->dat['files'][$ID]) {
-                                                $fI = array(
+                                                $fI = [
                                                     'filename' => PathUtility::basename($ID_absFile),
                                                     'ID_absFile' => $ID_absFile,
                                                     'ID' => $ID,
                                                     'relFileName' => $el['subst']['relFileName']
-                                                );
+                                                ];
                                                 $this->export_addFile($fI, '_SOFTREF_');
                                             }
                                             $this->dat['records'][$k]['rels'][$fieldname]['flexFormRels']['softrefs'][$key]['keys'][$spKey][$subKey]['file_ID'] = $ID;
@@ -630,12 +626,12 @@ class Export extends ImportExport
                                 $ID = md5($el['subst']['relFileName']);
                                 if ($ID_absFile) {
                                     if (!$this->dat['files'][$ID]) {
-                                        $fI = array(
+                                        $fI = [
                                             'filename' => PathUtility::basename($ID_absFile),
                                             'ID_absFile' => $ID_absFile,
                                             'ID' => $ID,
                                             'relFileName' => $el['subst']['relFileName']
-                                        );
+                                        ];
                                         $this->export_addFile($fI, '_SOFTREF_');
                                     }
                                     $this->dat['records'][$k]['rels'][$fieldname]['softrefs']['keys'][$spKey][$subKey]['file_ID'] = $ID;
@@ -702,7 +698,7 @@ class Export extends ImportExport
             $this->dat['records']['sys_file:' . $fileUid]['data']['sha1'] = $fileSha1;
         }
 
-        $fileRec = array();
+        $fileRec = [];
         $fileRec['filesize'] = $fileSize;
         $fileRec['filename'] = $file->getProperty('name');
         $fileRec['filemtime'] = $file->getProperty('modification_date');
@@ -743,7 +739,7 @@ class Export extends ImportExport
             return;
         }
         $fileInfo = stat($fI['ID_absFile']);
-        $fileRec = array();
+        $fileRec = [];
         $fileRec['filesize'] = $fileInfo['size'];
         $fileRec['filename'] = PathUtility::basename($fI['ID_absFile']);
         $fileRec['filemtime'] = $fileInfo['mtime'];
@@ -761,14 +757,14 @@ class Export extends ImportExport
         if ($recordRef && $recordRef !== '_SOFTREF_') {
             $refParts = explode(':', $recordRef, 2);
             if (!is_array($this->dat['header']['records'][$refParts[0]][$refParts[1]]['filerefs'])) {
-                $this->dat['header']['records'][$refParts[0]][$refParts[1]]['filerefs'] = array();
+                $this->dat['header']['records'][$refParts[0]][$refParts[1]]['filerefs'] = [];
             }
             $this->dat['header']['records'][$refParts[0]][$refParts[1]]['filerefs'][] = $fI['ID'];
         }
         $fileMd5 = md5_file($fI['ID_absFile']);
         if (!$this->saveFilesOutsideExportFile) {
             // ... and finally add the heavy stuff:
-            $fileRec['content'] = file_get_contents($fI['ID_absFile']);
+            $fileRec['content'] = GeneralUtility::getUrl($fI['ID_absFile']);
         } else {
             GeneralUtility::upload_copy_move($fI['ID_absFile'], $this->getTemporaryFilesPathForExport() . $fileMd5);
         }
@@ -782,7 +778,7 @@ class Export extends ImportExport
                 if (@is_file($RTEoriginal_absPath)) {
                     $RTEoriginal_ID = md5($RTEoriginal_absPath);
                     $fileInfo = stat($RTEoriginal_absPath);
-                    $fileRec = array();
+                    $fileRec = [];
                     $fileRec['filesize'] = $fileInfo['size'];
                     $fileRec['filename'] = PathUtility::basename($RTEoriginal_absPath);
                     $fileRec['filemtime'] = $fileInfo['mtime'];
@@ -793,7 +789,7 @@ class Export extends ImportExport
                     $fileMd5 = md5_file($RTEoriginal_absPath);
                     if (!$this->saveFilesOutsideExportFile) {
                         // ... and finally add the heavy stuff:
-                        $fileRec['content'] = file_get_contents($RTEoriginal_absPath);
+                        $fileRec['content'] = GeneralUtility::getUrl($RTEoriginal_absPath);
                     } else {
                         GeneralUtility::upload_copy_move($RTEoriginal_absPath, $this->getTemporaryFilesPathForExport() . $fileMd5);
                     }
@@ -813,7 +809,7 @@ class Export extends ImportExport
                 } else {
                     // html, htm:
                     $htmlParser = GeneralUtility::makeInstance(HtmlParser::class);
-                    $prefixedMedias = explode($uniquePrefix, $htmlParser->prefixResourcePath($uniquePrefix, $fileRec['content'], array(), $uniquePrefix));
+                    $prefixedMedias = explode($uniquePrefix, $htmlParser->prefixResourcePath($uniquePrefix, $fileRec['content'], [], $uniquePrefix));
                 }
                 $htmlResourceCaptured = false;
                 foreach ($prefixedMedias as $k => $v) {
@@ -828,7 +824,7 @@ class Export extends ImportExport
                             // Add file to memory if it is not set already:
                             if (!isset($this->dat['header']['files'][$EXTres_ID])) {
                                 $fileInfo = stat($EXTres_absPath);
-                                $fileRec = array();
+                                $fileRec = [];
                                 $fileRec['filesize'] = $fileInfo['size'];
                                 $fileRec['filename'] = PathUtility::basename($EXTres_absPath);
                                 $fileRec['filemtime'] = $fileInfo['mtime'];
@@ -838,7 +834,7 @@ class Export extends ImportExport
                                 // Setting this data in the header
                                 $this->dat['header']['files'][$EXTres_ID] = $fileRec;
                                 // ... and finally add the heavy stuff:
-                                $fileRec['content'] = file_get_contents($EXTres_absPath);
+                                $fileRec['content'] = GeneralUtility::getUrl($EXTres_absPath);
                                 $fileRec['content_md5'] = md5($fileRec['content']);
                                 $this->dat['files'][$EXTres_ID] = $fileRec;
                             }
@@ -881,7 +877,7 @@ class Export extends ImportExport
      */
     public function flatDBrels($dbrels)
     {
-        $list = array();
+        $list = [];
         foreach ($dbrels as $dat) {
             if ($dat['type'] == 'db') {
                 foreach ($dat['itemArray'] as $i) {
@@ -907,14 +903,14 @@ class Export extends ImportExport
      */
     public function flatSoftRefs($dbrels)
     {
-        $list = array();
+        $list = [];
         foreach ($dbrels as $field => $dat) {
             if (is_array($dat['softrefs']['keys'])) {
                 foreach ($dat['softrefs']['keys'] as $spKey => $elements) {
                     if (is_array($elements)) {
                         foreach ($elements as $subKey => $el) {
                             $lKey = $field . ':' . $spKey . ':' . $subKey;
-                            $list[$lKey] = array_merge(array('field' => $field, 'spKey' => $spKey), $el);
+                            $list[$lKey] = array_merge(['field' => $field, 'spKey' => $spKey], $el);
                             // Add file_ID key to header - slightly "risky" way of doing this because if the calculation
                             // changes for the same value in $this->records[...] this will not work anymore!
                             if ($el['subst'] && $el['subst']['relFileName']) {
@@ -930,7 +926,7 @@ class Export extends ImportExport
                         foreach ($subSoftrefs['keys'] as $spKey => $elements) {
                             foreach ($elements as $subKey => $el) {
                                 $lKey = $field . ':' . $structurePath . ':' . $spKey . ':' . $subKey;
-                                $list[$lKey] = array_merge(array('field' => $field, 'spKey' => $spKey, 'structurePath' => $structurePath), $el);
+                                $list[$lKey] = array_merge(['field' => $field, 'spKey' => $spKey, 'structurePath' => $structurePath], $el);
                                 // Add file_ID key to header - slightly "risky" way of doing this because if the calculation
                                 // changes for the same value in $this->records[...] this will not work anymore!
                                 if ($el['subst'] && $el['subst']['relFileName']) {
@@ -960,7 +956,7 @@ class Export extends ImportExport
                 $this->recordTypesIncludeFields[$table],
                 $this->defaultRecordIncludeFields
             ));
-            $newRow = array();
+            $newRow = [];
             foreach ($row as $key => $value) {
                 if (in_array($key, $includeFields)) {
                     $newRow[$key] = $value;
@@ -1009,12 +1005,12 @@ class Export extends ImportExport
     public function createXML()
     {
         // Options:
-        $options = array(
-            'alt_options' => array(
-                '/header' => array(
+        $options = [
+            'alt_options' => [
+                '/header' => [
                     'disableTypeAttrib' => true,
                     'clearStackPath' => true,
-                    'parentTagMap' => array(
+                    'parentTagMap' => [
                         'files' => 'file',
                         'files_fal' => 'file',
                         'records' => 'table',
@@ -1029,29 +1025,29 @@ class Export extends ImportExport
                         'softrefCfg' => 'softrefExportMode',
                         'extensionDependencies' => 'extkey',
                         'softrefs' => 'softref_element'
-                    ),
-                    'alt_options' => array(
-                        '/pagetree' => array(
+                    ],
+                    'alt_options' => [
+                        '/pagetree' => [
                             'disableTypeAttrib' => true,
                             'useIndexTagForNum' => 'node',
-                            'parentTagMap' => array(
+                            'parentTagMap' => [
                                 'node:subrow' => 'node'
-                            )
-                        ),
-                        '/pid_lookup/page_contents' => array(
+                            ]
+                        ],
+                        '/pid_lookup/page_contents' => [
                             'disableTypeAttrib' => true,
-                            'parentTagMap' => array(
+                            'parentTagMap' => [
                                 'page_contents' => 'table'
-                            ),
-                            'grandParentTagMap' => array(
+                            ],
+                            'grandParentTagMap' => [
                                 'page_contents/table' => 'item'
-                            )
-                        )
-                    )
-                ),
-                '/records' => array(
+                            ]
+                        ]
+                    ]
+                ],
+                '/records' => [
                     'disableTypeAttrib' => true,
-                    'parentTagMap' => array(
+                    'parentTagMap' => [
                         'records' => 'tablerow',
                         'tablerow:data' => 'fieldlist',
                         'tablerow:rels' => 'related',
@@ -1070,27 +1066,27 @@ class Export extends ImportExport
                         'path' => 'element',
                         'keys' => 'softref_key',
                         'softref_key' => 'softref_element'
-                    ),
-                    'alt_options' => array(
-                        '/records/tablerow/fieldlist' => array(
+                    ],
+                    'alt_options' => [
+                        '/records/tablerow/fieldlist' => [
                             'useIndexTagForAssoc' => 'field'
-                        )
-                    )
-                ),
-                '/files' => array(
+                        ]
+                    ]
+                ],
+                '/files' => [
                     'disableTypeAttrib' => true,
-                    'parentTagMap' => array(
+                    'parentTagMap' => [
                         'files' => 'file'
-                    )
-                ),
-                '/files_fal' => array(
+                    ]
+                ],
+                '/files_fal' => [
                     'disableTypeAttrib' => true,
-                    'parentTagMap' => array(
+                    'parentTagMap' => [
                         'files_fal' => 'file'
-                    )
-                )
-            )
-        );
+                    ]
+                ]
+            ]
+        ];
         // Creating XML file from $outputArray:
         $charset = $this->dat['header']['charset'] ?: 'utf-8';
         $XML = '<?xml version="1.0" encoding="' . $charset . '" standalone="yes" ?>' . LF;

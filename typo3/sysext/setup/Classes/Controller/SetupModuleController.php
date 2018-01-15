@@ -21,17 +21,17 @@ use TYPO3\CMS\Backend\Module\AbstractModule;
 use TYPO3\CMS\Backend\Module\ModuleLoader;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
-use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Database\DatabaseConnection;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\FormProtection\FormProtectionFactory;
 use TYPO3\CMS\Core\Imaging\Icon;
-use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\Resource\Exception\FileDoesNotExistException;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Saltedpasswords\Salt\SaltFactory;
 
 /**
  * Script class for the Setup module
@@ -62,12 +62,17 @@ class SetupModuleController extends AbstractModule
     /**
      * @var array
      */
-    public $MOD_MENU = array();
+    public $MOD_MENU = [];
 
     /**
      * @var array
      */
-    public $MOD_SETTINGS = array();
+    public $MOD_SETTINGS = [];
+
+    /**
+     * @var \TYPO3\CMS\Backend\Template\DocumentTemplate
+     */
+    public $doc;
 
     /**
      * @var string
@@ -182,8 +187,10 @@ class SetupModuleController extends AbstractModule
 
     /**
      * If settings are submitted to _POST[DATA], store them
-     * NOTICE: This method is called before the \TYPO3\CMS\Backend\Template\ModuleTemplate
+     * NOTICE: This method is called before the \TYPO3\CMS\Backend\Template\DocumentTemplate
      * is included. See bottom of document.
+     *
+     * @see \TYPO3\CMS\Backend\Template\DocumentTemplate
      */
     public function storeIncomingData()
     {
@@ -192,7 +199,7 @@ class SetupModuleController extends AbstractModule
         $columns = $GLOBALS['TYPO3_USER_SETTINGS']['columns'];
         $beUser = $this->getBackendUser();
         $beUserId = $beUser->user['uid'];
-        $storeRec = array();
+        $storeRec = [];
         $fieldList = $this->getFieldsFromShowItem();
         if (is_array($d) && $this->formProtection->validateToken((string)GeneralUtility::_POST('formToken'), 'BE user setup', 'edit')) {
             // UC hashed before applying changes
@@ -217,7 +224,7 @@ class SetupModuleController extends AbstractModule
                         continue;
                     }
                     if ($config['table']) {
-                        if ($config['table'] === 'be_users' && !in_array($field, array('password', 'password2', 'passwordCurrent', 'email', 'realName', 'admin', 'avatar'))) {
+                        if ($config['table'] === 'be_users' && !in_array($field, ['password', 'password2', 'passwordCurrent', 'email', 'realName', 'admin', 'avatar'])) {
                             if (!isset($config['access']) || $this->checkAccess($config) && $beUser->user[$field] !== $d['be_users'][$field]) {
                                 if ($config['type'] === 'check') {
                                     $fieldValue = isset($d['be_users'][$field]) ? 1 : 0;
@@ -241,7 +248,7 @@ class SetupModuleController extends AbstractModule
                 // Possibility to modify the transmitted values. Useful to do transformations, like RSA password decryption
                 if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ext/setup/mod/index.php']['modifyUserDataBeforeSave'])) {
                     foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ext/setup/mod/index.php']['modifyUserDataBeforeSave'] as $function) {
-                        $params = array('be_user_data' => &$be_user_data);
+                        $params = ['be_user_data' => &$be_user_data];
                         GeneralUtility::callUserFunction($function, $params, $this);
                     }
                 }
@@ -257,9 +264,14 @@ class SetupModuleController extends AbstractModule
                 }
                 // Update the password:
                 if ($passwordIsConfirmed) {
-                    $currentPasswordHashed = $GLOBALS['BE_USER']->user['password'];
-                    $saltFactory = \TYPO3\CMS\Saltedpasswords\Salt\SaltFactory::getSaltingInstance($currentPasswordHashed);
-                    if ($saltFactory->checkPassword($be_user_data['passwordCurrent'], $currentPasswordHashed)) {
+                    if ($this->isAdmin) {
+                        $passwordOk = true;
+                    } else {
+                        $currentPasswordHashed = $GLOBALS['BE_USER']->user['password'];
+                        $saltFactory = SaltFactory::getSaltingInstance($currentPasswordHashed);
+                        $passwordOk = $saltFactory->checkPassword($be_user_data['passwordCurrent'], $currentPasswordHashed);
+                    }
+                    if ($passwordOk) {
                         $this->passwordIsUpdated = self::PASSWORD_UPDATED;
                         $storeRec['be_users'][$beUserId]['password'] = $be_user_data['password'];
                     } else {
@@ -279,7 +291,7 @@ class SetupModuleController extends AbstractModule
             // If something in the uc-array of the user has changed, we save the array...
             if ($save_before != $save_after) {
                 $beUser->writeUC($beUser->uc);
-                $beUser->writelog(254, 1, 0, 1, 'Personal settings changed', array());
+                $beUser->writelog(254, 1, 0, 1, 'Personal settings changed', []);
                 $this->setupIsUpdated = true;
             }
             // Persist data if something has changed:
@@ -287,10 +299,12 @@ class SetupModuleController extends AbstractModule
                 // Make instance of TCE for storing the changes.
                 /** @var DataHandler $dataHandler */
                 $dataHandler = GeneralUtility::makeInstance(DataHandler::class);
+                $dataHandler->stripslashes_values = false;
                 // This is so the user can actually update his user record.
-                $isAdmin = $beUser->user['admin'];
-                $beUser->user['admin'] = 1;
-                $dataHandler->start($storeRec, array(), $beUser);
+                $realUser = $this->getRealScriptUserObj();
+                $isAdmin = $realUser->user['admin'];
+                $realUser->user['admin'] = 1;
+                $dataHandler->start($storeRec, [], $realUser);
                 // This is to make sure that the users record can be updated even if in another workspace. This is tolerated.
                 $dataHandler->bypassWorkspaceRestrictions = true;
                 $dataHandler->process_datamap();
@@ -299,7 +313,7 @@ class SetupModuleController extends AbstractModule
                     $this->setupIsUpdated = true;
                 }
                 // Restore admin status after processing
-                $beUser->user['admin'] = $isAdmin;
+                $realUser->user['admin'] = $isAdmin;
             }
         }
     }
@@ -331,6 +345,8 @@ class SetupModuleController extends AbstractModule
             $this->tsFieldConf['password2.']['disabled'] = 1;
             $this->tsFieldConf['passwordCurrent.']['disabled'] = 1;
         }
+        // Create instance of object for output of data
+        $this->doc = GeneralUtility::makeInstance(\TYPO3\CMS\Backend\Template\DocumentTemplate::class);
     }
 
     /**
@@ -343,7 +359,7 @@ class SetupModuleController extends AbstractModule
         $javaScript = '';
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ext/setup/mod/index.php']['setupScriptHook'])) {
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ext/setup/mod/index.php']['setupScriptHook'] as $function) {
-                $params = array();
+                $params = [];
                 $javaScript .= GeneralUtility::callUserFunction($function, $params, $this);
             }
         }
@@ -376,7 +392,7 @@ class SetupModuleController extends AbstractModule
         $this->loadModules = GeneralUtility::makeInstance(ModuleLoader::class);
         $this->loadModules->observeWorkspaces = true;
         $this->loadModules->load($GLOBALS['TBE_MODULES']);
-        $this->content .= $this->moduleTemplate->header($this->getLanguageService()->getLL('UserSettings'));
+        $this->content .= $this->doc->header($this->getLanguageService()->getLL('UserSettings'));
         $this->addFlashMessages();
 
         // Render user switch
@@ -414,12 +430,24 @@ class SetupModuleController extends AbstractModule
     {
         $GLOBALS['SOBE'] = $this;
         $this->simulateUser();
-        $this->storeIncomingData();
         $this->init();
+        $this->storeIncomingData();
         $this->main();
 
         $response->getBody()->write($this->moduleTemplate->renderContent());
         return $response;
+    }
+
+    /**
+     * Prints the content / ends page
+     *
+     * @return void
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function printContent()
+    {
+        GeneralUtility::logDeprecatedFunction();
+        echo $this->content;
     }
 
     /**
@@ -462,50 +490,44 @@ class SetupModuleController extends AbstractModule
     protected function renderUserSetup()
     {
         $html = '';
-        $result = array();
+        $result = [];
         $firstTabLabel = '';
-        $code = array();
+        $code = [];
         $fieldArray = $this->getFieldsFromShowItem();
         $tabLabel = '';
         foreach ($fieldArray as $fieldName) {
-            $more = '';
+            $config = $GLOBALS['TYPO3_USER_SETTINGS']['columns'][$fieldName];
+            if (isset($config['access']) && !$this->checkAccess($config)) {
+                continue;
+            }
+
             if (substr($fieldName, 0, 8) === '--div--;') {
                 if ($firstTabLabel === '') {
                     // First tab
                     $tabLabel = $this->getLabel(substr($fieldName, 8), '', false);
                     $firstTabLabel = $tabLabel;
                 } else {
-                    $result[] = array(
+                    $result[] = [
                         'label' => $tabLabel,
                         'content' => count($code) ? implode(LF, $code) : ''
-                    );
+                    ];
                     $tabLabel = $this->getLabel(substr($fieldName, 8), '', false);
-                    $code = array();
+                    $code = [];
                 }
-                continue;
-            }
-            $config = $GLOBALS['TYPO3_USER_SETTINGS']['columns'][$fieldName];
-
-            // Field my be disabled in setup.fields
-            if (isset($this->tsFieldConf[$fieldName . '.']['disabled']) && $this->tsFieldConf[$fieldName . '.']['disabled'] == 1) {
-                continue;
-            }
-            if (isset($config['access']) && !$this->checkAccess($config)) {
                 continue;
             }
             $label = $this->getLabel($config['label'], $fieldName);
             $label = $this->getCSH($config['csh'] ?: $fieldName, $label);
             $type = $config['type'];
             $class = $config['class'];
-
             if ($type !== 'check') {
                 $class .= ' form-control';
             }
-
-            $style = $config['style'];
+            $more = '';
             if ($class) {
                 $more .= ' class="' . htmlspecialchars($class) . '"';
             }
+            $style = $config['style'];
             if ($style) {
                 $more .= ' style="' . htmlspecialchars($style) . '"';
             }
@@ -550,7 +572,7 @@ class SetupModuleController extends AbstractModule
                     break;
                 case 'select':
                     if ($config['itemsProcFunc']) {
-                        $html = GeneralUtility::callUserFunction($config['itemsProcFunc'], $config, $this);
+                        $html = GeneralUtility::callUserFunction($config['itemsProcFunc'], $config, $this, '');
                     } else {
                         $html = '<select id="field_' . htmlspecialchars($fieldName) . '"
                             name="data' . $dataAdd . '[' . htmlspecialchars($fieldName) . ']"' .
@@ -562,7 +584,7 @@ class SetupModuleController extends AbstractModule
                     }
                     break;
                 case 'user':
-                    $html = GeneralUtility::callUserFunction($config['userFunc'], $config, $this);
+                    $html = GeneralUtility::callUserFunction($config['userFunc'], $config, $this, '');
                     break;
                 case 'button':
                     if ($config['onClick']) {
@@ -609,19 +631,11 @@ class SetupModuleController extends AbstractModule
                             ' value="' . (int)$avatarFileUid . '" />';
 
                     $html .= '<div class="btn-group">';
-                    $iconFactory = GeneralUtility::makeInstance(IconFactory::class);
                     if ($avatarFileUid) {
-                        $html .=
-                            '<a id="clear_button_' . htmlspecialchars($fieldName) . '" '
-                                . 'onclick="clearExistingImage(); return false;" class="btn btn-default">'
-                                . $iconFactory->getIcon('actions-delete', Icon::SIZE_SMALL)
-                            . '</a>';
+                        $html .= '<a id="clear_button_' . htmlspecialchars($fieldName) . '" onclick="clearExistingImage(); return false;" class="btn btn-default"><span class="t3-icon fa t3-icon fa fa-remove"> </span></a>';
                     }
-                    $html .=
-                        '<a id="add_button_' . htmlspecialchars($fieldName) . '" class="btn btn-default btn-add-avatar"'
-                            . ' onclick="openFileBrowser();return false;">'
-                            . $iconFactory->getIcon('actions-insert-record', Icon::SIZE_SMALL)
-                            . '</a></div>';
+                    $html .= '<a id="add_button_' . htmlspecialchars($fieldName) . '" class="btn btn-default btn-add-avatar" onclick="openFileBrowser();return false;"><span class="t3-icon t3-icon-actions t3-icon-actions-insert t3-icon-insert-record"> </span></a>' .
+                            '</div>';
 
                     $this->addAvatarButtonJs($fieldName);
                     break;
@@ -629,16 +643,16 @@ class SetupModuleController extends AbstractModule
                     $html = '';
             }
 
-            $code[] = '<div class="form-section"><div class="row"><div class="form-group col-md-12">' .
+            $code[] = '<div class="form-section"><div class="form-group">' .
                 $label .
                 $html .
-                '</div></div></div>';
+                '</div></div>';
         }
 
-        $result[] = array(
+        $result[] = [
             'label' => $tabLabel,
             'content' => count($code) ? implode(LF, $code) : ''
-        );
+        ];
         return $result;
     }
 
@@ -661,15 +675,13 @@ class SetupModuleController extends AbstractModule
     /**
      * Return a select with available languages
      *
-     * @param array $params
-     *
      * @return string Complete select as HTML string or warning box if something went wrong.
      */
-    public function renderLanguageSelect($params)
+    public function renderLanguageSelect()
     {
-        $languageOptions = array();
+        $languageOptions = [];
         // Compile the languages dropdown
-        $langDefault = htmlspecialchars($this->getLanguageService()->getLL('lang_default'));
+        $langDefault = $this->getLanguageService()->getLL('lang_default', true);
         $languageOptions[$langDefault] = '<option value=""' . ($this->getBackendUser()->uc['lang'] === '' ? ' selected="selected"' : '') . '>' . $langDefault . '</option>';
         // Traverse the number of languages
         /** @var $locales \TYPO3\CMS\Core\Localization\Locales */
@@ -678,7 +690,7 @@ class SetupModuleController extends AbstractModule
         foreach ($languages as $locale => $name) {
             if ($locale !== 'default') {
                 $defaultName = isset($GLOBALS['LOCAL_LANG']['default']['lang_' . $locale]) ? $GLOBALS['LOCAL_LANG']['default']['lang_' . $locale][0]['source'] : $name;
-                $localizedName = htmlspecialchars($this->getLanguageService()->getLL('lang_' . $locale));
+                $localizedName = $this->getLanguageService()->getLL('lang_' . $locale, true);
                 if ($localizedName === '') {
                     $localizedName = htmlspecialchars($name);
                 }
@@ -695,7 +707,7 @@ class SetupModuleController extends AbstractModule
             </select>';
         if ($this->getBackendUser()->uc['lang'] && !@is_dir((PATH_typo3conf . 'l10n/' . $this->getBackendUser()->uc['lang']))) {
             // TODO: The text constants have to be moved into language files
-            $languageUnavailableWarning = 'The selected language "' . htmlspecialchars($this->getLanguageService()->getLL('lang_' . $this->getBackendUser()->uc['lang'])) . '" is not available before the language files are installed.&nbsp;&nbsp;<br />&nbsp;&nbsp;' . ($this->getBackendUser()->isAdmin() ? 'You can use the Language module to easily download new language files.' : 'Please ask your system administrator to do this.');
+            $languageUnavailableWarning = 'The selected language "' . $this->getLanguageService()->getLL(('lang_' . $this->getBackendUser()->uc['lang']), true) . '" is not available before the language files are installed.&nbsp;&nbsp;<br />&nbsp;&nbsp;' . ($this->getBackendUser()->isAdmin() ? 'You can use the Language module to easily download new language files.' : 'Please ask your system administrator to do this.');
             $languageCode = '<br /><span class="label label-danger">' . $languageUnavailableWarning . '</span><br /><br />' . $languageCode;
         }
         return $languageCode;
@@ -711,11 +723,7 @@ class SetupModuleController extends AbstractModule
      */
     public function renderStartModuleSelect($params, $pObj)
     {
-        // Load available backend modules
-        $this->loadModules = GeneralUtility::makeInstance(ModuleLoader::class);
-        $this->loadModules->observeWorkspaces = true;
-        $this->loadModules->load($GLOBALS['TBE_MODULES']);
-        $startModuleSelect = '<option value="">' . htmlspecialchars($this->getLanguageService()->getLL('startModule.firstInMenu')) . '</option>';
+        $startModuleSelect = '<option value="">' . $this->getLanguageService()->getLL('startModule.firstInMenu', true) . '</option>';
         foreach ($pObj->loadModules->modules as $mainMod => $modData) {
             if (!empty($modData['sub']) && is_array($modData['sub'])) {
                 $modules = '';
@@ -723,9 +731,9 @@ class SetupModuleController extends AbstractModule
                     $modName = $subData['name'];
                     $modules .= '<option value="' . htmlspecialchars($modName) . '"';
                     $modules .= $this->getBackendUser()->uc['startModule'] === $modName ? ' selected="selected"' : '';
-                    $modules .= '>' . htmlspecialchars($this->getLanguageService()->sL($this->loadModules->getLabelsForModule($modName)['title'])) . '</option>';
+                    $modules .= '>' . $this->getLanguageService()->moduleLabels['tabs'][$modName . '_tab'] . '</option>';
                 }
-                $groupLabel = htmlspecialchars($this->getLanguageService()->sL($this->loadModules->getLabelsForModule($mainMod)['title']));
+                $groupLabel = $this->getLanguageService()->moduleLabels['tabs'][$mainMod . '_tab'];
                 $startModuleSelect .= '<optgroup label="' . htmlspecialchars($groupLabel) . '">' . $modules . '</optgroup>';
             }
         }
@@ -746,18 +754,12 @@ class SetupModuleController extends AbstractModule
         unset($this->OLD_BE_USER);
         if ($this->getBackendUser()->isAdmin()) {
             $this->simUser = (int)GeneralUtility::_GP('simUser');
-            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('be_users');
-            $users = $queryBuilder
-                ->select('*')
-                ->from('be_users')
-                ->where(
-                    $queryBuilder->expr()->neq('uid', (int)$this->getBackendUser()->user['uid']),
-                    $queryBuilder->expr()->notLike('username', $queryBuilder->createNamedParameter($queryBuilder->escapeLikeWildcards('_cli_') . '%'))
-                )
-                ->orderBy('username')
-                ->execute()
-                ->fetchAll();
-            $opt = array();
+            // Make user-selector:
+            $db = $this->getDatabaseConnection();
+            $where = 'AND username NOT LIKE ' . $db->fullQuoteStr($db->escapeStrForLike('_cli_', 'be_users') . '%', 'be_users');
+            $where .= ' AND uid <> ' . (int)$this->getBackendUser()->user['uid'] . BackendUtility::BEenableFields('be_users');
+            $users = BackendUtility::getUserNames('username,usergroup,usergroup_cached_list,uid,realName', $where);
+            $opt = [];
             foreach ($users as $rr) {
                 $label = $rr['username'] . ($rr['realName'] ? ' (' . $rr['realName'] . ')' : '');
                 $opt[] = '<option value="' . (int)$rr['uid'] . '"' . ($this->simUser === (int)$rr['uid'] ? ' selected="selected"' : '') . '>' . htmlspecialchars($label) . '</option>';
@@ -832,10 +834,9 @@ class SetupModuleController extends AbstractModule
      * @param string $str Locallang key
      * @param string $key Alternative override-config key
      * @param bool $addLabelTag Defines whether the string should be wrapped in a <label> tag.
-     * @param string $altLabelTagId Alternative id for use in "for" attribute of <label> tag. By default the $str key is used prepended with "field_".
      * @return string HTML output.
      */
-    protected function getLabel($str, $key = '', $addLabelTag = true, $altLabelTagId = '')
+    protected function getLabel($str, $key = '', $addLabelTag = true)
     {
         if (substr($str, 0, 4) === 'LLL:') {
             $out = htmlspecialchars($this->getLanguageService()->sL($str));
@@ -846,7 +847,7 @@ class SetupModuleController extends AbstractModule
             $out = '<span style="color:#999999">' . $out . '</span>';
         }
         if ($addLabelTag) {
-            $out = '<label>' . $out . '</label>';
+            $out = '<label for="' . ($altLabelTagId ?: 'field_' . htmlspecialchars($key)) . '">' . $out . '</label>';
         }
         return $out;
     }
@@ -875,12 +876,33 @@ class SetupModuleController extends AbstractModule
 
     /**
      * Returns array with fields defined in $GLOBALS['TYPO3_USER_SETTINGS']['showitem']
+     * Remove fields which are disabled by user TSconfig
      *
-     * @return array Array with fieldnames visible in form
+     * @return string[] Array with field names visible in form
      */
     protected function getFieldsFromShowItem()
     {
-        return GeneralUtility::trimExplode(',', $GLOBALS['TYPO3_USER_SETTINGS']['showitem'], true);
+        $allowedFields = GeneralUtility::trimExplode(',', $GLOBALS['TYPO3_USER_SETTINGS']['showitem'], true);
+        // do not ask for current password if admin (unknown for other users and no security gain)
+        if ($this->isAdmin) {
+            $key = array_search('passwordCurrent', $allowedFields);
+            if ($key !== false) {
+                unset($allowedFields[$key]);
+            }
+        }
+        if (!is_array($this->tsFieldConf)) {
+            return $allowedFields;
+        }
+        foreach ($this->tsFieldConf as $fieldName => $userTsFieldConfig) {
+            if (!empty($userTsFieldConfig['disabled'])) {
+                $fieldName = rtrim($fieldName, '.');
+                $key = array_search($fieldName, $allowedFields);
+                if ($key !== false) {
+                    unset($allowedFields[$key]);
+                }
+            }
+        }
+        return $allowedFields;
     }
 
     /**
@@ -891,19 +913,14 @@ class SetupModuleController extends AbstractModule
      */
     protected function getAvatarFileUid($beUserId)
     {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('sys_file_reference');
-        $file = $queryBuilder
-            ->select('uid_local')
-            ->from('sys_file_reference')
-            ->where(
-                $queryBuilder->expr()->eq('tablenames', $queryBuilder->createNamedParameter('be_users')),
-                $queryBuilder->expr()->eq('fieldname', $queryBuilder->createNamedParameter('avatar')),
-                $queryBuilder->expr()->eq('table_local', $queryBuilder->createNamedParameter('sys_file')),
-                $queryBuilder->expr()->eq('uid_foreign', (int)$beUserId)
-            )
-            ->execute()
-            ->fetchColumn();
-        return (int)$file;
+        $file = $this->getDatabaseConnection()->exec_SELECTgetSingleRow(
+            'uid_local',
+            'sys_file_reference',
+            'tablenames = \'be_users\' AND fieldname = \'avatar\' AND ' .
+            'table_local = \'sys_file\' AND uid_foreign = ' . (int)$beUserId .
+            BackendUtility::BEenableFields('sys_file_reference') . BackendUtility::deleteClause('sys_file_reference')
+        );
+        return $file ? $file['uid_local'] : 0;
     }
 
     /**
@@ -921,17 +938,12 @@ class SetupModuleController extends AbstractModule
             return;
         }
 
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('sys_file_reference');
-        $queryBuilder->getRestrictions()->removeAll();
-        $queryBuilder
-            ->delete('sys_file_reference')
-            ->where(
-                $queryBuilder->expr()->eq('tablenames', $queryBuilder->createNamedParameter('be_users')),
-                $queryBuilder->expr()->eq('fieldname', $queryBuilder->createNamedParameter('avatar')),
-                $queryBuilder->expr()->eq('table_local', $queryBuilder->createNamedParameter('sys_file')),
-                $queryBuilder->expr()->eq('uid_foreign', (int)$beUserId)
-            )
-            ->execute();
+        // Delete old file reference
+        $this->getDatabaseConnection()->exec_DELETEquery(
+            'sys_file_reference',
+            'tablenames = \'be_users\' AND fieldname = \'avatar\' AND ' .
+            'table_local = \'sys_file\' AND uid_foreign = ' . (int)$beUserId
+        );
 
         // Create new reference
         if ($fileUid) {
@@ -952,14 +964,14 @@ class SetupModuleController extends AbstractModule
             if ($file && GeneralUtility::inList($GLOBALS['TYPO3_CONF_VARS']['GFX']['imagefile_ext'], $file->getExtension())) {
 
                 // Create new file reference
-                $storeRec['sys_file_reference']['NEW1234'] = array(
+                $storeRec['sys_file_reference']['NEW1234'] = [
                     'uid_local' => (int)$fileUid,
                     'uid_foreign' => (int)$beUserId,
                     'tablenames' => 'be_users',
                     'fieldname' => 'avatar',
                     'pid' => 0,
                     'table_local' => 'sys_file',
-                );
+                ];
                 $storeRec['be_users'][(int)$beUserId]['avatar'] = 'NEW1234';
             }
         }
@@ -1015,6 +1027,14 @@ class SetupModuleController extends AbstractModule
     protected function getLanguageService()
     {
         return $GLOBALS['LANG'];
+    }
+
+    /**
+     * @return DatabaseConnection
+     */
+    protected function getDatabaseConnection()
+    {
+        return $GLOBALS['TYPO3_DB'];
     }
 
     /**

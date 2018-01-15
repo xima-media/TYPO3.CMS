@@ -33,11 +33,11 @@ class ArrayElementViewHelper extends AbstractViewHelper
     public function render(array $array, $key, $subKey = '')
     {
         return static::renderStatic(
-            array(
+            [
                 'array' => $array,
                 'key' => $key,
                 'subKey' => $subKey
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

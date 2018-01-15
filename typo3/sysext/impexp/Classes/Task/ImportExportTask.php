@@ -15,7 +15,6 @@ namespace TYPO3\CMS\Impexp\Task;
  */
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\Resource\Exception;
@@ -36,20 +35,12 @@ class ImportExportTask implements TaskInterface
     protected $taskObject;
 
     /**
-     * URL to task module
-     *
-     * @var string
-     */
-    protected $moduleUrl;
-
-    /**
      * Constructor
      *
      * @param TaskModuleController $taskObject
      */
     public function __construct(TaskModuleController $taskObject)
     {
-        $this->moduleUrl = BackendUtility::getModuleUrl('user_task');
         $this->taskObject = $taskObject;
         $this->getLanguageService()->includeLLFile('EXT:impexp/Resources/Private/Language/locallang_csh.xlf');
     }
@@ -88,14 +79,12 @@ class ImportExportTask implements TaskInterface
         if ($id > 0) {
             $url = BackendUtility::getModuleUrl(
                 'xMOD_tximpexp',
-                array(
+                [
                     'tx_impexp[action]' => 'export',
                     'preset[load]' => 1,
-                    'preset[select]' => $id,
-                    'returnUrl' => $this->moduleUrl
-                )
+                    'preset[select]' => $id]
             );
-            \TYPO3\CMS\Core\Utility\HttpUtility::redirect($url);
+            return $this->taskObject->urlInIframe($url);
         } else {
             // Header
             $lang = $this->getLanguageService();
@@ -108,10 +97,10 @@ class ImportExportTask implements TaskInterface
             if (is_array($presets) && !empty($presets)) {
                 $lines = [];
                 foreach ($presets as $key => $presetCfg) {
-                    $configuration = unserialize($presetCfg['preset_data'], ['allowed_classes' => false]);
+                    $configuration = unserialize($presetCfg['preset_data']);
                     $title = strlen($presetCfg['title']) ? $presetCfg['title'] : '[' . $presetCfg['uid'] . ']';
                     $icon = 'EXT:impexp/Resources/Public/Images/export.gif';
-                    $description = array();
+                    $description = [];
                     // Is public?
                     if ($presetCfg['public']) {
                         $description[] = $lang->getLL('task.public') . ': ' . $lang->sL('LLL:EXT:lang/locallang_common.xlf:yes');
@@ -147,13 +136,12 @@ class ImportExportTask implements TaskInterface
                         $description[] = '<br />' . $metaInformation;
                     }
                     // Collect all preset information
-                    $lines[$key] = array(
-                        'uid' => 'impexp' . $key,
+                    $lines[$key] = [
                         'icon' => $icon,
                         'title' => $title,
                         'descriptionHtml' => implode('<br />', $description),
                         'link' => BackendUtility::getModuleUrl('user_task') . '&SET[function]=impexp.TYPO3\\CMS\\Impexp\\Task\\ImportExportTask&display=' . $presetCfg['uid']
-                    );
+                    ];
                 }
                 // Render preset list
                 $content .= $this->taskObject->renderListMenu($lines);
@@ -178,25 +166,19 @@ class ImportExportTask implements TaskInterface
     /**
      * Select presets for this user
      *
-     * @return array|bool Array of preset records
+     * @return array Array of preset records
      */
     protected function getPresets()
     {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable('tx_impexp_presets');
-
-        return $queryBuilder->select('*')
-            ->from('tx_impexp_presets')
-            ->where(
-                $queryBuilder->expr()->orX(
-                    $queryBuilder->expr()->gt('public', 0),
-                    $queryBuilder->expr()->eq('user_uid', (int)$this->getBackendUser()->user['uid'])
-                )
-            )
-            ->orderBy('item_uid', 'DESC')
-            ->addOrderBy('title')
-            ->execute()
-            ->fetchAll();
+        $db = $this->getDatabase();
+        $presets = $db->exec_SELECTgetRows(
+            '*',
+            'tx_impexp_presets',
+            '(public > 0 OR user_uid=' . $this->getBackendUser()->user['uid'] . ')',
+            '',
+            'item_uid DESC, title'
+        );
+        return $presets;
     }
 
     /**

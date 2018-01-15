@@ -14,14 +14,7 @@ namespace TYPO3\CMS\Recycler\Tests\Unit\Task;
  * The TYPO3 project - inspiring people to share!
  */
 
-use Prophecy\Argument;
-use Prophecy\Prophecy\ObjectProphecy;
-use TYPO3\CMS\Core\Database\Connection;
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
-use TYPO3\CMS\Core\Database\Query\QueryBuilder;
-use TYPO3\CMS\Core\Tests\Unit\Database\Mocks\MockPlatform;
-use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Database\DatabaseConnection;
 use TYPO3\CMS\Recycler\Task\CleanerTask;
 
 /**
@@ -39,7 +32,7 @@ class CleanerTaskTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     protected function setUp()
     {
-        $this->subject = $this->getMock(CleanerTask::class, array('dummy'), array(), '', false);
+        $this->subject = $this->getMock(CleanerTask::class, ['dummy'], [], '', false);
     }
 
     /**
@@ -58,7 +51,7 @@ class CleanerTaskTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function getTcaTablesCanBeSet()
     {
-        $tables = array('pages', 'tt_content');
+        $tables = ['pages', 'tt_content'];
         $this->subject->setTcaTables($tables);
 
         $this->assertEquals($tables, $this->subject->getTcaTables());
@@ -73,31 +66,27 @@ class CleanerTaskTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
         $GLOBALS['TCA']['pages']['ctrl']['tstamp'] = 'tstamp';
 
         /** @var \PHPUnit_Framework_MockObject_MockObject|CleanerTask $subject */
-        $subject = $this->getMock(CleanerTask::class, array('getPeriodAsTimestamp'), array(), '', false);
-        $subject->setTcaTables(['pages']);
-        $subject->expects($this->once())->method('getPeriodAsTimestamp')->willReturn(400);
+        $subject = $this->getMock(CleanerTask::class, ['getPeriodAsTimestamp'], [], '', false);
 
-        /** @var Connection|ObjectProphecy $connection */
-        $connection = $this->prophesize(Connection::class);
-        $connection->getDatabasePlatform()->willReturn(new MockPlatform());
-        $connection->getExpressionBuilder()->willReturn(new ExpressionBuilder($connection->reveal()));
-        $connection->quoteIdentifier(Argument::cetera())->willReturnArgument(0);
+        $tables = ['pages'];
+        $subject->setTcaTables($tables);
 
-        // TODO: This should rather be a functional test if we need a query builder
-        // or we should clean up the code itself to not need to mock internal behavior here
-        $queryBuilder = new QueryBuilder(
-            $connection->reveal(),
-            null,
-            new \Doctrine\DBAL\Query\QueryBuilder($connection->reveal())
-        );
+        $period = 14;
+        $subject->setPeriod($period);
+        $periodAsTimestamp = strtotime('-' . $period . ' days');
+        $subject->expects($this->once())->method('getPeriodAsTimestamp')->willReturn($periodAsTimestamp);
 
-        $connectionPool = $this->prophesize(ConnectionPool::class);
-        $connectionPool->getQueryBuilderForTable('pages')->willReturn($queryBuilder);
-        GeneralUtility::addInstance(ConnectionPool::class, $connectionPool->reveal());
+        $dbMock = $this->getMock(DatabaseConnection::class);
+        $dbMock->expects($this->once())
+            ->method('exec_DELETEquery')
+            ->with($this->equalTo('pages'), $this->equalTo('deleted = 1 AND tstamp < ' . $periodAsTimestamp));
 
-        $connection->executeUpdate('DELETE FROM pages WHERE (deleted = 1) AND (tstamp < 400)', Argument::cetera())
-            ->shouldBeCalled()
-            ->willReturn(1);
+        $dbMock->expects($this->once())
+            ->method('sql_error')
+            ->will($this->returnValue(''));
+
+        $subject->setDatabaseConnection($dbMock);
+
         $this->assertTrue($subject->execute());
     }
 
@@ -109,29 +98,18 @@ class CleanerTaskTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
         $GLOBALS['TCA']['pages']['ctrl']['delete'] = 'deleted';
         $GLOBALS['TCA']['pages']['ctrl']['tstamp'] = 'tstamp';
 
-        $this->subject->setTcaTables(['pages']);
+        $tables = ['pages'];
+        $this->subject->setTcaTables($tables);
 
-        /** @var Connection|ObjectProphecy $connection */
-        $connection = $this->prophesize(Connection::class);
-        $connection->getDatabasePlatform()->willReturn(new MockPlatform());
-        $connection->getExpressionBuilder()->willReturn(new ExpressionBuilder($connection->reveal()));
-        $connection->quoteIdentifier(Argument::cetera())->willReturnArgument(0);
+        $period = 14;
+        $this->subject->setPeriod($period);
 
-        // TODO: This should rather be a functional test if we need a query builder
-        // or we should clean up the code itself to not need to mock internal behavior here
-        $queryBuilder = new QueryBuilder(
-            $connection->reveal(),
-            null,
-            new \Doctrine\DBAL\Query\QueryBuilder($connection->reveal())
-        );
+        $dbMock = $this->getMock(DatabaseConnection::class);
+        $dbMock->expects($this->once())
+            ->method('sql_error')
+            ->willReturn(1049);
 
-        $connectionPool = $this->prophesize(ConnectionPool::class);
-        $connectionPool->getQueryBuilderForTable('pages')->willReturn($queryBuilder);
-        GeneralUtility::addInstance(ConnectionPool::class, $connectionPool->reveal());
-
-        $connection->executeUpdate(Argument::cetera())
-            ->shouldBeCalled()
-            ->willThrow(new \Doctrine\DBAL\DBALException());
+        $this->subject->setDatabaseConnection($dbMock);
 
         $this->assertFalse($this->subject->execute());
     }

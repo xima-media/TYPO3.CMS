@@ -14,8 +14,6 @@ namespace TYPO3\CMS\Core\Resource\Processing;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Imaging\GraphicalFunctions;
-use TYPO3\CMS\Core\Log\LogManager;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -33,8 +31,8 @@ class LocalImageProcessor implements ProcessorInterface
      */
     public function __construct()
     {
-        /** @var $logManager LogManager */
-        $logManager = GeneralUtility::makeInstance(LogManager::class);
+        /** @var $logManager \TYPO3\CMS\Core\Log\LogManager */
+        $logManager = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Log\LogManager::class);
         $this->logger = $logManager->getLogger(__CLASS__);
     }
 
@@ -47,7 +45,7 @@ class LocalImageProcessor implements ProcessorInterface
     public function canProcessTask(TaskInterface $task)
     {
         $canProcessTask = $task->getType() === 'Image';
-        $canProcessTask = $canProcessTask & in_array($task->getName(), array('Preview', 'CropScaleMask'));
+        $canProcessTask = $canProcessTask & in_array($task->getName(), ['Preview', 'CropScaleMask']);
         return $canProcessTask;
     }
 
@@ -76,7 +74,7 @@ class LocalImageProcessor implements ProcessorInterface
                 $imageDimensions = $this->getGraphicalFunctionsObject()->getImageDimensions($result['filePath']);
                 $task->getTargetFile()->setName($task->getTargetFileName());
                 $task->getTargetFile()->updateProperties(
-                    array('width' => $imageDimensions[0], 'height' => $imageDimensions[1], 'size' => filesize($result['filePath']), 'checksum' => $task->getConfigurationChecksum())
+                    ['width' => $imageDimensions[0], 'height' => $imageDimensions[1], 'size' => filesize($result['filePath']), 'checksum' => $task->getConfigurationChecksum()]
                 );
                 $task->getTargetFile()->updateWithLocalFile($result['filePath']);
 
@@ -85,7 +83,7 @@ class LocalImageProcessor implements ProcessorInterface
                 $task->setExecuted(true);
                 $task->getTargetFile()->setUsesOriginalFile();
                 $task->getTargetFile()->updateProperties(
-                    array('width' => $result['width'], 'height' => $result['height'], 'size' => $task->getSourceFile()->getSize(), 'checksum' => $task->getConfigurationChecksum())
+                    ['width' => $result['width'], 'height' => $result['height'], 'size' => $task->getSourceFile()->getSize(), 'checksum' => $task->getConfigurationChecksum()]
                 );
 
             // Seems we have no valid processing result
@@ -121,12 +119,12 @@ class LocalImageProcessor implements ProcessorInterface
             $localProcessedFile = $storage->getFileForLocalProcessing($task->getTargetFile(), false);
             $task->setExecuted(true);
             $imageDimensions = $this->getGraphicalFunctionsObject()->getImageDimensions($localProcessedFile);
-            $properties = array(
+            $properties = [
                 'width' => $imageDimensions[0],
                 'height' => $imageDimensions[1],
                 'size' => filesize($localProcessedFile),
                 'checksum' => $task->getConfigurationChecksum()
-            );
+            ];
             $task->getTargetFile()->updateProperties($properties);
 
             return true;
@@ -144,10 +142,10 @@ class LocalImageProcessor implements ProcessorInterface
     {
         switch ($taskName) {
             case 'Preview':
-                $helper = GeneralUtility::makeInstance(LocalPreviewHelper::class, $this);
+                $helper = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Resource\Processing\LocalPreviewHelper::class, $this);
             break;
             case 'CropScaleMask':
-                $helper = GeneralUtility::makeInstance(LocalCropScaleMaskHelper::class, $this);
+                $helper = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Resource\Processing\LocalCropScaleMaskHelper::class, $this);
             break;
             default:
                 throw new \InvalidArgumentException('Cannot find helper for task name: "' . $taskName . '"', 1353401352);
@@ -157,14 +155,35 @@ class LocalImageProcessor implements ProcessorInterface
     }
 
     /**
-     * @return GraphicalFunctions
+     * Creates error image based on gfx/notfound_thumb.png
+     * Requires GD lib enabled, otherwise it will exit with the three
+     * textstrings outputted as text. Outputs the image stream to browser and exits!
+     *
+     * @param string $filename Name of the file
+     * @param string $textline1 Text line 1
+     * @param string $textline2 Text line 2
+     * @param string $textline3 Text line 3
+     * @return void
+     * @throws \RuntimeException
+     *
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8. Use \TYPO3\CMS\Core\Imaging\GraphicalFunctions::getTemporaryImageWithText() instead.
+     */
+    public function getTemporaryImageWithText($filename, $textline1, $textline2, $textline3)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        $graphicalFunctions = $this->getGraphicalFunctionsObject();
+        $graphicalFunctions->getTemporaryImageWithText($filename, $textline1, $textline2, $textline3);
+    }
+
+    /**
+     * @return \TYPO3\CMS\Core\Imaging\GraphicalFunctions
      */
     protected function getGraphicalFunctionsObject()
     {
         static $graphicalFunctionsObject = null;
 
         if ($graphicalFunctionsObject === null) {
-            $graphicalFunctionsObject = GeneralUtility::makeInstance(GraphicalFunctions::class);
+            $graphicalFunctionsObject = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Imaging\GraphicalFunctions::class);
         }
 
         return $graphicalFunctionsObject;

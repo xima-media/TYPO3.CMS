@@ -72,7 +72,7 @@ class SpellCheckingController
     /**
      * @var array
      */
-    public $misspelled = array();
+    public $misspelled = [];
 
     /**
      * @var array
@@ -177,7 +177,7 @@ class SpellCheckingController
         if (!$this->pspell_is_available || $this->forceCommandMode) {
             $AspellVersionString = explode('Aspell', shell_exec($this->AspellDirectory . ' -v'));
             $AspellVersion = substr($AspellVersionString[1], 0, 4);
-            if (doubleval($AspellVersion) < doubleval('0.5') && (!$this->pspell_is_available || $this->forceCommandMode)) {
+            if (floatval($AspellVersion) < floatval('0.5') && (!$this->pspell_is_available || $this->forceCommandMode)) {
                 echo 'Configuration problem: Aspell version ' . $AspellVersion . ' too old. Spell checking cannot be performed in command mode.';
             }
             $this->defaultAspellEncoding = trim(shell_exec($this->AspellDirectory . ' config encoding'));
@@ -251,9 +251,9 @@ class SpellCheckingController
             }
             // Updating the personal word list
             $to_p_dict = GeneralUtility::_POST('to_p_dict');
-            $to_p_dict = $to_p_dict ? $to_p_dict : array();
+            $to_p_dict = $to_p_dict ? $to_p_dict : [];
             $to_r_list = GeneralUtility::_POST('to_r_list');
-            $to_r_list = $to_r_list ? $to_r_list : array();
+            $to_r_list = $to_r_list ? $to_r_list : [];
             header('Content-Type: text/plain; charset=' . strtoupper($this->parserCharset));
             header('Pragma: no-cache');
             if ($to_p_dict || $to_r_list) {
@@ -347,7 +347,7 @@ var selectedDictionary = "' . $this->dictionary . '";
             // Calculating parsing and spell checkting time
             $time = number_format(microtime(true) - $time_start, 2, ',', ' ');
             // Insert spellcheck info
-            $this->result .= 'var spellcheckInfo = { "Total words":"' . $this->wordCount . '","Misspelled words":"' . sizeof($this->misspelled) . '","Total suggestions":"' . $this->suggestionCount . '","Total words suggested":"' . $this->suggestedWordCount . '","Spelling checked in":"' . $time . '" };
+            $this->result .= 'var spellcheckInfo = { "Total words":"' . $this->wordCount . '","Misspelled words":"' . count($this->misspelled) . '","Total suggestions":"' . $this->suggestionCount . '","Total words suggested":"' . $this->suggestedWordCount . '","Spelling checked in":"' . $time . '" };
 // -->
 /*]]>*/
 </script>
@@ -414,8 +414,8 @@ var selectedDictionary = "' . $this->dictionary . '";
                         $dictionaryContent = GeneralUtility::trimExplode(LF, $dictionaryContent[1]);
                         // Fix Aspell character set oddity (i.e. iso8859-1)
                         $characterSet = str_replace(
-                            array('iso', '--'),
-                            array('iso-', '-'),
+                            ['iso', '--'],
+                            ['iso-', '-'],
                             $dictionaryContent[0]
                         );
                     }
@@ -471,7 +471,7 @@ var selectedDictionary = "' . $this->dictionary . '";
         if ($this->personalDictionaryPath) {
             // Fix the options of the personl word list and of the replacement pairs files
             // Aspell creates such files only for the main dictionary
-            $fileNames = array();
+            $fileNames = [];
             $mainDictionary = preg_split('/[-_]/', $this->dictionary, 2);
             $fileNames[0] = $this->personalDictionaryPath . '/' . '.aspell.' . $mainDictionary[0] . '.pws';
             $fileNames[1] = $this->personalDictionaryPath . '/' . '.aspell.' . $mainDictionary[0] . '.prepl';
@@ -580,7 +580,7 @@ var selectedDictionary = "' . $this->dictionary . '";
      */
     public function spellCheckHandler($xml_parser, $string)
     {
-        $incurrent = array();
+        $incurrent = [];
         $stringText = $string;
         $words = preg_split($this->parserCharset == 'utf-8' ? '/\\P{L}+/u' : '/\\W+/', $stringText);
         foreach ($words as $word) {
@@ -589,14 +589,14 @@ var selectedDictionary = "' . $this->dictionary . '";
                 if ($this->pspell_is_available && !$this->forceCommandMode) {
                     if (!pspell_check($this->pspell_link, $word)) {
                         if (!in_array($word, $this->misspelled)) {
-                            if (sizeof($this->misspelled) != 0) {
+                            if (count($this->misspelled) != 0) {
                                 $this->suggestedWords .= ',';
                             }
-                            $suggest = array();
+                            $suggest = [];
                             $suggest = pspell_suggest($this->pspell_link, $word);
-                            if (sizeof($suggest) != 0) {
+                            if (count($suggest) != 0) {
                                 $this->suggestionCount++;
-                                $this->suggestedWordCount += sizeof($suggest);
+                                $this->suggestedWordCount += count($suggest);
                             }
                             $this->suggestedWords .= '"' . $word . '":"' . implode(',', $suggest) . '"';
                             $this->misspelled[] = $word;
@@ -629,7 +629,7 @@ var selectedDictionary = "' . $this->dictionary . '";
                         . ' --encoding=' . escapeshellarg($this->aspellEncoding)
                         . ' 2>&1';
                     $AspellAnswer = shell_exec($AspellCommand);
-                    $AspellResultLines = array();
+                    $AspellResultLines = [];
                     $AspellResultLines = GeneralUtility::trimExplode(LF, $AspellAnswer, true);
                     if (substr($AspellResultLines[0], 0, 6) == 'Error:') {
                         echo '{' . $AspellAnswer . '}';
@@ -637,18 +637,18 @@ var selectedDictionary = "' . $this->dictionary . '";
                     GeneralUtility::unlink_tempfile($tmpFileName);
                     if ($AspellResultLines['1'][0] !== '*') {
                         if (!in_array($word, $this->misspelled)) {
-                            if (sizeof($this->misspelled) != 0) {
+                            if (count($this->misspelled) != 0) {
                                 $this->suggestedWords .= ',';
                             }
-                            $suggest = array();
-                            $suggestions = array();
+                            $suggest = [];
+                            $suggestions = [];
                             if ($AspellResultLines['1'][0] === '&') {
                                 $suggestions = GeneralUtility::trimExplode(':', $AspellResultLines['1'], true);
                                 $suggest = GeneralUtility::trimExplode(',', $suggestions['1'], true);
                             }
-                            if (sizeof($suggest) != 0) {
+                            if (count($suggest) != 0) {
                                 $this->suggestionCount++;
-                                $this->suggestedWordCount += sizeof($suggest);
+                                $this->suggestedWordCount += count($suggest);
                             }
                             $this->suggestedWords .= '"' . $word . '":"' . implode(',', $suggest) . '"';
                             $this->misspelled[] = $word;

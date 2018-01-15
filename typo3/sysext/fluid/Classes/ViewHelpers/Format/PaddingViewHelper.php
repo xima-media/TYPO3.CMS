@@ -68,12 +68,12 @@ class PaddingViewHelper extends AbstractViewHelper
     public function render($padLength, $padString = ' ', $padType = 'right', $value = null)
     {
         return static::renderStatic(
-            array(
+            [
                 'padLength' => $padLength,
                 'padString' => $padString,
                 'padType' => $padType,
                 'value' => $value
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
@@ -93,11 +93,11 @@ class PaddingViewHelper extends AbstractViewHelper
         if ($value === null) {
             $value = $renderChildrenClosure();
         }
-        $padTypes = array(
+        $padTypes = [
             'left' => STR_PAD_LEFT,
             'right' => STR_PAD_RIGHT,
             'both' => STR_PAD_BOTH
-        );
+        ];
         $padType = $arguments['padType'];
         if (!isset($padTypes[$padType])) {
             $padType = 'right';

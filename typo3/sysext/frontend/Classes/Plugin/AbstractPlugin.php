@@ -66,7 +66,7 @@ class AbstractPlugin
      *
      * @var array
      */
-    public $piVars = array(
+    public $piVars = [
         'pointer' => '',
         // Used as a pointer for lists
         'mode' => '',
@@ -74,7 +74,7 @@ class AbstractPlugin
         'sword' => '',
         // Search word
         'sort' => ''
-    );
+    ];
 
     /**
      * Local pointer variabe array.
@@ -83,14 +83,14 @@ class AbstractPlugin
      *
      * @var array
      */
-    public $internal = array('res_count' => 0, 'results_at_a_time' => 20, 'maxPages' => 10, 'currentRow' => array(), 'currentTable' => '');
+    public $internal = ['res_count' => 0, 'results_at_a_time' => 20, 'maxPages' => 10, 'currentRow' => [], 'currentTable' => ''];
 
     /**
      * Local Language content
      *
      * @var array
      */
-    public $LOCAL_LANG = array();
+    public $LOCAL_LANG = [];
 
     /**
      * Contains those LL keys, which have been set to (empty) in TypoScript.
@@ -100,15 +100,22 @@ class AbstractPlugin
      *
      * @var array
      */
-    protected $LOCAL_LANG_UNSET = array();
+    protected $LOCAL_LANG_UNSET = [];
+
+    /**
+     * Local Language content charset for individual labels (overriding)
+     *
+     * @var array
+     */
+    public $LOCAL_LANG_charset = [];
 
     /**
      * Flag that tells if the locallang file has been fetch (or tried to
      * be fetched) already.
      *
-     * @var bool
+     * @var int
      */
-    public $LOCAL_LANG_loaded = false;
+    public $LOCAL_LANG_loaded = 0;
 
     /**
      * Pointer to the language to use.
@@ -168,12 +175,12 @@ class AbstractPlugin
     /**
      * @var array
      */
-    public $pi_autoCacheFields = array();
+    public $pi_autoCacheFields = [];
 
     /**
-     * @var bool
+     * @var int
      */
-    public $pi_autoCacheEn = false;
+    public $pi_autoCacheEn = 0;
 
     /**
      * If set, then links are
@@ -196,11 +203,11 @@ class AbstractPlugin
      * Should normally be set in the main function with the TypoScript content passed to the method.
      *
      * $conf[LOCAL_LANG][_key_] is reserved for Local Language overrides.
-     * $conf[userFunc] reserved for setting up the USER / USER_INT object. See TSref
+     * $conf[userFunc] / $conf[includeLibs]  reserved for setting up the USER / USER_INT object. See TSref
      *
      * @var array
      */
-    public $conf = array();
+    public $conf = [];
 
     /**
      * internal, don't mess with...
@@ -313,7 +320,7 @@ class AbstractPlugin
         if (isset($this->conf['_DEFAULT_PI_VARS.']) && is_array($this->conf['_DEFAULT_PI_VARS.'])) {
             $this->conf['_DEFAULT_PI_VARS.'] = $this->applyStdWrapRecursive($this->conf['_DEFAULT_PI_VARS.']);
             $tmp = $this->conf['_DEFAULT_PI_VARS.'];
-            ArrayUtility::mergeRecursiveWithOverrule($tmp, is_array($this->piVars) ? $this->piVars : array());
+            ArrayUtility::mergeRecursiveWithOverrule($tmp, is_array($this->piVars) ? $this->piVars : []);
             $this->piVars = $tmp;
         }
     }
@@ -337,7 +344,7 @@ class AbstractPlugin
      * @see pi_linkToPage()
      * @see ContentObjectRenderer->getTypoLink()
      */
-    public function pi_getPageLink($id, $target = '', $urlParameters = array())
+    public function pi_getPageLink($id, $target = '', $urlParameters = [])
     {
         return $this->cObj->getTypoLink_URL($id, $urlParameters, $target);
     }
@@ -354,7 +361,7 @@ class AbstractPlugin
      * @return string The input string wrapped in <a> tags with the URL and target set.
      * @see pi_getPageLink(), ContentObjectRenderer::getTypoLink()
      */
-    public function pi_linkToPage($str, $id, $target = '', $urlParameters = array())
+    public function pi_linkToPage($str, $id, $target = '', $urlParameters = [])
     {
         return $this->cObj->getTypoLink($str, $id, $urlParameters, $target);
     }
@@ -370,9 +377,9 @@ class AbstractPlugin
      * @return string The input string wrapped in <a> tags
      * @see pi_linkTP_keepPIvars(), ContentObjectRenderer::typoLink()
      */
-    public function pi_linkTP($str, $urlParameters = array(), $cache = false, $altPageId = 0)
+    public function pi_linkTP($str, $urlParameters = [], $cache = false, $altPageId = 0)
     {
-        $conf = array();
+        $conf = [];
         $conf['useCacheHash'] = $this->pi_USER_INT_obj ? 0 : $cache;
         $conf['no_cache'] = $this->pi_USER_INT_obj ? 0 : !$cache;
         $conf['parameter'] = $altPageId ? $altPageId : ($this->pi_tmpPageId ? $this->pi_tmpPageId : $this->frontendController->id);
@@ -393,7 +400,7 @@ class AbstractPlugin
      * @return string The input string wrapped in <a> tags
      * @see pi_linkTP()
      */
-    public function pi_linkTP_keepPIvars($str, $overrulePIvars = array(), $cache = false, $clearAnyway = false, $altPageId = 0)
+    public function pi_linkTP_keepPIvars($str, $overrulePIvars = [], $cache = false, $clearAnyway = false, $altPageId = 0)
     {
         if (is_array($this->piVars) && is_array($overrulePIvars) && !$clearAnyway) {
             $piVars = $this->piVars;
@@ -404,7 +411,7 @@ class AbstractPlugin
                 $cache = $this->pi_autoCache($overrulePIvars);
             }
         }
-        return $this->pi_linkTP($str, array($this->prefixId => $overrulePIvars), $cache, $altPageId);
+        return $this->pi_linkTP($str, [$this->prefixId => $overrulePIvars], $cache, $altPageId);
     }
 
     /**
@@ -418,7 +425,7 @@ class AbstractPlugin
      * @return string The URL ($this->cObj->lastTypoLinkUrl)
      * @see pi_linkTP_keepPIvars()
      */
-    public function pi_linkTP_keepPIvars_url($overrulePIvars = array(), $cache = false, $clearAnyway = false, $altPageId = 0)
+    public function pi_linkTP_keepPIvars_url($overrulePIvars = [], $cache = false, $clearAnyway = false, $altPageId = 0)
     {
         $this->pi_linkTP_keepPIvars('|', $overrulePIvars, $cache, $clearAnyway, $altPageId);
         return $this->cObj->lastTypoLinkUrl;
@@ -437,15 +444,15 @@ class AbstractPlugin
      * @return string The input string wrapped in <a> tags
      * @see pi_linkTP(), pi_linkTP_keepPIvars()
      */
-    public function pi_list_linkSingle($str, $uid, $cache = false, $mergeArr = array(), $urlOnly = false, $altPageId = 0)
+    public function pi_list_linkSingle($str, $uid, $cache = false, $mergeArr = [], $urlOnly = false, $altPageId = 0)
     {
         if ($this->prefixId) {
             if ($cache) {
-                $overrulePIvars = $uid ? array('showUid' => $uid) : array();
+                $overrulePIvars = $uid ? ['showUid' => $uid] : [];
                 $overrulePIvars = array_merge($overrulePIvars, (array)$mergeArr);
-                $str = $this->pi_linkTP($str, array($this->prefixId => $overrulePIvars), $cache, $altPageId);
+                $str = $this->pi_linkTP($str, [$this->prefixId => $overrulePIvars], $cache, $altPageId);
             } else {
-                $overrulePIvars = array('showUid' => $uid ?: '');
+                $overrulePIvars = ['showUid' => $uid ?: ''];
                 $overrulePIvars = array_merge($overrulePIvars, (array)$mergeArr);
                 $str = $this->pi_linkTP_keepPIvars($str, $overrulePIvars, $cache, 0, $altPageId);
             }
@@ -508,7 +515,7 @@ class AbstractPlugin
      * @param bool $forceOutput Forces the output of the page browser if you set this option to "TRUE" (otherwise it's only drawn if enough entries are available)
      * @return string Output HTML-Table, wrapped in <div>-tags with a class attribute (if $wrapArr is not passed,
      */
-    public function pi_list_browseresults($showResultCount = 1, $tableParams = '', $wrapArr = array(), $pointerName = 'pointer', $hscText = true, $forceOutput = false)
+    public function pi_list_browseresults($showResultCount = 1, $tableParams = '', $wrapArr = [], $pointerName = 'pointer', $hscText = true, $forceOutput = false)
     {
         // example $wrapArr-array how it could be traversed from an extension
         /* $wrapArr = array(
@@ -536,7 +543,7 @@ class AbstractPlugin
         //	 		 2: only the text "Displaying results..." will be shown
         $showResultCount = (int)$showResultCount;
         // If this is set, two links named "<< First" and "LAST >>" will be shown and point to the very first or last page.
-        $showFirstLast = !empty($this->internal['showFirstLast']);
+        $showFirstLast = $this->internal['showFirstLast'];
         // If this has a value the "previous" button is always visible (will be forced if "showFirstLast" is set)
         $alwaysPrev = $showFirstLast ? 1 : $this->pi_alwaysPrev;
         if (isset($this->internal['pagefloat'])) {
@@ -574,12 +581,12 @@ class AbstractPlugin
                 $firstPage = 0;
                 $lastPage = MathUtility::forceIntegerInRange($totalPages, 1, $maxPages);
             }
-            $links = array();
+            $links = [];
             // Make browse-table/links:
             // Link to first page
             if ($showFirstLast) {
                 if ($pointer > 0) {
-                    $links[] = $this->cObj->wrap($this->pi_linkTP_keepPIvars($this->pi_getLL('pi_list_browseresults_first', '<< First', $hscText), array($pointerName => null), $pi_isOnlyFields), $wrapper['inactiveLinkWrap']);
+                    $links[] = $this->cObj->wrap($this->pi_linkTP_keepPIvars($this->pi_getLL('pi_list_browseresults_first', '<< First', $hscText), [$pointerName => null], $pi_isOnlyFields), $wrapper['inactiveLinkWrap']);
                 } else {
                     $links[] = $this->cObj->wrap($this->pi_getLL('pi_list_browseresults_first', '<< First', $hscText), $wrapper['disabledLinkWrap']);
                 }
@@ -587,7 +594,7 @@ class AbstractPlugin
             // Link to previous page
             if ($alwaysPrev >= 0) {
                 if ($pointer > 0) {
-                    $links[] = $this->cObj->wrap($this->pi_linkTP_keepPIvars($this->pi_getLL('pi_list_browseresults_prev', '< Previous', $hscText), array($pointerName => ($pointer - 1) ?: ''), $pi_isOnlyFields), $wrapper['inactiveLinkWrap']);
+                    $links[] = $this->cObj->wrap($this->pi_linkTP_keepPIvars($this->pi_getLL('pi_list_browseresults_prev', '< Previous', $hscText), [$pointerName => ($pointer - 1) ?: ''], $pi_isOnlyFields), $wrapper['inactiveLinkWrap']);
                 } elseif ($alwaysPrev) {
                     $links[] = $this->cObj->wrap($this->pi_getLL('pi_list_browseresults_prev', '< Previous', $hscText), $wrapper['disabledLinkWrap']);
                 }
@@ -604,10 +611,10 @@ class AbstractPlugin
                     if ($this->internal['dontLinkActivePage']) {
                         $links[] = $this->cObj->wrap($pageText, $wrapper['activeLinkWrap']);
                     } else {
-                        $links[] = $this->cObj->wrap($this->pi_linkTP_keepPIvars($pageText, array($pointerName => $a ?: ''), $pi_isOnlyFields), $wrapper['activeLinkWrap']);
+                        $links[] = $this->cObj->wrap($this->pi_linkTP_keepPIvars($pageText, [$pointerName => $a ?: ''], $pi_isOnlyFields), $wrapper['activeLinkWrap']);
                     }
                 } else {
-                    $links[] = $this->cObj->wrap($this->pi_linkTP_keepPIvars($pageText, array($pointerName => $a ?: ''), $pi_isOnlyFields), $wrapper['inactiveLinkWrap']);
+                    $links[] = $this->cObj->wrap($this->pi_linkTP_keepPIvars($pageText, [$pointerName => $a ?: ''], $pi_isOnlyFields), $wrapper['inactiveLinkWrap']);
                 }
             }
             if ($pointer < $totalPages - 1 || $showFirstLast) {
@@ -615,13 +622,13 @@ class AbstractPlugin
                 if ($pointer >= $totalPages - 1) {
                     $links[] = $this->cObj->wrap($this->pi_getLL('pi_list_browseresults_next', 'Next >', $hscText), $wrapper['disabledLinkWrap']);
                 } else {
-                    $links[] = $this->cObj->wrap($this->pi_linkTP_keepPIvars($this->pi_getLL('pi_list_browseresults_next', 'Next >', $hscText), array($pointerName => $pointer + 1), $pi_isOnlyFields), $wrapper['inactiveLinkWrap']);
+                    $links[] = $this->cObj->wrap($this->pi_linkTP_keepPIvars($this->pi_getLL('pi_list_browseresults_next', 'Next >', $hscText), [$pointerName => $pointer + 1], $pi_isOnlyFields), $wrapper['inactiveLinkWrap']);
                 }
             }
             // Link to last page
             if ($showFirstLast) {
                 if ($pointer < $totalPages - 1) {
-                    $links[] = $this->cObj->wrap($this->pi_linkTP_keepPIvars($this->pi_getLL('pi_list_browseresults_last', 'Last >>', $hscText), array($pointerName => $totalPages - 1), $pi_isOnlyFields), $wrapper['inactiveLinkWrap']);
+                    $links[] = $this->cObj->wrap($this->pi_linkTP_keepPIvars($this->pi_getLL('pi_list_browseresults_last', 'Last >>', $hscText), [$pointerName => $totalPages - 1], $pi_isOnlyFields), $wrapper['inactiveLinkWrap']);
                 } else {
                     $links[] = $this->cObj->wrap($this->pi_getLL('pi_list_browseresults_last', 'Last >>', $hscText), $wrapper['disabledLinkWrap']);
                 }
@@ -657,18 +664,48 @@ class AbstractPlugin
     }
 
     /**
+     * Returns a Search box, sending search words to piVars "sword" and setting the "no_cache" parameter as well in the form.
+     * Submits the search request to the current REQUEST_URI
+     *
+     * @param string $tableParams Attributes for the table tag which is wrapped around the table cells containing the search box
+     * @return string Output HTML, wrapped in <div>-tags with a class attribute
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function pi_list_searchBox($tableParams = '')
+    {
+        GeneralUtility::logDeprecatedFunction();
+        // Search box design:
+        $sTables = '
+
+		<!--
+			List search box:
+		-->
+		<div' . $this->pi_classParam('searchbox') . '>
+			<form action="' . htmlspecialchars(GeneralUtility::getIndpEnv('REQUEST_URI')) . '" method="post" style="margin: 0 0 0 0;">
+			<' . rtrim('table ' . $tableParams) . '>
+				<tr>
+					<td><input type="text" name="' . $this->prefixId . '[sword]" value="' . htmlspecialchars($this->piVars['sword']) . '"' . $this->pi_classParam('searchbox-sword') . ' /></td>
+					<td><input type="submit" value="' . $this->pi_getLL('pi_list_searchBox_search', 'Search', true) . '"' . $this->pi_classParam('searchbox-button') . ' />' . '<input type="hidden" name="no_cache" value="1" />' . '<input type="hidden" name="' . $this->prefixId . '[pointer]" value="" />' . '</td>
+				</tr>
+			</table>
+			</form>
+		</div>';
+        return $sTables;
+    }
+
+    /**
      * Returns a mode selector; a little menu in a table normally put in the top of the page/list.
      *
      * @param array $items Key/Value pairs for the menu; keys are the piVars[mode] values and the "values" are the labels for them.
      * @param string $tableParams Attributes for the table tag which is wrapped around the table cells containing the menu
      * @return string Output HTML, wrapped in <div>-tags with a class attribute
      */
-    public function pi_list_modeSelector($items = array(), $tableParams = '')
+    public function pi_list_modeSelector($items = [], $tableParams = '')
     {
-        $cells = array();
+        $cells = [];
         foreach ($items as $k => $v) {
             $cells[] = '
-					<td' . ($this->piVars['mode'] == $k ? $this->pi_classParam('modeSelector-SCell') : '') . '><p>' . $this->pi_linkTP_keepPIvars(htmlspecialchars($v), array('mode' => $k), $this->pi_isOnlyFields($this->pi_isOnlyFields)) . '</p></td>';
+					<td' . ($this->piVars['mode'] == $k ? $this->pi_classParam('modeSelector-SCell') : '') . '><p>' . $this->pi_linkTP_keepPIvars(htmlspecialchars($v), ['mode' => $k], $this->pi_isOnlyFields($this->pi_isOnlyFields)) . '</p></td>';
         }
         $sTables = '
 
@@ -700,7 +737,7 @@ class AbstractPlugin
     public function pi_list_makelist($res, $tableParams = '')
     {
         // Make list table header:
-        $tRows = array();
+        $tRows = [];
         $this->internal['currentRow'] = '';
         $tRows[] = $this->pi_list_header();
         // Make list table rows
@@ -832,7 +869,7 @@ class AbstractPlugin
      * @return string Returns FALSE/blank if no BE User login and of course if the panel is not shown for other reasons. Otherwise the HTML for the panel (a table).
      * @see ContentObjectRenderer::EDITPANEL()
      */
-    public function pi_getEditPanel($row = array(), $tablename = '', $label = '', $conf = array())
+    public function pi_getEditPanel($row = [], $tablename = '', $label = '', $conf = [])
     {
         $panel = '';
         if (!$row || !$tablename) {
@@ -875,17 +912,17 @@ class AbstractPlugin
      * @return string The processed content
      * @see ContentObjectRenderer::editIcons()
      */
-    public function pi_getEditIcon($content, $fields, $title = '', $row = array(), $tablename = '', $oConf = array())
+    public function pi_getEditIcon($content, $fields, $title = '', $row = [], $tablename = '', $oConf = [])
     {
         if ($this->frontendController->beUserLogin) {
             if (!$row || !$tablename) {
                 $row = $this->internal['currentRow'];
                 $tablename = $this->internal['currentTable'];
             }
-            $conf = array_merge(array(
+            $conf = array_merge([
                 'beforeLastTag' => 1,
                 'iconTitle' => $title
-            ), $oConf);
+            ], $oConf);
             $content = $this->cObj->editIcons($content, $tablename . ':' . $fields, $conf, $tablename . ':' . $row['uid'], $row, '&viewUrl=' . rawurlencode(GeneralUtility::getIndpEnv('REQUEST_URI')));
         }
         return $content;
@@ -911,7 +948,12 @@ class AbstractPlugin
         if (!empty($this->LOCAL_LANG[$this->LLkey][$key][0]['target'])
             || isset($this->LOCAL_LANG_UNSET[$this->LLkey][$key])
         ) {
-            $word = $this->LOCAL_LANG[$this->LLkey][$key][0]['target'];
+            // The "from" charset of csConv() is only set for strings from TypoScript via _LOCAL_LANG
+            if (isset($this->LOCAL_LANG_charset[$this->LLkey][$key])) {
+                $word = $this->frontendController->csConv($this->LOCAL_LANG[$this->LLkey][$key][0]['target'], $this->LOCAL_LANG_charset[$this->LLkey][$key]);
+            } else {
+                $word = $this->LOCAL_LANG[$this->LLkey][$key][0]['target'];
+            }
         } elseif ($this->altLLkey) {
             $alternativeLanguageKeys = GeneralUtility::trimExplode(',', $this->altLLkey, true);
             $alternativeLanguageKeys = array_reverse($alternativeLanguageKeys);
@@ -921,6 +963,13 @@ class AbstractPlugin
                 ) {
                     // Alternative language translation for key exists
                     $word = $this->LOCAL_LANG[$languageKey][$key][0]['target'];
+                    // The "from" charset of csConv() is only set for strings from TypoScript via _LOCAL_LANG
+                    if (isset($this->LOCAL_LANG_charset[$languageKey][$key])) {
+                        $word = $this->frontendController->csConv(
+                            $word,
+                            $this->LOCAL_LANG_charset[$this->altLLkey][$key]
+                        );
+                    }
                     break;
                 }
             }
@@ -967,7 +1016,7 @@ class AbstractPlugin
             /** @var $languageFactory LocalizationFactory */
             $languageFactory = GeneralUtility::makeInstance(LocalizationFactory::class);
             // Read the strings in the required charset (since TYPO3 4.2)
-            $this->LOCAL_LANG = $languageFactory->getParsedData($languageFilePath, $this->LLkey, 'utf-8');
+            $this->LOCAL_LANG = $languageFactory->getParsedData($languageFilePath, $this->LLkey, $this->frontendController->renderCharset);
             $alternativeLanguageKeys = GeneralUtility::trimExplode(',', $this->altLLkey, true);
             foreach ($alternativeLanguageKeys as $languageKey) {
                 $tempLL = $languageFactory->getParsedData($languageFilePath, $languageKey);
@@ -978,7 +1027,7 @@ class AbstractPlugin
             // Overlaying labels from TypoScript (including fictitious language keys for non-system languages!):
             if (isset($this->conf['_LOCAL_LANG.'])) {
                 // Clear the "unset memory"
-                $this->LOCAL_LANG_UNSET = array();
+                $this->LOCAL_LANG_UNSET = [];
                 foreach ($this->conf['_LOCAL_LANG.'] as $languageKey => $languageArray) {
                     // Remove the dot after the language key
                     $languageKey = substr($languageKey, 0, -1);
@@ -990,13 +1039,14 @@ class AbstractPlugin
                                 if ($labelValue === '') {
                                     $this->LOCAL_LANG_UNSET[$languageKey][$labelKey] = '';
                                 }
+                                $this->LOCAL_LANG_charset[$languageKey][$labelKey] = 'utf-8';
                             }
                         }
                     }
                 }
             }
         }
-        $this->LOCAL_LANG_loaded = true;
+        $this->LOCAL_LANG_loaded = 1;
     }
 
     /***************************
@@ -1049,14 +1099,14 @@ class AbstractPlugin
             $WHERE .= $this->cObj->searchWhere($this->piVars['sword'], $this->internal['searchFieldList'], $table) . LF;
         }
         if ($count) {
-            $queryParts = array(
+            $queryParts = [
                 'SELECT' => 'count(*)',
                 'FROM' => $TABLENAMES,
                 'WHERE' => $WHERE,
                 'GROUPBY' => '',
                 'ORDERBY' => '',
                 'LIMIT' => ''
-            );
+            ];
         } else {
             // Order by data:
             if (!$orderBy && $this->internal['orderBy']) {
@@ -1069,14 +1119,14 @@ class AbstractPlugin
             $results_at_a_time = MathUtility::forceIntegerInRange($this->internal['results_at_a_time'], 1, 1000);
             $LIMIT = $pointer * $results_at_a_time . ',' . $results_at_a_time;
             // Add 'SELECT'
-            $queryParts = array(
+            $queryParts = [
                 'SELECT' => $this->pi_prependFieldsWithTable($table, $this->pi_listFields),
                 'FROM' => $TABLENAMES,
                 'WHERE' => $WHERE,
                 'GROUPBY' => $this->databaseConnection->stripGroupBy($groupBy),
                 'ORDERBY' => $this->databaseConnection->stripOrderBy($orderBy),
                 'LIMIT' => $LIMIT
-            );
+            ];
         }
         return $this->databaseConnection->exec_SELECT_queryArray($queryParts);
     }
@@ -1109,7 +1159,7 @@ class AbstractPlugin
         }
         $recursive = MathUtility::forceIntegerInRange($recursive, 0);
         $pid_list_arr = array_unique(GeneralUtility::trimExplode(',', $pid_list, true));
-        $pid_list = array();
+        $pid_list = [];
         foreach ($pid_list_arr as $val) {
             $val = MathUtility::forceIntegerInRange($val, 0);
             if ($val) {
@@ -1132,7 +1182,7 @@ class AbstractPlugin
     public function pi_prependFieldsWithTable($table, $fieldList)
     {
         $list = GeneralUtility::trimExplode(',', $fieldList, true);
-        $return = array();
+        $return = [];
         foreach ($list as $listItem) {
             $return[] = $table . '.' . $listItem;
         }
@@ -1153,7 +1203,7 @@ class AbstractPlugin
     public function pi_getCategoryTableContents($table, $pid, $whereClause = '', $groupBy = '', $orderBy = '', $limit = '')
     {
         $res = $this->databaseConnection->exec_SELECTquery('*', $table, 'pid=' . (int)$pid . $this->cObj->enableFields($table) . ' ' . $whereClause, $groupBy, $orderBy, $limit);
-        $outArr = array();
+        $outArr = [];
         while ($row = $this->databaseConnection->sql_fetch_assoc($res)) {
             $outArr[$row['uid']] = $row;
         }
@@ -1258,7 +1308,7 @@ class AbstractPlugin
         if (!is_array($this->cObj->data[$field]) && $this->cObj->data[$field]) {
             $this->cObj->data[$field] = GeneralUtility::xml2array($this->cObj->data[$field]);
             if (!is_array($this->cObj->data[$field])) {
-                $this->cObj->data[$field] = array();
+                $this->cObj->data[$field] = [];
             }
         }
     }

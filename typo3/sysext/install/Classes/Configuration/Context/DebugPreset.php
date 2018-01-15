@@ -34,7 +34,7 @@ class DebugPreset extends Configuration\AbstractPreset
     /**
      * @var array Configuration values handled by this preset
      */
-    protected $configurationValues = array(
+    protected $configurationValues = [
         'BE/debug' => true,
         'FE/debug' => true,
         'SYS/devIPmask' => '*',
@@ -44,12 +44,13 @@ class DebugPreset extends Configuration\AbstractPreset
         'SYS/systemLogLevel' => 0,
         // E_WARNING | E_RECOVERABLE_ERROR | E_DEPRECATED | E_USER_DEPRECATED
         'SYS/exceptionalErrors' => 28674,
-    );
+        'SYS/clearCacheSystem' => true,
+    ];
 
     /**
      * Development preset is always available
      *
-     * @return bool Always TRUE
+     * @return bool TRUE if mbstring PHP module is loaded
      */
     public function isAvailable()
     {

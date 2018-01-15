@@ -17,6 +17,7 @@ namespace TYPO3\CMS\Taskcenter\Controller;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TYPO3\CMS\Backend\Module\BaseScriptClass;
+use TYPO3\CMS\Backend\Template\Components\ButtonBar;
 use TYPO3\CMS\Backend\Template\ModuleTemplate;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Imaging\Icon;
@@ -56,10 +57,11 @@ class TaskModuleController extends BaseScriptClass
     public function __construct()
     {
         $this->moduleTemplate = GeneralUtility::makeInstance(ModuleTemplate::class);
+        $this->moduleTemplate->getPageRenderer()->addCssFile(ExtensionManagementUtility::extRelPath('taskcenter') . 'Resources/Public/Css/styles.css');
         $this->getLanguageService()->includeLLFile('EXT:taskcenter/Resources/Private/Language/locallang_task.xlf');
-        $this->MCONF = array(
+        $this->MCONF = [
             'name' => $this->moduleName
-        );
+        ];
         parent::init();
     }
 
@@ -70,7 +72,7 @@ class TaskModuleController extends BaseScriptClass
      */
     public function menuConfig()
     {
-        $this->MOD_MENU = array('mode' => array());
+        $this->MOD_MENU = ['mode' => []];
         $this->MOD_MENU['mode']['information'] = $this->getLanguageService()->sL('LLL:EXT:taskcenter/Resources/Private/Language/locallang.xlf:task_overview');
         $this->MOD_MENU['mode']['tasks'] = $this->getLanguageService()->sL('LLL:EXT:taskcenter/Resources/Private/Language/locallang.xlf:task_tasks');
         /* Copied from parent::menuConfig, because parent is hardcoded to menu.function,
@@ -196,7 +198,7 @@ class TaskModuleController extends BaseScriptClass
                 } else {
                     $flashMessage = GeneralUtility::makeInstance(
                         FlashMessage::class,
-                        $this->getLanguageService()->getLL('error-access'),
+                        $this->getLanguageService()->getLL('error-access', true),
                         $this->getLanguageService()->getLL('error_header'),
                         FlashMessage::ERROR
                     );
@@ -205,7 +207,7 @@ class TaskModuleController extends BaseScriptClass
                 // Error if the task is not an instance of \TYPO3\CMS\Taskcenter\TaskInterface
                 $flashMessage = GeneralUtility::makeInstance(
                     FlashMessage::class,
-                    sprintf($this->getLanguageService()->getLL('error_no-instance'), $taskClass, TaskInterface::class),
+                    sprintf($this->getLanguageService()->getLL('error_no-instance', true), $taskClass, TaskInterface::class),
                     $this->getLanguageService()->getLL('error_header'),
                     FlashMessage::ERROR
                 );
@@ -227,20 +229,11 @@ class TaskModuleController extends BaseScriptClass
             $defaultFlashMessageQueue->enqueue($flashMessage);
         }
 
-        $content = '<div class="taskcenter">
-                        <div class="row">
-                            <div class="col-sm-4 col-md-3">
-                                <div class="taskcenter-menu">
-                                    ' . $this->indexAction() . '
-                                </div>
-                            </div>
-                            <div class="col-sm-8 col-md-9">
-                                <div class="taskcenter-content taskcenter-content-' . strtolower(str_replace('\\', '-', htmlspecialchars(($extKey . '-' . $taskClass)))) . '">
-                                    ' . $actionContent . '
-                                </div>
-                            </div>
-                        </div>
-                    </div>';
+        $content = '<div id="taskcenter-main">
+						<div id="taskcenter-menu">' . $this->indexAction() . '</div>
+						<div id="taskcenter-item" class="' . htmlspecialchars(($extKey . '-' . $taskClass)) . '">' . $actionContent . '
+						</div>
+					</div>';
         $this->content .= $content;
     }
 
@@ -270,7 +263,7 @@ class TaskModuleController extends BaseScriptClass
     {
         $content = '<h1>' . nl2br(htmlspecialchars($title)) . '</h1>';
         if (!empty($description)) {
-            $content .= '<p>' . nl2br(htmlspecialchars($description)) . '</p>';
+            $content .= '<p class="description">' . nl2br(htmlspecialchars($description)) . '</p>';
         }
         return $content;
     }
@@ -299,7 +292,7 @@ class TaskModuleController extends BaseScriptClass
             $this->getPageRenderer()->loadRequireJsModule('TYPO3/CMS/Taskcenter/Taskcenter');
             $userSorting = unserialize($this->getBackendUser()->uc['taskcenter']['sorting']);
             if (is_array($userSorting)) {
-                $newSorting = array();
+                $newSorting = [];
                 foreach ($userSorting as $item) {
                     if (isset($items[$item])) {
                         $newSorting[] = $items[$item];
@@ -310,7 +303,7 @@ class TaskModuleController extends BaseScriptClass
             }
         }
         if (is_array($items) && !empty($items)) {
-            foreach ($items as $itemKey => $item) {
+            foreach ($items as $item) {
                 $title = htmlspecialchars($item['title']);
                 $icon = ($additionalClass = ($collapsedStyle = ''));
                 // Check for custom icon
@@ -331,49 +324,39 @@ class TaskModuleController extends BaseScriptClass
                 }
                 $description = $item['descriptionHtml'] ?: '<p>' . nl2br(htmlspecialchars($item['description'])) . '</p>';
                 $id = $this->getUniqueKey($item['uid']);
-                $contentId = strtolower(str_replace('\\', '-', $id));
                 // Collapsed & expanded menu items
-                if (isset($this->getBackendUser()->uc['taskcenter']['states'][$id]) && $this->getBackendUser()->uc['taskcenter']['states'][$id]) {
-                    $collapsed = true;
-                    $collapseIcon = $this->moduleTemplate->getIconFactory()->getIcon('actions-view-list-expand', Icon::SIZE_SMALL)->render('inline');
+                if ($mainMenu && isset($this->getBackendUser()->uc['taskcenter']['states'][$id]) && $this->getBackendUser()->uc['taskcenter']['states'][$id]) {
+                    $collapsedStyle = 'style="display:none"';
+                    $additionalClass = 'collapsed';
                 } else {
-                    $collapsed = false;
-                    $collapseIcon = $this->moduleTemplate->getIconFactory()->getIcon('actions-view-list-collapse', Icon::SIZE_SMALL)->render('inline');
+                    $additionalClass = 'expanded';
+                }
+                // First & last menu item
+                if ($count == 0) {
+                    $additionalClass .= ' first-item';
+                } elseif ($count + 1 === count($items)) {
+                    $additionalClass .= ' last-item';
                 }
                 // Active menu item
-                $panelState = (string)$this->MOD_SETTINGS['function'] == $item['uid'] ? 'panel-active' : 'panel-default';
-                $content .= '<li id="el_' . $id . '">
-                                <div id="' . $contentId . '" data-taskcenter-id="' . $id . '" class="panel ' . $panelState . '">
-                                    <div class="panel-heading">
-                                        <div class="panel-heading-right">
-                                            <a href="#task_content_' . $contentId . '" class="panel-header-collapse t3js-taskcenter-header-collapse" role="button" data-toggle="collapse" data-uid="' . $contentId . '" aria-expanded="' . ($collapsed ? 'false' : 'true') . '">
-                                                ' . $collapseIcon . '
-                                            </a>
-                                        </div>
-                                        <div class="panel-heading-left">
-                                            <a href="' . $item['link'] . '" class="panel-title">
-                                                ' . ($icon ? '<span class="panel-title-icon">' . $icon . '</span>' : '') . '
-                                                <span class="panel-title-name">'
-                                                    . $title . ' '
-                                                    . $this->moduleTemplate->getIconFactory()->getIcon(
-                                                        'actions-view-table-expand',
-                                                        Icon::SIZE_SMALL
-                                                    )->render('inline')
-                                                . '</span>
-                                            </a>
-                                        </div>
-                                    </div>
-                                    <div id="task_content_' . $contentId . '" class="panel-collapse collapse t3js-taskcenter-collapse ' . ($collapsed ? '' : 'in') . '" aria-expanded="true">
-                                        <div class="panel-body">
-                                            ' . $description . '
-                                        </div>
-                                    </div>
-                                </div>
+                $active = (string)$this->MOD_SETTINGS['function'] == $item['uid'] ? ' active-task' : '';
+                // Main menu: Render additional syntax to sort tasks
+                if ($mainMenu) {
+                    $section = '<div class="down"><i class="fa fa-caret-down fa-fw"></i></div>
+								<div class="drag"><i class="fa fa-arrows"></i></div>';
+                    $backgroundClass = 't3-row-header ';
+                } else {
+                    $backgroundClass = '';
+                }
+                $content .= '<li class="' . $additionalClass . $active . '" id="el_' . $id . '">
+								' . $section . '
+								<div class="image">' . $icon . '</div>
+								<div class="' . $backgroundClass . 'link"><a href="' . $item['link'] . '">' . $title . '</a></div>
+								<div class="content " ' . $collapsedStyle . '>' . $description . '</div>
 							</li>';
                 $count++;
             }
             $navigationId = $mainMenu ? 'id="task-list"' : '';
-            $content = '<ul ' . $navigationId . ' class="list-unstyled">' . $content . '</ul>';
+            $content = '<ul ' . $navigationId . ' class="task-list">' . $content . '</ul>';
         }
         return $content;
     }
@@ -386,7 +369,7 @@ class TaskModuleController extends BaseScriptClass
     protected function indexAction()
     {
         $content = '';
-        $tasks = array();
+        $tasks = [];
         $icon = ExtensionManagementUtility::extRelPath('taskcenter') . 'Resources/Public/Icons/module-taskcenter.svg';
         // Render the tasks only if there are any available
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['taskcenter']) && !empty($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['taskcenter'])) {
@@ -410,21 +393,21 @@ class TaskModuleController extends BaseScriptClass
                     }
                     // Generate an array of all tasks
                     $uniqueKey = $this->getUniqueKey($extKey . '.' . $taskClass);
-                    $tasks[$uniqueKey] = array(
+                    $tasks[$uniqueKey] = [
                         'title' => $taskTitle,
                         'descriptionHtml' => $taskDescriptionHtml,
                         'description' => $this->getLanguageService()->sL($task['description']),
                         'icon' => $icon,
                         'link' => $link,
                         'uid' => $extKey . '.' . $taskClass
-                    );
+                    ];
                 }
             }
             $content .= $this->renderListMenu($tasks, true);
         } else {
             $flashMessage = GeneralUtility::makeInstance(
                 FlashMessage::class,
-                $this->getLanguageService()->getLL('no-tasks'),
+                $this->getLanguageService()->getLL('no-tasks', true),
                 '',
                 FlashMessage::INFO
             );
@@ -446,6 +429,17 @@ class TaskModuleController extends BaseScriptClass
     protected function getButtons()
     {
         $buttonBar = $this->moduleTemplate->getDocHeaderComponent()->getButtonBar();
+
+        // Fullscreen Button
+        $url = GeneralUtility::getIndpEnv('TYPO3_REQUEST_URL');
+        $onClick = 'devlogWin=window.open(' . GeneralUtility::quoteJSvalue($url) . ',\'taskcenter\',\'width=790,status=0,menubar=1,resizable=1,location=0,scrollbars=1,toolbar=0\');return false;';
+        $fullscreenButton = $buttonBar->makeLinkButton()
+            ->setTitle($this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.openInNewWindow'))
+            ->setOnClick($onClick)
+            ->setHref('#')
+            ->setIcon($this->moduleTemplate->getIconFactory()->getIcon('actions-window-open', Icon::SIZE_SMALL))
+            ;
+        $buttonBar->addButton($fullscreenButton, ButtonBar::BUTTON_POSITION_RIGHT, 1);
 
         // Shortcut
         $shortcutButton = $buttonBar->makeShortcutButton()
@@ -490,7 +484,7 @@ class TaskModuleController extends BaseScriptClass
      */
     public function urlInIframe($url)
     {
-        return '<div class="panel panel-default"><iframe scrolling="auto"  width="100%" src="' . $url . '" name="list_frame" id="list_frame" frameborder="no" style="height: 500px"></iframe></div>';
+        return '<iframe scrolling="auto"  width="100%" src="' . $url . '" name="list_frame" id="list_frame" frameborder="no"></iframe>';
     }
 
     /**
@@ -502,9 +496,24 @@ class TaskModuleController extends BaseScriptClass
      */
     protected function getUniqueKey($string)
     {
-        $search = array('.', '_');
-        $replace = array('-', '');
+        $search = ['.', '_'];
+        $replace = ['-', ''];
         return str_replace($search, $replace, $string);
+    }
+
+    /**
+     * This method prepares the link for opening the devlog in a new window
+     *
+     * @return string Hyperlink with icon and appropriate JavaScript
+     */
+    protected function openInNewWindow()
+    {
+        $url = GeneralUtility::getIndpEnv('TYPO3_REQUEST_URL');
+        $onClick = 'devlogWin=window.open(' . GeneralUtility::quoteJSvalue($url) . ',\'taskcenter\',\'width=790,status=0,menubar=1,resizable=1,location=0,scrollbars=1,toolbar=0\');return false;';
+        $content = '<a href="#" onclick="' . htmlspecialchars($onClick) . '" title="' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.openInNewWindow', true) . '">'
+            . $this->moduleTemplate->getIconFactory()->getIcon('actions-window-open', Icon::SIZE_SMALL)->render()
+        . '</a>';
+        return $content;
     }
 
     /**

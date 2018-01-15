@@ -105,7 +105,7 @@ lib.parseFunc_RTE < lib.parseFunc
 lib.parseFunc_RTE {
 	//  makelinks >
 	# Processing <table> and <blockquote> blocks separately
-	externalBlocks = article, aside, blockquote, div, dd, dl, footer, header, nav, ol, section, table, ul
+	externalBlocks = article, aside, blockquote, div, dd, dl, footer, header, nav, ol, section, table, ul, pre
 	externalBlocks {
 		# The blockquote content is passed into parseFunc again...
 		blockquote.stripNL=1
@@ -143,6 +143,7 @@ lib.parseFunc_RTE {
 		dd < .div
 		ol < .div
 		ul < .div
+		li.stdWrap.parseFunc < lib.parseFunc
 	}
 	nonTypoTagStdWrap.encapsLines {
 		encapsTagList = p,pre,h1,h2,h3,h4,h5,h6,hr,dt,li
@@ -223,6 +224,9 @@ lib.stdheader {
 		field = header
 		htmlSpecialChars = 1
 		typolink.parameter.field = header_link
+		typolink.target < lib.parseTarget
+		typolink.target =
+		typolink.target.override = {$styles.content.links.target}
 	}
 	10.key.field = header_layout
 	10.key.ifEmpty = {$content.defaultHeaderType}
@@ -968,7 +972,7 @@ tt_content.image.20 {
 				10 = TEXT
 				10 {
 					if {
-						isTrue.data = file:current:description
+						isTrue.data = register:allImageCaptions
 						value = 1
 						equals.data = register:imageCount
 					}

@@ -28,12 +28,22 @@ class ResourceCompressor
     /**
      * @var string
      */
-    protected $targetDirectory = 'typo3temp/assets/compressed/';
+    protected $targetDirectory = 'typo3temp/compressor/';
+
+    /**
+     * @var string
+     */
+    protected $relativePath = '';
 
     /**
      * @var string
      */
     protected $rootPath = '';
+
+    /**
+     * @var string
+     */
+    protected $backPath = '';
 
     /**
      * gzipped versions are only created if $TYPO3_CONF_VARS[TYPO3_MODE]['compressionLevel'] is set
@@ -62,7 +72,7 @@ class ResourceCompressor
     {
         // we check for existence of our targetDirectory
         if (!is_dir(PATH_site . $this->targetDirectory)) {
-            GeneralUtility::mkdir_deep(PATH_site . $this->targetDirectory);
+            GeneralUtility::mkdir(PATH_site . $this->targetDirectory);
         }
         // if enabled, we check whether we should auto-create the .htaccess file
         if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['generateApacheHtaccess']) {
@@ -82,7 +92,65 @@ class ResourceCompressor
                 $this->gzipCompressionLevel = (int)$compressionLevel;
             }
         }
-        $this->setRootPath(TYPO3_MODE === 'BE' ? PATH_typo3 : PATH_site);
+        $this->setInitialPaths();
+    }
+
+    /**
+     * Sets initial values for paths.
+     *
+     * @return void
+     */
+    public function setInitialPaths()
+    {
+        $this->setInitialRelativePath();
+        $this->setInitialRootPath();
+        $this->setInitialBackPath();
+    }
+
+    /**
+     * Sets relative back path
+     *
+     * @return void
+     */
+    protected function setInitialBackPath()
+    {
+        $backPath = TYPO3_MODE === 'BE' ? $GLOBALS['BACK_PATH'] : '';
+        $this->setBackPath($backPath);
+    }
+
+    /**
+     * Sets absolute path to working directory
+     *
+     * @return void
+     */
+    protected function setInitialRootPath()
+    {
+        $rootPath = TYPO3_MODE === 'BE' ? PATH_typo3 : PATH_site;
+        $this->setRootPath($rootPath);
+    }
+
+    /**
+     * Sets relative path to PATH_site
+     *
+     * @return void
+     */
+    protected function setInitialRelativePath()
+    {
+        $relativePath = TYPO3_MODE === 'BE' ? $GLOBALS['BACK_PATH'] . '../' : '';
+        $this->setRelativePath($relativePath);
+    }
+
+    /**
+     * Sets relative path to PATH_site
+     *
+     * @param string $relativePath Relative path to site root
+     * @return void
+     */
+    public function setRelativePath($relativePath)
+    {
+        if (is_string($relativePath)) {
+            $this->relativePath = $relativePath;
+        }
     }
 
     /**
@@ -99,6 +167,19 @@ class ResourceCompressor
     }
 
     /**
+     * Sets relative back path
+     *
+     * @param string $backPath Back path
+     * @return void
+     */
+    public function setBackPath($backPath)
+    {
+        if (is_string($backPath)) {
+            $this->backPath = $backPath;
+        }
+    }
+
+    /**
      * Concatenates the Stylesheet files
      *
      * Options:
@@ -108,25 +189,26 @@ class ResourceCompressor
      * @param array $options Additional options
      * @return array CSS files
      */
-    public function concatenateCssFiles(array $cssFiles, array $options = array())
+    public function concatenateCssFiles(array $cssFiles, array $options = [])
     {
-        $filesToIncludeByType = array('all' => array());
+        $filesToIncludeByType = ['all' => []];
         foreach ($cssFiles as $key => $fileOptions) {
             // no concatenation allowed for this file, so continue
             if (!empty($fileOptions['excludeFromConcatenation'])) {
                 continue;
             }
+            // we remove BACK_PATH from $filename, so make it relative to root path
             $filenameFromMainDir = $this->getFilenameFromMainDir($fileOptions['file']);
             // if $options['baseDirectories'] set, we only include files below these directories
             if (
                 !isset($options['baseDirectories'])
                 || $this->checkBaseDirectory(
-                    $filenameFromMainDir, array_merge($options['baseDirectories'], array($this->targetDirectory))
+                    $filenameFromMainDir, array_merge($options['baseDirectories'], [$this->targetDirectory])
                 )
             ) {
                 $type = isset($fileOptions['media']) ? strtolower($fileOptions['media']) : 'all';
                 if (!isset($filesToIncludeByType[$type])) {
-                    $filesToIncludeByType[$type] = array();
+                    $filesToIncludeByType[$type] = [];
                 }
                 if ($fileOptions['forceOnTop']) {
                     array_unshift($filesToIncludeByType[$type], $filenameFromMainDir);
@@ -143,17 +225,18 @@ class ResourceCompressor
                     continue;
                 }
                 $targetFile = $this->createMergedCssFile($filesToInclude);
-                $concatenatedOptions = array(
-                    'file' => $targetFile,
+                $targetFileRelative = $this->relativePath . $targetFile;
+                $concatenatedOptions = [
+                    'file' => $targetFileRelative,
                     'rel' => 'stylesheet',
                     'media' => $mediaOption,
                     'compress' => true,
                     'excludeFromConcatenation' => true,
                     'forceOnTop' => false,
                     'allWrap' => ''
-                );
+                ];
                 // place the merged stylesheet on top of the stylesheets
-                $cssFiles = array_merge($cssFiles, array($targetFile => $concatenatedOptions));
+                $cssFiles = array_merge($cssFiles, [$targetFileRelative => $concatenatedOptions]);
             }
         }
         return $cssFiles;
@@ -167,15 +250,16 @@ class ResourceCompressor
      */
     public function concatenateJsFiles(array $jsFiles)
     {
-        $filesToInclude = array();
+        $filesToInclude = [];
         foreach ($jsFiles as $key => $fileOptions) {
             // invalid section found or no concatenation allowed, so continue
             if (empty($fileOptions['section']) || !empty($fileOptions['excludeFromConcatenation'])) {
                 continue;
             }
             if (!isset($filesToInclude[$fileOptions['section']])) {
-                $filesToInclude[$fileOptions['section']] = array();
+                $filesToInclude[$fileOptions['section']] = [];
             }
+            // we remove BACK_PATH from $filename, so make it relative to root path
             $filenameFromMainDir = $this->getFilenameFromMainDir($fileOptions['file']);
             if ($fileOptions['forceOnTop']) {
                 array_unshift($filesToInclude[$fileOptions['section']], $filenameFromMainDir);
@@ -188,17 +272,18 @@ class ResourceCompressor
         if (!empty($filesToInclude)) {
             foreach ($filesToInclude as $section => $files) {
                 $targetFile = $this->createMergedJsFile($files);
-                $concatenatedOptions = array(
-                    'file' => $targetFile,
+                $targetFileRelative = $this->relativePath . $targetFile;
+                $concatenatedOptions = [
+                    'file' => $targetFileRelative,
                     'type' => 'text/javascript',
                     'section' => $section,
                     'compress' => true,
                     'excludeFromConcatenation' => true,
                     'forceOnTop' => false,
                     'allWrap' => ''
-                );
+                ];
                 // place the merged javascript on top of the JS files
-                $jsFiles = array_merge(array($targetFile => $concatenatedOptions), $jsFiles);
+                $jsFiles = array_merge([$targetFileRelative => $concatenatedOptions], $jsFiles);
             }
         }
         return $jsFiles;
@@ -276,13 +361,11 @@ class ResourceCompressor
         }
         $targetFile = $this->targetDirectory . 'merged-' . md5($unique) . '.' . $type;
         // if the file doesn't already exist, we create it
-        if (!file_exists(PATH_site . $targetFile)) {
+        if (!file_exists((PATH_site . $targetFile))) {
             $concatenated = '';
             // concatenate all the files together
             foreach ($filesToInclude as $filename) {
-                $filenameAbsolute = GeneralUtility::resolveBackPath($this->rootPath . $filename);
-                $filename = PathUtility::stripPathSitePrefix($filenameAbsolute);
-                $contents = file_get_contents($filenameAbsolute);
+                $contents = GeneralUtility::getUrl(GeneralUtility::resolveBackPath($this->rootPath . $filename));
                 // remove any UTF-8 byte order mark (BOM) from files
                 if (StringUtility::beginsWith($contents, "\xEF\xBB\xBF")) {
                     $contents = substr($contents, 3);
@@ -310,7 +393,7 @@ class ResourceCompressor
      */
     public function compressCssFiles(array $cssFiles)
     {
-        $filesAfterCompression = array();
+        $filesAfterCompression = [];
         foreach ($cssFiles as $key => $fileOptions) {
             // if compression is enabled
             if ($fileOptions['compress']) {
@@ -347,20 +430,82 @@ class ResourceCompressor
         } else {
             $unique = $filenameAbsolute;
         }
-        // make sure it is again the full filename
-        $filename = PathUtility::stripPathSitePrefix($filenameAbsolute);
 
-        $pathinfo = PathUtility::pathinfo($filenameAbsolute);
+        $pathinfo = PathUtility::pathinfo($filename);
         $targetFile = $this->targetDirectory . $pathinfo['filename'] . '-' . md5($unique) . '.css';
         // only create it, if it doesn't exist, yet
-        if (!file_exists(PATH_site . $targetFile) || $this->createGzipped && !file_exists(PATH_site . $targetFile . '.gzip')) {
-            $contents = $this->compressCssString(file_get_contents($filenameAbsolute));
+        if (!file_exists((PATH_site . $targetFile)) || $this->createGzipped && !file_exists((PATH_site . $targetFile . '.gzip'))) {
+            $contents = $this->compressCssString(GeneralUtility::getUrl($filenameAbsolute));
             if (strpos($filename, $this->targetDirectory) === false) {
                 $contents = $this->cssFixRelativeUrlPaths($contents, PathUtility::dirname($filename) . '/');
             }
             $this->writeFileAndCompressed($targetFile, $contents);
         }
-        return $this->returnFileReference($targetFile);
+        return $this->relativePath . $this->returnFileReference($targetFile);
+    }
+
+    /**
+     * Callback function for preg_replace
+     *
+     * @see compressCssFile
+     * @param array $matches
+     * @return string the compressed string
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, not in use anymore
+     */
+    public static function compressCssPregCallback($matches)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        if ($matches[1]) {
+            // Group 1: Double quoted string.
+            return $matches[1];
+        } elseif ($matches[2]) {
+            // Group 2: Single quoted string.
+            return $matches[2];
+        } elseif ($matches[3]) {
+            // Group 3: Regular non-MacIE5-hack comment.
+            return '
+';
+        } elseif ($matches[4]) {
+            // Group 4: MacIE5-hack-type-1 comment.
+            return '
+/*\\T1*/
+';
+        } elseif ($matches[5]) {
+            // Group 5,6,7: MacIE5-hack-type-2 comment
+            $matches[6] = preg_replace('/\\s++([+>{};,)])/S', '$1', $matches[6]);
+            // Clean pre-punctuation.
+            $matches[6] = preg_replace('/([+>{}:;,(])\\s++/S', '$1', $matches[6]);
+            // Clean post-punctuation.
+            $matches[6] = preg_replace('/;?\\}/S', '}
+', $matches[6]);
+            // Add a touch of formatting.
+            return '
+/*T2\\*/' . $matches[6] . '
+/*T2E*/
+';
+        } elseif ($matches[8]) {
+            // Group 8: calc function (see http://www.w3.org/TR/2006/WD-css3-values-20060919/#calc)
+            return 'calc' . $matches[8];
+        } elseif (isset($matches[9])) {
+            // Group 9: Non-string, non-comment. Safe to clean whitespace here.
+            $matches[9] = preg_replace('/^\\s++/', '', $matches[9]);
+            // Strip all leading whitespace.
+            $matches[9] = preg_replace('/\\s++$/', '', $matches[9]);
+            // Strip all trailing whitespace.
+            $matches[9] = preg_replace('/\\s{2,}+/', ' ', $matches[9]);
+            // Consolidate multiple whitespace.
+            $matches[9] = preg_replace('/\\s++([+>{};,)])/S', '$1', $matches[9]);
+            // Clean pre-punctuation.
+            $matches[9] = preg_replace('/([+>{}:;,(])\\s++/S', '$1', $matches[9]);
+            // Clean post-punctuation.
+            $matches[9] = preg_replace('/;?\\}/S', '}
+', $matches[9]);
+            // Add a touch of formatting.
+            return $matches[9];
+        }
+        return $matches[0] . '
+/* ERROR! Unexpected _proccess_css_minify() parameter */
+';
     }
 
     /**
@@ -371,7 +516,7 @@ class ResourceCompressor
      */
     public function compressJsFiles(array $jsFiles)
     {
-        $filesAfterCompression = array();
+        $filesAfterCompression = [];
         foreach ($jsFiles as $fileName => $fileOptions) {
             // If compression is enabled
             if ($fileOptions['compress']) {
@@ -405,11 +550,11 @@ class ResourceCompressor
         $pathinfo = PathUtility::pathinfo($filename);
         $targetFile = $this->targetDirectory . $pathinfo['filename'] . '-' . md5($unique) . '.js';
         // only create it, if it doesn't exist, yet
-        if (!file_exists(PATH_site . $targetFile) || $this->createGzipped && !file_exists(PATH_site . $targetFile . '.gzip')) {
-            $contents = file_get_contents($filenameAbsolute);
+        if (!file_exists((PATH_site . $targetFile)) || $this->createGzipped && !file_exists((PATH_site . $targetFile . '.gzip'))) {
+            $contents = GeneralUtility::getUrl($filenameAbsolute);
             $this->writeFileAndCompressed($targetFile, $contents);
         }
-        return $this->returnFileReference($targetFile);
+        return $this->relativePath . $this->returnFileReference($targetFile);
     }
 
     /**
@@ -420,28 +565,36 @@ class ResourceCompressor
      */
     protected function getFilenameFromMainDir($filename)
     {
+        // if BACK_PATH is empty return $filename
+        if (empty($this->backPath)) {
+            return $filename;
+        }
         // if the file exists in the root path, just return the $filename
-        if (is_file($this->rootPath . ltrim($filename, '/'))) {
-            return ltrim($filename, '/');
+        if (strpos($filename, $this->backPath) === 0) {
+            $file = str_replace($this->backPath, '', $filename);
+            if (is_file(GeneralUtility::resolveBackPath($this->rootPath . $file))) {
+                return $file;
+            }
         }
         // if the file is from a special TYPO3 internal directory, add the missing typo3/ prefix
         if (is_file(realpath(PATH_site . TYPO3_mainDir . $filename))) {
             $filename = TYPO3_mainDir . $filename;
         }
         // build the file path relatively to the PATH_site
-        if (substr($filename, 0, 3) === '../') {
-            $file = GeneralUtility::resolveBackPath(PATH_typo3 . $filename);
+        $backPath = str_replace(TYPO3_mainDir, '', $this->backPath);
+        $file = str_replace($backPath, '', $filename);
+        if (substr($file, 0, 3) === '../') {
+            $file = GeneralUtility::resolveBackPath(PATH_typo3 . $file);
         } else {
-            $file = PATH_site . ltrim($filename, '/');
+            $file = PATH_site . $file;
         }
-
         // check if the file exists, and if so, return the path relative to TYPO3_mainDir
         if (is_file($file)) {
             $mainDirDepth = substr_count(TYPO3_mainDir, '/');
             return str_repeat('../', $mainDirDepth) . str_replace(PATH_site, '', $file);
         }
         // none of above conditions were met, fallback to default behaviour
-        return $filename;
+        return substr($filename, strlen($this->backPath));
     }
 
     /**
@@ -471,7 +624,8 @@ class ResourceCompressor
      */
     protected function cssFixRelativeUrlPaths($contents, $oldDir)
     {
-        $newDir = '../../../' . $oldDir;
+        $mainDir = TYPO3_MODE === 'BE' ? TYPO3_mainDir : '';
+        $newDir = '../../' . $mainDir . $oldDir;
         // Replace "url()" paths
         if (stripos($contents, 'url') !== false) {
             $regex = '/url(\\(\\s*["\']?(?!\\/)([^"\']+)["\']?\\s*\\))/iU';
@@ -496,8 +650,8 @@ class ResourceCompressor
      */
     protected function findAndReplaceUrlPathsByRegex($contents, $regex, $newDir, $wrap = '|')
     {
-        $matches = array();
-        $replacements = array();
+        $matches = [];
+        $replacements = [];
         $wrap = explode('|', $wrap);
         preg_match_all($regex, $contents, $matches);
         foreach ($matches[2] as $matchCount => $match) {
@@ -525,7 +679,7 @@ class ResourceCompressor
      */
     protected function cssFixStatements($contents)
     {
-        $matches = array();
+        $matches = [];
         $comment = LF . '/* moved by compressor */' . LF;
         // nothing to do, so just return contents
         if (stripos($contents, '@charset') === false && stripos($contents, '@import') === false && stripos($contents, '@namespace') === false) {
@@ -597,9 +751,10 @@ class ResourceCompressor
     {
         // if the client accepts gzip and we can create gzipped files, we give him compressed versions
         if ($this->createGzipped && strpos(GeneralUtility::getIndpEnv('HTTP_ACCEPT_ENCODING'), 'gzip') !== false) {
-            $filename .= '.gzip';
+            return $filename . '.gzip';
+        } else {
+            return $filename;
         }
-        return PathUtility::getRelativePath($this->rootPath, PATH_site) . $filename;
     }
 
     /**
@@ -612,9 +767,9 @@ class ResourceCompressor
     {
         $externalContent = GeneralUtility::getUrl($url);
         $filename = $this->targetDirectory . 'external-' . md5($url);
-        // write only if file does not exist and md5 of the content is not the same as fetched one
+        // Write only if file does not exist OR md5 of the content is not the same as fetched one
         if (!file_exists(PATH_site . $filename)
-            && (md5($externalContent) !== md5(file_get_contents(PATH_site . $filename)))
+            || (md5($externalContent) !== md5(GeneralUtility::getUrl(PATH_site . $filename)))
         ) {
             GeneralUtility::writeFile(PATH_site . $filename, $externalContent);
         }

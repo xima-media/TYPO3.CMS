@@ -17,7 +17,7 @@ namespace TYPO3\CMS\Frontend\Imaging;
 use TYPO3\CMS\Core\Imaging\GraphicalFunctions;
 use TYPO3\CMS\Core\Resource\File;
 use TYPO3\CMS\Core\Resource\ProcessedFile;
-use TYPO3\CMS\Core\Utility\ArrayUtility;
+use TYPO3\CMS\Core\TypoScript\TemplateService;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\File\BasicFileUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -49,30 +49,70 @@ use TYPO3\CMS\Frontend\ContentObject\ContentObjectRenderer;
 class GifBuilder extends GraphicalFunctions
 {
     /**
+     * the main image
+     *
+     * @var string
+     */
+    public $im = '';
+
+    /**
+     * the image-width
+     *
+     * @var int
+     */
+    public $w = 0;
+
+    /**
+     * the image-height
+     *
+     * @var int
+     */
+    public $h = 0;
+
+    /**
+     * map-data
+     *
+     * @var string
+     */
+    public $map;
+
+    /**
+     * @var array
+     */
+    public $workArea;
+
+    /**
+     * This holds the operational setup for gifbuilder. Basically this is a TypoScript array with properties.
+     *
+     * @var array
+     */
+    public $setup = [];
+
+    /**
      * Contains all text strings used on this image
      *
      * @var array
      */
-    public $combinedTextStrings = array();
+    public $combinedTextStrings = [];
 
     /**
      * Contains all filenames (basename without extension) used on this image
      *
      * @var array
      */
-    public $combinedFileNames = array();
+    public $combinedFileNames = [];
 
     /**
      * This is the array from which data->field: [key] is fetched. So this is the current record!
      *
      * @var array
      */
-    public $data = array();
+    public $data = [];
 
     /**
      * @var array
      */
-    public $objBB = array();
+    public $objBB = [];
 
     /**
      * @var string
@@ -82,12 +122,17 @@ class GifBuilder extends GraphicalFunctions
     /**
      * @var array
      */
-    public $charRangeMap = array();
+    public $charRangeMap = [];
 
     /**
      * @var int[]
      */
-    public $XY = array();
+    public $XY = [];
+
+    /**
+     * @var array
+     */
+    public $OFFSET = [];
 
     /**
      * @var ContentObjectRenderer
@@ -97,7 +142,7 @@ class GifBuilder extends GraphicalFunctions
     /**
      * @var array
      */
-    public $defaultWorkArea = array();
+    public $defaultWorkArea = [];
 
     /**
      * Initialization of the GIFBUILDER objects, in particular TEXT and IMAGE. This includes finding the bounding box, setting dimensions and offset values before the actual rendering is started.
@@ -130,13 +175,13 @@ class GifBuilder extends GraphicalFunctions
                 }
             }
             // Initializing global Char Range Map
-            $this->charRangeMap = array();
+            $this->charRangeMap = [];
             if (is_array($GLOBALS['TSFE']->tmpl->setup['_GIFBUILDER.']['charRangeMap.'])) {
                 foreach ($GLOBALS['TSFE']->tmpl->setup['_GIFBUILDER.']['charRangeMap.'] as $cRMcfgkey => $cRMcfg) {
                     if (is_array($cRMcfg)) {
                         // Initializing:
                         $cRMkey = $GLOBALS['TSFE']->tmpl->setup['_GIFBUILDER.']['charRangeMap.'][substr($cRMcfgkey, 0, -1)];
-                        $this->charRangeMap[$cRMkey] = array();
+                        $this->charRangeMap[$cRMkey] = [];
                         $this->charRangeMap[$cRMkey]['charMapConfig'] = $cRMcfg['charMapConfig.'];
                         $this->charRangeMap[$cRMkey]['cfgKey'] = substr($cRMcfgkey, 0, -1);
                         $this->charRangeMap[$cRMkey]['multiplicator'] = (double) $cRMcfg['fontSizeMultiplicator'];
@@ -145,7 +190,7 @@ class GifBuilder extends GraphicalFunctions
                 }
             }
             // Getting sorted list of TypoScript keys from setup.
-            $sKeyArray = ArrayUtility::filterAndSortByNumericKeys($this->setup);
+            $sKeyArray = TemplateService::sortedKeyList($this->setup);
             // Setting the background color, passing it through stdWrap
             if ($conf['backColor.'] || $conf['backColor']) {
                 $this->setup['backColor'] = isset($this->setup['backColor.']) ? trim($this->cObj->stdWrap($this->setup['backColor'], $this->setup['backColor.'])) : $this->setup['backColor'];
@@ -334,7 +379,7 @@ class GifBuilder extends GraphicalFunctions
 
     /**
      * Initiates the image file generation if ->setup is TRUE and if the file did not exist already.
-     * Gets filename from fileName() and if file exists in typo3temp/assets/images/ dir it will - of course - not be rendered again.
+     * Gets filename from fileName() and if file exists in typo3temp/ dir it will - of course - not be rendered again.
      * Otherwise rendering means calling ->make(), then ->output(), then ->destroy()
      *
      * @return string The filename for the created GIF/PNG file. The filename will be prefixed "GB_
@@ -344,11 +389,11 @@ class GifBuilder extends GraphicalFunctions
     {
         if ($this->setup) {
             // Relative to PATH_site
-            $gifFileName = $this->fileName('images/');
+            $gifFileName = $this->fileName('GB/');
             // File exists
             if (!file_exists($gifFileName)) {
                 // Create temporary directory if not done:
-                $this->createTempSubDir('images/');
+                $this->createTempSubDir('GB/');
                 // Create file:
                 $this->make();
                 $this->output($gifFileName);
@@ -390,7 +435,7 @@ class GifBuilder extends GraphicalFunctions
             $this->saveAlphaLayer = true;
             // Force PNG in case no format is set
             $this->setup['format'] = 'png';
-            $BGcols = array();
+            $BGcols = [];
         } else {
             // Fill the background with the given color
             $BGcols = $this->convertColor($this->setup['backColor']);
@@ -399,7 +444,7 @@ class GifBuilder extends GraphicalFunctions
         }
         // Traverse the GIFBUILDER objects an render each one:
         if (is_array($this->setup)) {
-            $sKeyArray = ArrayUtility::filterAndSortByNumericKeys($this->setup);
+            $sKeyArray = TemplateService::sortedKeyList($this->setup);
             foreach ($sKeyArray as $theKey) {
                 $theValue = $this->setup[$theKey];
                 if ((int)$theKey && ($conf = $this->setup[$theKey . '.'])) {
@@ -407,7 +452,7 @@ class GifBuilder extends GraphicalFunctions
                     // all properties of the TEXT sub-object have already been stdWrap-ped
                     // before in ->checkTextObj()
                     if ($theValue !== 'TEXT') {
-                        $isStdWrapped = array();
+                        $isStdWrapped = [];
                         foreach ($conf as $key => $value) {
                             $parameter = rtrim($key, '.');
                             if (!$isStdWrapped[$parameter] && isset($conf[$parameter . '.'])) {
@@ -428,7 +473,7 @@ class GifBuilder extends GraphicalFunctions
                         case 'TEXT':
                             if (!$conf['hide']) {
                                 if (is_array($conf['shadow.'])) {
-                                    $isStdWrapped = array();
+                                    $isStdWrapped = [];
                                     foreach ($conf['shadow.'] as $key => $value) {
                                         $parameter = rtrim($key, '.');
                                         if (!$isStdWrapped[$parameter] && isset($conf[$parameter . '.'])) {
@@ -439,7 +484,7 @@ class GifBuilder extends GraphicalFunctions
                                     $this->makeShadow($this->im, $conf['shadow.'], $this->workArea, $conf);
                                 }
                                 if (is_array($conf['emboss.'])) {
-                                    $isStdWrapped = array();
+                                    $isStdWrapped = [];
                                     foreach ($conf['emboss.'] as $key => $value) {
                                         $parameter = rtrim($key, '.');
                                         if (!$isStdWrapped[$parameter] && isset($conf[$parameter . '.'])) {
@@ -450,7 +495,7 @@ class GifBuilder extends GraphicalFunctions
                                     $this->makeEmboss($this->im, $conf['emboss.'], $this->workArea, $conf);
                                 }
                                 if (is_array($conf['outline.'])) {
-                                    $isStdWrapped = array();
+                                    $isStdWrapped = [];
                                     foreach ($conf['outline.'] as $key => $value) {
                                         $parameter = rtrim($key, '.');
                                         if (!$isStdWrapped[$parameter] && isset($conf[$parameter . '.'])) {
@@ -549,7 +594,7 @@ class GifBuilder extends GraphicalFunctions
     {
         $cObj = GeneralUtility::makeInstance(ContentObjectRenderer::class);
         $cObj->start($this->data);
-        $isStdWrapped = array();
+        $isStdWrapped = [];
         foreach ($conf as $key => $value) {
             $parameter = rtrim($key, '.');
             if (!$isStdWrapped[$parameter] && isset($conf[$parameter . '.'])) {
@@ -583,7 +628,11 @@ class GifBuilder extends GraphicalFunctions
         // Max length = 100 if automatic line braks are not defined:
         if (!isset($conf['breakWidth']) || !$conf['breakWidth']) {
             $tlen = (int)$conf['textMaxLength'] ?: 100;
-            $conf['text'] = $this->csConvObj->substr('utf-8', $conf['text'], 0, $tlen);
+            if ($this->nativeCharset) {
+                $conf['text'] = $this->csConvObj->substr($this->nativeCharset, $conf['text'], 0, $tlen);
+            } else {
+                $conf['text'] = substr($conf['text'], 0, $tlen);
+            }
         }
         if ((string)$conf['text'] != '') {
             // Char range map thingie:
@@ -591,7 +640,7 @@ class GifBuilder extends GraphicalFunctions
             if (is_array($this->charRangeMap[$fontBaseName])) {
                 // Initialize splitRendering array:
                 if (!is_array($conf['splitRendering.'])) {
-                    $conf['splitRendering.'] = array();
+                    $conf['splitRendering.'] = [];
                 }
                 $cfgK = $this->charRangeMap[$fontBaseName]['cfgKey'];
                 // Do not impose settings if a splitRendering object already exists:
@@ -605,7 +654,7 @@ class GifBuilder extends GraphicalFunctions
                     }
                     // Multiplicator of pixelSpace:
                     if ($this->charRangeMap[$fontBaseName]['pixelSpace']) {
-                        $travKeys = array('xSpaceBefore', 'xSpaceAfter', 'ySpaceBefore', 'ySpaceAfter');
+                        $travKeys = ['xSpaceBefore', 'xSpaceAfter', 'ySpaceBefore', 'ySpaceAfter'];
                         foreach ($travKeys as $pxKey) {
                             if (isset($conf['splitRendering.'][$cfgK . '.'][$pxKey])) {
                                 $conf['splitRendering.'][$cfgK . '.'][$pxKey] = round($conf['splitRendering.'][$cfgK . '.'][$pxKey] * ($conf['fontSize'] / $this->charRangeMap[$fontBaseName]['pixelSpace']));
@@ -641,7 +690,7 @@ class GifBuilder extends GraphicalFunctions
      */
     public function calcOffset($string)
     {
-        $value = array();
+        $value = [];
         $numbers = GeneralUtility::trimExplode(',', $this->calculateFunctions($string));
         foreach ($numbers as $key => $val) {
             if ((string)$val == (string)(int)$val) {
@@ -703,6 +752,9 @@ class GifBuilder extends GraphicalFunctions
         $basicFileFunctions = GeneralUtility::makeInstance(BasicFileUtility::class);
         $filePrefix = implode('_', array_merge($this->combinedTextStrings, $this->combinedFileNames));
         $filePrefix = $basicFileFunctions->cleanFileName($filePrefix);
+
+        // shorten prefix to avoid overly long file names
+        $filePrefix = substr($filePrefix, 0, 100);
 
         return $this->tempPath . $pre . $filePrefix . '_' . GeneralUtility::shortMD5(serialize($this->setup)) . '.' . $this->extension();
     }

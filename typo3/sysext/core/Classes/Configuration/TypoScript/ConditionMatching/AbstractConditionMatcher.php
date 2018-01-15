@@ -15,13 +15,12 @@ namespace TYPO3\CMS\Core\Configuration\TypoScript\ConditionMatching;
  */
 
 use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Core\Utility\VersionNumberUtility;
 
 /**
  * Matching TypoScript conditions
  *
  * Used with the TypoScript parser.
- * Matches IPnumbers etc. for use with templates
+ * Matches browserinfo, IPnumbers for use with templates
  */
 abstract class AbstractConditionMatcher
 {
@@ -53,7 +52,7 @@ abstract class AbstractConditionMatcher
      *
      * @var array
      */
-    protected $simulateMatchConditions = array();
+    protected $simulateMatchConditions = [];
 
     /**
      * Sets the id of the page to evaluate conditions for.
@@ -63,7 +62,7 @@ abstract class AbstractConditionMatcher
      */
     public function setPageId($pageId)
     {
-        if (is_integer($pageId) && $pageId > 0) {
+        if (is_int($pageId) && $pageId > 0) {
             $this->pageId = $pageId;
         }
     }
@@ -135,13 +134,13 @@ abstract class AbstractConditionMatcher
      */
     protected function normalizeExpression($expression)
     {
-        $normalizedExpression = preg_replace(array(
+        $normalizedExpression = preg_replace([
             '/\\]\\s*(OR|\\|\\|)?\\s*\\[/i',
             '/\\]\\s*(AND|&&)\\s*\\[/i'
-        ), array(
+        ], [
             ']||[',
             ']&&['
-        ), trim($expression));
+        ], trim($expression));
         return $normalizedExpression;
     }
 
@@ -202,6 +201,13 @@ abstract class AbstractConditionMatcher
      */
     protected function evaluateConditionCommon($key, $value)
     {
+        $lowerKey = strtolower($key);
+        if ($lowerKey === 'browser' || $lowerKey === 'device' || $lowerKey === 'version' || $lowerKey === 'system' || $lowerKey === 'useragent') {
+            GeneralUtility::deprecationLog(
+                'Usage of client related conditions (browser, device, version, system, useragent) is deprecated since 7.0.'
+            );
+            $browserInfo = $this->getBrowserInfo(GeneralUtility::getIndpEnv('HTTP_USER_AGENT'));
+        }
         $keyParts = GeneralUtility::trimExplode('|', $key);
         switch ($keyParts[0]) {
             case 'applicationContext':
@@ -213,6 +219,82 @@ abstract class AbstractConditionMatcher
                     }
                 }
                 return false;
+                break;
+            case 'browser':
+                $values = GeneralUtility::trimExplode(',', $value, true);
+                // take all identified browsers into account, eg chrome deliver
+                // webkit=>532.5, chrome=>4.1, safari=>532.5
+                // so comparing string will be
+                // "webkit532.5 chrome4.1 safari532.5"
+                $all = '';
+                foreach ($browserInfo['all'] as $key => $value) {
+                    $all .= $key . $value . ' ';
+                }
+                foreach ($values as $test) {
+                    if (stripos($all, $test) !== false) {
+                        return true;
+                    }
+                }
+                return false;
+                break;
+            case 'version':
+                $values = GeneralUtility::trimExplode(',', $value, true);
+                foreach ($values as $test) {
+                    if (strcspn($test, '=<>') == 0) {
+                        switch ($test[0]) {
+                            case '=':
+                                if (floatval(substr($test, 1)) == $browserInfo['version']) {
+                                    return true;
+                                }
+                                break;
+                            case '<':
+                                if (floatval(substr($test, 1)) > $browserInfo['version']) {
+                                    return true;
+                                }
+                                break;
+                            case '>':
+                                if (floatval(substr($test, 1)) < $browserInfo['version']) {
+                                    return true;
+                                }
+                                break;
+                        }
+                    } elseif (strpos(' ' . $browserInfo['version'], $test) == 1) {
+                        return true;
+                    }
+                }
+                return false;
+                break;
+            case 'system':
+                $values = GeneralUtility::trimExplode(',', $value, true);
+                // Take all identified systems into account, e.g. mac for iOS, Linux
+                // for android and Windows NT for Windows XP
+                $allSystems = ' ' . implode(' ', $browserInfo['all_systems']);
+                foreach ($values as $test) {
+                    if (stripos($allSystems, $test) !== false) {
+                        return true;
+                    }
+                }
+                return false;
+                break;
+            case 'device':
+                if (!isset($this->deviceInfo)) {
+                    $this->deviceInfo = $this->getDeviceType(GeneralUtility::getIndpEnv('HTTP_USER_AGENT'));
+                }
+                $values = GeneralUtility::trimExplode(',', $value, true);
+                foreach ($values as $test) {
+                    if ($this->deviceInfo == $test) {
+                        return true;
+                    }
+                }
+                return false;
+                break;
+            case 'useragent':
+                $test = trim($value);
+                if ($test !== '') {
+                    return $this->searchStringWildcard((string)$browserInfo['useragent'], $test);
+                } else {
+                    return false;
+                }
                 break;
             case 'language':
                 if (GeneralUtility::getIndpEnv('HTTP_ACCEPT_LANGUAGE') === $value) {
@@ -287,7 +369,7 @@ abstract class AbstractConditionMatcher
                 return false;
                 break;
             case 'compatVersion':
-                return VersionNumberUtility::convertVersionNumberToInteger(TYPO3_branch) >= VersionNumberUtility::convertVersionNumberToInteger($value);
+                return GeneralUtility::compat_version($value);
                 break;
             case 'loginUser':
                 if ($this->isUserLoggedIn()) {
@@ -339,10 +421,10 @@ abstract class AbstractConditionMatcher
                 return false;
                 break;
             case 'userFunc':
-                $matches = array();
+                $matches = [];
                 preg_match_all('/^\s*([^\(\s]+)\s*(?:\((.*)\))?\s*$/', $value, $matches);
                 $funcName = $matches[1][0];
-                $funcValues = trim($matches[2][0]) !== '' ? $this->parseUserFuncArguments($matches[2][0]) : array();
+                $funcValues = trim($matches[2][0]) !== '' ? $this->parseUserFuncArguments($matches[2][0]) : [];
                 if (is_callable($funcName) && call_user_func_array($funcName, $funcValues)) {
                     return true;
                 }
@@ -395,7 +477,7 @@ abstract class AbstractConditionMatcher
      */
     protected function parseUserFuncArguments($arguments)
     {
-        $result = array();
+        $result = [];
         $arguments = trim($arguments);
         while ($arguments !== '') {
             if ($arguments[0] === ',') {
@@ -422,7 +504,7 @@ abstract class AbstractConditionMatcher
                 }
             }
             $arguments = trim($arguments);
-        };
+        }
         return $result;
     }
 
@@ -487,10 +569,10 @@ abstract class AbstractConditionMatcher
             $rightValue = $matches[2];
             switch ($operator) {
                 case '>=':
-                    return $leftValue >= doubleval($rightValue);
+                    return $leftValue >= floatval($rightValue);
                     break;
                 case '<=':
-                    return $leftValue <= doubleval($rightValue);
+                    return $leftValue <= floatval($rightValue);
                     break;
                 case '!=':
                     // multiple values may be split with '|'
@@ -498,7 +580,7 @@ abstract class AbstractConditionMatcher
                     $found = false;
                     $rightValueParts = GeneralUtility::trimExplode('|', $rightValue);
                     foreach ($rightValueParts as $rightValueSingle) {
-                        if ($leftValue == doubleval($rightValueSingle)) {
+                        if ($leftValue == floatval($rightValueSingle)) {
                             $found = true;
                             break;
                         }
@@ -506,10 +588,10 @@ abstract class AbstractConditionMatcher
                     return $found === false;
                     break;
                 case '<':
-                    return $leftValue < doubleval($rightValue);
+                    return $leftValue < floatval($rightValue);
                     break;
                 case '>':
-                    return $leftValue > doubleval($rightValue);
+                    return $leftValue > floatval($rightValue);
                     break;
                 default:
                     // nothing valid found except '=', use '='
@@ -546,14 +628,37 @@ abstract class AbstractConditionMatcher
                 // Regular expression, only "//" is allowed as delimiter
                 $regex = $needle;
             } else {
-                $needle = str_replace(array('*', '?'), array('###MANY###', '###ONE###'), $needle);
+                $needle = str_replace(['*', '?'], ['###MANY###', '###ONE###'], $needle);
                 $regex = '/^' . preg_quote($needle, '/') . '$/';
                 // Replace the marker with .* to match anything (wildcard)
-                $regex = str_replace(array('###MANY###', '###ONE###'), array('.*', '.'), $regex);
+                $regex = str_replace(['###MANY###', '###ONE###'], ['.*', '.'], $regex);
             }
             $result = (bool)preg_match($regex, $haystack);
         }
         return $result;
+    }
+
+    /**
+     * Generates an array with abstracted browser information
+     *
+     * @param string $userAgent The useragent string, \TYPO3\CMS\Core\Utility\GeneralUtility::getIndpEnv('HTTP_USER_AGENT')
+     * @return array Contains keys "browser", "version", "system
+     */
+    protected function getBrowserInfo($userAgent)
+    {
+        return \TYPO3\CMS\Core\Utility\ClientUtility::getBrowserInfo($userAgent);
+    }
+
+    /**
+     * Gets a code for a browsing device based on the input useragent string.
+     *
+     * @param string $userAgent The useragent string, \TYPO3\CMS\Core\Utility\GeneralUtility::getIndpEnv('HTTP_USER_AGENT')
+     * @return string Code for the specific device type
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    protected function getDeviceType($userAgent)
+    {
+        return \TYPO3\CMS\Core\Utility\ClientUtility::getDeviceType($userAgent);
     }
 
     /**

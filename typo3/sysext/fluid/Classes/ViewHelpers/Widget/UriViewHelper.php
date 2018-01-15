@@ -2,18 +2,24 @@
 namespace TYPO3\CMS\Fluid\ViewHelpers\Widget;
 
 /*
- * This file is part of the TYPO3 CMS project.
- *
- * It is free software; you can redistribute it and/or modify it under
- * the terms of the GNU General Public License, either version 2
- * of the License, or any later version.
- *
- * For the full copyright and license information, please read the
- * LICENSE.txt file that was distributed with this source code.
- *
- * The TYPO3 project - inspiring people to share!
- */
-
+ * This script is backported from the TYPO3 Flow package "TYPO3.Fluid".   *
+ *                                                                        *
+ * It is free software; you can redistribute it and/or modify it under    *
+ * the terms of the GNU Lesser General Public License, either version 3   *
+ *  of the License, or (at your option) any later version.                *
+ *                                                                        *
+ *                                                                        *
+ * This script is distributed in the hope that it will be useful, but     *
+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHAN-    *
+ * TABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser       *
+ * General Public License for more details.                               *
+ *                                                                        *
+ * You should have received a copy of the GNU Lesser General Public       *
+ * License along with the script.                                         *
+ * If not, see http://www.gnu.org/licenses/lgpl.html                      *
+ *                                                                        *
+ * The TYPO3 project - inspiring people to share!                         *
+ *                                                                        */
 /**
  * A view helper for creating URIs to extbase actions within widgets.
  *
@@ -53,7 +59,7 @@ class UriViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\AbstractViewHelper
      * @return string The rendered link
      * @api
      */
-    public function render($action = null, $arguments = array(), $section = '', $format = '', $ajax = false)
+    public function render($action = null, $arguments = [], $section = '', $format = '', $ajax = false)
     {
         if ($ajax === true) {
             return $this->getAjaxUri();
@@ -91,7 +97,7 @@ class UriViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\AbstractViewHelper
     {
         $uriBuilder = $this->controllerContext->getUriBuilder();
         $argumentPrefix = $this->controllerContext->getRequest()->getArgumentPrefix();
-        $arguments = $this->hasArgument('arguments') ? $this->arguments['arguments'] : array();
+        $arguments = $this->hasArgument('arguments') ? $this->arguments['arguments'] : [];
         if ($this->hasArgument('action')) {
             $arguments['action'] = $this->arguments['action'];
         }
@@ -99,11 +105,11 @@ class UriViewHelper extends \TYPO3\CMS\Fluid\Core\ViewHelper\AbstractViewHelper
             $arguments['format'] = $this->arguments['format'];
         }
         return $uriBuilder->reset()
-            ->setArguments(array($argumentPrefix => $arguments))
+            ->setArguments([$argumentPrefix => $arguments])
             ->setSection($this->arguments['section'])
             ->setAddQueryString(true)
             ->setAddQueryStringMethod($this->arguments['addQueryStringMethod'])
-            ->setArgumentsToBeExcludedFromQueryString(array($argumentPrefix, 'cHash'))
+            ->setArgumentsToBeExcludedFromQueryString([$argumentPrefix, 'cHash'])
             ->setFormat($this->arguments['format'])
             ->build();
     }

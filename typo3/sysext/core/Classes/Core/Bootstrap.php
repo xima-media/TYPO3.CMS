@@ -53,7 +53,7 @@ class Bootstrap
     /**
      * @var array List of early instances
      */
-    protected $earlyInstances = array();
+    protected $earlyInstances = [];
 
     /**
      * @var string Path to install tool
@@ -64,7 +64,7 @@ class Bootstrap
      * A list of all registered request handlers, see the Application class / entry points for the registration
      * @var \TYPO3\CMS\Core\Http\RequestHandlerInterface[]|\TYPO3\CMS\Core\Console\RequestHandlerInterface[]
      */
-    protected $availableRequestHandlers = array();
+    protected $availableRequestHandlers = [];
 
     /**
      * The Response object when using Request/Response logic
@@ -174,7 +174,12 @@ class Bootstrap
             ->defineLoggingAndExceptionConstants()
             ->unsetReservedGlobalVariables()
             ->initializeTypo3DbGlobal();
-
+        if (empty($GLOBALS['TYPO3_CONF_VARS']['SYS']['encryptionKey'])) {
+            throw new \RuntimeException(
+                'TYPO3 Encryption is empty. $GLOBALS[\'TYPO3_CONF_VARS\'][\'SYS\'][\'encryptionKey\'] needs to be set for TYPO3 to work securely',
+                1502987245
+            );
+        }
         return $this;
     }
 
@@ -273,7 +278,7 @@ class Bootstrap
      */
     protected function resolveRequestHandler($request)
     {
-        $suitableRequestHandlers = array();
+        $suitableRequestHandlers = [];
         foreach ($this->availableRequestHandlers as $requestHandlerClassName) {
             /** @var \TYPO3\CMS\Core\Http\RequestHandlerInterface|\TYPO3\CMS\Core\Console\RequestHandlerInterface $requestHandler */
             $requestHandler = GeneralUtility::makeInstance($requestHandlerClassName, $this);
@@ -321,15 +326,16 @@ class Bootstrap
     {
         if ($this->response instanceof \Psr\Http\Message\ResponseInterface) {
             if (!headers_sent()) {
-                foreach ($this->response->getHeaders() as $name => $values) {
-                    header($name . ': ' . implode(', ', $values));
-                }
                 // If the response code was not changed by legacy code (still is 200)
                 // then allow the PSR-7 response object to explicitly set it.
                 // Otherwise let legacy code take precedence.
                 // This code path can be deprecated once we expose the response object to third party code
                 if (http_response_code() === 200) {
                     header('HTTP/' . $this->response->getProtocolVersion() . ' ' . $this->response->getStatusCode() . ' ' . $this->response->getReasonPhrase());
+                }
+
+                foreach ($this->response->getHeaders() as $name => $values) {
+                    header($name . ': ' . implode(', ', $values));
                 }
             }
             echo $this->response->getBody()->__toString();
@@ -575,11 +581,12 @@ class Bootstrap
      */
     protected function setCacheHashOptions()
     {
-        $GLOBALS['TYPO3_CONF_VARS']['FE']['cacheHash'] = array(
+        $GLOBALS['TYPO3_CONF_VARS']['FE']['cacheHash'] = [
             'cachedParametersWhiteList' => GeneralUtility::trimExplode(',', $GLOBALS['TYPO3_CONF_VARS']['FE']['cHashOnlyForParameters'], true),
             'excludedParameters' => GeneralUtility::trimExplode(',', $GLOBALS['TYPO3_CONF_VARS']['FE']['cHashExcludedParameters'], true),
-            'requireCacheHashPresenceParameters' => GeneralUtility::trimExplode(',', $GLOBALS['TYPO3_CONF_VARS']['FE']['cHashRequiredParameters'], true)
-        );
+            'requireCacheHashPresenceParameters' => GeneralUtility::trimExplode(',', $GLOBALS['TYPO3_CONF_VARS']['FE']['cHashRequiredParameters'], true),
+            'includePageId' => $GLOBALS['TYPO3_CONF_VARS']['FE']['cHashIncludePageId']
+        ];
         if (trim($GLOBALS['TYPO3_CONF_VARS']['FE']['cHashExcludedParametersIfEmpty']) === '*') {
             $GLOBALS['TYPO3_CONF_VARS']['FE']['cacheHash']['excludeAllEmptyParameters'] = true;
         } else {
@@ -677,7 +684,7 @@ class Bootstrap
             // Register an error handler for the given errorHandlerError
             $errorHandler = GeneralUtility::makeInstance($errorHandlerClassName, $errorHandlerErrors);
             $errorHandler->setExceptionalErrors($exceptionalErrors);
-            if (is_callable(array($errorHandler, 'setDebugMode'))) {
+            if (is_callable([$errorHandler, 'setDebugMode'])) {
                 $errorHandler->setDebugMode($displayErrors === 1);
             }
         }
@@ -708,7 +715,7 @@ class Bootstrap
      *
      * @return Bootstrap
      */
-    protected function defineTypo3RequestTypes()
+    public function defineTypo3RequestTypes()
     {
         define('TYPO3_REQUESTTYPE_FE', 1);
         define('TYPO3_REQUESTTYPE_BE', 2);
@@ -1004,7 +1011,7 @@ class Bootstrap
 
         /** @var $codeCache \TYPO3\CMS\Core\Cache\Frontend\PhpFrontend */
         $codeCache = $this->getEarlyInstance(\TYPO3\CMS\Core\Cache\CacheManager::class)->getCache('cache_core');
-        $routesFromPackages = array();
+        $routesFromPackages = [];
         if ($codeCache->has($cacheIdentifier)) {
             // substr is necessary, because the php frontend wraps php code around the cache value
             $routesFromPackages = unserialize(substr($codeCache->get($cacheIdentifier), 6, -2));

@@ -138,7 +138,7 @@ class ListController extends AbstractModuleController
                     'composerMode.title',
                     'extensionmanager'
                 ),
-                FlashMessage::WARNING
+                FlashMessage::INFO
             );
         }
     }
@@ -169,9 +169,9 @@ class ListController extends AbstractModuleController
         $availableExtensions = $this->listUtility->getAvailableExtensions();
         if (isset($availableExtensions[$extensionKey])) {
             $extensionArray = $this->listUtility->enrichExtensionsWithEmConfAndTerInformation(
-                array(
+                [
                     $extensionKey => $availableExtensions[$extensionKey]
-                )
+                ]
             );
             /** @var ExtensionModelUtility $extensionModelUtility */
             $extensionModelUtility = $this->objectManager->get(ExtensionModelUtility::class);
@@ -233,15 +233,11 @@ class ListController extends AbstractModuleController
             $officialDistributions = $this->extensionRepository->findAllOfficialDistributions();
             $communityDistributions = $this->extensionRepository->findAllCommunityDistributions();
 
-            if (!$showUnsuitableDistributions) {
-                $suitableOfficialDistributions = $this->dependencyUtility->getExtensionsSuitableForTypo3Version($officialDistributions);
-                $this->view->assign('officialDistributions', $suitableOfficialDistributions);
-                $suitableCommunityDistributions = $this->dependencyUtility->getExtensionsSuitableForTypo3Version($communityDistributions);
-                $this->view->assign('communityDistributions', $suitableCommunityDistributions);
-            } else {
-                $this->view->assign('officialDistributions', $officialDistributions);
-                $this->view->assign('communityDistributions', $communityDistributions);
-            }
+            $officialDistributions = $this->dependencyUtility->filterYoungestVersionOfExtensionList($officialDistributions->toArray(), $showUnsuitableDistributions);
+            $communityDistributions = $this->dependencyUtility->filterYoungestVersionOfExtensionList($communityDistributions->toArray(), $showUnsuitableDistributions);
+
+            $this->view->assign('officialDistributions', $officialDistributions);
+            $this->view->assign('communityDistributions', $communityDistributions);
         }
         $this->view->assign('enableDistributionsView', $importExportInstalled);
         $this->view->assign('showUnsuitableDistributions', $showUnsuitableDistributions);
@@ -259,11 +255,11 @@ class ListController extends AbstractModuleController
         $extensions = $this->extensionRepository->findByExtensionKeyOrderedByVersion($extensionKey);
 
         $this->view->assignMultiple(
-            array(
+            [
                 'extensionKey' => $extensionKey,
                 'currentVersion' => $currentVersion,
                 'extensions' => $extensions
-            )
+            ]
         );
     }
 

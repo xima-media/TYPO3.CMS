@@ -15,7 +15,6 @@ namespace TYPO3\CMS\Install\Controller\Action\Step;
  */
 
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
-use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
  * Database connect step:
@@ -35,10 +34,10 @@ class DatabaseConnect extends AbstractStepAction
      */
     public function execute()
     {
-        $result = array();
+        $result = [];
 
         /** @var $configurationManager \TYPO3\CMS\Core\Configuration\ConfigurationManager */
-        $configurationManager = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
+        $configurationManager = $this->objectManager->get(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
 
         $postValues = $this->postValues['values'];
         if (isset($postValues['loadDbal'])) {
@@ -50,33 +49,33 @@ class DatabaseConnect extends AbstractStepAction
             switch ($driver) {
                 case 'mssql':
                 case 'odbc_mssql':
-                    $driverConfig = array(
+                    $driverConfig = [
                         'useNameQuote' => true,
                         'quoteClob' => false,
-                    );
+                    ];
                     break;
                 case 'oci8':
-                    $driverConfig = array(
-                        'driverOptions' => array(
+                    $driverConfig = [
+                        'driverOptions' => [
                             'connectSID' => '',
-                        ),
-                    );
+                        ],
+                    ];
                     break;
             }
-            $config = array(
-                '_DEFAULT' => array(
+            $config = [
+                '_DEFAULT' => [
                     'type' => 'adodb',
-                    'config' => array(
+                    'config' => [
                         'driver' => $driver,
-                    )
-                )
-            );
+                    ]
+                ]
+            ];
             if (isset($driverConfig)) {
                 $config['_DEFAULT']['config'] = array_merge($config['_DEFAULT']['config'], $driverConfig);
             }
             $configurationManager->setLocalConfigurationValueByPath('EXTCONF/dbal/handlerCfg', $config);
         } else {
-            $localConfigurationPathValuePairs = array();
+            $localConfigurationPathValuePairs = [];
 
             if ($this->isDbalEnabled()) {
                 $config = $configurationManager->getConfigurationValueByPath('EXTCONF/dbal/handlerCfg');
@@ -90,10 +89,10 @@ class DatabaseConnect extends AbstractStepAction
             if (isset($postValues['username'])) {
                 $value = $postValues['username'];
                 if (strlen($value) <= 50) {
-                    $localConfigurationPathValuePairs['DB/Connections/Default/user'] = $value;
+                    $localConfigurationPathValuePairs['DB/username'] = $value;
                 } else {
                     /** @var $errorStatus \TYPO3\CMS\Install\Status\ErrorStatus */
-                    $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
+                    $errorStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\ErrorStatus::class);
                     $errorStatus->setTitle('Database username not valid');
                     $errorStatus->setMessage('Given username must be shorter than fifty characters.');
                     $result[] = $errorStatus;
@@ -103,10 +102,10 @@ class DatabaseConnect extends AbstractStepAction
             if (isset($postValues['password'])) {
                 $value = $postValues['password'];
                 if (strlen($value) <= 50) {
-                    $localConfigurationPathValuePairs['DB/Connections/Default/password'] = $value;
+                    $localConfigurationPathValuePairs['DB/password'] = $value;
                 } else {
                     /** @var $errorStatus \TYPO3\CMS\Install\Status\ErrorStatus */
-                    $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
+                    $errorStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\ErrorStatus::class);
                     $errorStatus->setTitle('Database password not valid');
                     $errorStatus->setMessage('Given password must be shorter than fifty characters.');
                     $result[] = $errorStatus;
@@ -116,10 +115,10 @@ class DatabaseConnect extends AbstractStepAction
             if (isset($postValues['host'])) {
                 $value = $postValues['host'];
                 if (preg_match('/^[a-zA-Z0-9_\\.-]+(:.+)?$/', $value) && strlen($value) <= 255) {
-                    $localConfigurationPathValuePairs['DB/Connections/Default/host'] = $value;
+                    $localConfigurationPathValuePairs['DB/host'] = $value;
                 } else {
                     /** @var $errorStatus \TYPO3\CMS\Install\Status\ErrorStatus */
-                    $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
+                    $errorStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\ErrorStatus::class);
                     $errorStatus->setTitle('Database host not valid');
                     $errorStatus->setMessage('Given host is not alphanumeric (a-z, A-Z, 0-9 or _-.:) or longer than 255 characters.');
                     $result[] = $errorStatus;
@@ -129,10 +128,10 @@ class DatabaseConnect extends AbstractStepAction
             if (isset($postValues['port']) && $postValues['host'] !== 'localhost') {
                 $value = $postValues['port'];
                 if (preg_match('/^[0-9]+(:.+)?$/', $value) && $value > 0 && $value <= 65535) {
-                    $localConfigurationPathValuePairs['DB/Connections/Default/port'] = (int)$value;
+                    $localConfigurationPathValuePairs['DB/port'] = (int)$value;
                 } else {
                     /** @var $errorStatus \TYPO3\CMS\Install\Status\ErrorStatus */
-                    $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
+                    $errorStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\ErrorStatus::class);
                     $errorStatus->setTitle('Database port not valid');
                     $errorStatus->setMessage('Given port is not numeric or within range 1 to 65535.');
                     $result[] = $errorStatus;
@@ -141,10 +140,10 @@ class DatabaseConnect extends AbstractStepAction
 
             if (isset($postValues['socket']) && $postValues['socket'] !== '') {
                 if (@file_exists($postValues['socket'])) {
-                    $localConfigurationPathValuePairs['DB/Connections/Default/unix_socket'] = $postValues['socket'];
+                    $localConfigurationPathValuePairs['DB/socket'] = $postValues['socket'];
                 } else {
                     /** @var $errorStatus \TYPO3\CMS\Install\Status\ErrorStatus */
-                    $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
+                    $errorStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\ErrorStatus::class);
                     $errorStatus->setTitle('Socket does not exist');
                     $errorStatus->setMessage('Given socket location does not exist on server.');
                     $result[] = $errorStatus;
@@ -154,10 +153,10 @@ class DatabaseConnect extends AbstractStepAction
             if (isset($postValues['database'])) {
                 $value = $postValues['database'];
                 if (strlen($value) <= 50) {
-                    $localConfigurationPathValuePairs['DB/Connections/Default/dbname'] = $value;
+                    $localConfigurationPathValuePairs['DB/database'] = $value;
                 } else {
                     /** @var $errorStatus \TYPO3\CMS\Install\Status\ErrorStatus */
-                    $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
+                    $errorStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\ErrorStatus::class);
                     $errorStatus->setTitle('Database name not valid');
                     $errorStatus->setMessage('Given database name must be shorter than fifty characters.');
                     $result[] = $errorStatus;
@@ -175,11 +174,11 @@ class DatabaseConnect extends AbstractStepAction
                     ->disableCoreCache();
                 if ($this->isDbalEnabled()) {
                     require(ExtensionManagementUtility::extPath('dbal') . 'ext_localconf.php');
-                    GeneralUtility::makeInstance(\TYPO3\CMS\Core\Cache\CacheManager::class)->setCacheConfigurations($GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']);
+                    \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Cache\CacheManager::class)->setCacheConfigurations($GLOBALS['TYPO3_CONF_VARS']['SYS']['caching']['cacheConfigurations']);
                 }
                 if (!$this->isConnectSuccessful()) {
                     /** @var $errorStatus \TYPO3\CMS\Install\Status\ErrorStatus */
-                    $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
+                    $errorStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\ErrorStatus::class);
                     $errorStatus->setTitle('Database connect not successful');
                     $errorStatus->setMessage('Connecting to the database with given settings failed. Please check.');
                     $result[] = $errorStatus;
@@ -225,8 +224,8 @@ class DatabaseConnect extends AbstractStepAction
             ->assign('password', $this->getConfiguredPassword())
             ->assign('host', $this->getConfiguredHost())
             ->assign('port', $this->getConfiguredOrDefaultPort())
-            ->assign('database', $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['dbname'] ?: '')
-            ->assign('socket', $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['unix_socket'] ?: '');
+            ->assign('database', $GLOBALS['TYPO3_CONF_VARS']['DB']['database'] ?: '')
+            ->assign('socket', $GLOBALS['TYPO3_CONF_VARS']['DB']['socket'] ?: '');
 
         if ($isDbalEnabled) {
             $this->view->assign('selectedDbalDriver', $this->getSelectedDbalDriver());
@@ -287,13 +286,13 @@ class DatabaseConnect extends AbstractStepAction
     protected function isConnectSuccessful()
     {
         /** @var $databaseConnection \TYPO3\CMS\Core\Database\DatabaseConnection */
-        $databaseConnection = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Database\DatabaseConnection::class);
+        $databaseConnection = $this->objectManager->get(\TYPO3\CMS\Core\Database\DatabaseConnection::class);
 
         if ($this->isDbalEnabled()) {
             // Set additional connect information based on dbal driver. postgres for example needs
             // database name already for connect.
-            if (isset($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['dbname'])) {
-                $databaseConnection->setDatabaseName($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['dbname']);
+            if (isset($GLOBALS['TYPO3_CONF_VARS']['DB']['database'])) {
+                $databaseConnection->setDatabaseName($GLOBALS['TYPO3_CONF_VARS']['DB']['database']);
             }
         }
 
@@ -318,11 +317,12 @@ class DatabaseConnect extends AbstractStepAction
     protected function isHostConfigured()
     {
         $hostConfigured = true;
-        if (empty($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['host'])) {
+        if (empty($GLOBALS['TYPO3_CONF_VARS']['DB']['host'])) {
             $hostConfigured = false;
         }
-        if (!isset($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['port'])
-            && !isset($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['unix_socket'])
+        if (
+            !isset($GLOBALS['TYPO3_CONF_VARS']['DB']['port'])
+            && !isset($GLOBALS['TYPO3_CONF_VARS']['DB']['socket'])
         ) {
             $hostConfigured = false;
         }
@@ -340,10 +340,10 @@ class DatabaseConnect extends AbstractStepAction
     protected function isConfigurationComplete()
     {
         $configurationComplete = $this->isHostConfigured();
-        if (!isset($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['user'])) {
+        if (!isset($GLOBALS['TYPO3_CONF_VARS']['DB']['username'])) {
             $configurationComplete = false;
         }
-        if (!isset($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['password'])) {
+        if (!isset($GLOBALS['TYPO3_CONF_VARS']['DB']['password'])) {
             $configurationComplete = false;
         }
         return $configurationComplete;
@@ -367,39 +367,39 @@ class DatabaseConnect extends AbstractStepAction
      */
     protected function useDefaultValuesForNotConfiguredOptions()
     {
-        $localConfigurationPathValuePairs = array();
+        $localConfigurationPathValuePairs = [];
 
-        $localConfigurationPathValuePairs['DB/Connections/Default/host'] = $this->getConfiguredHost();
+        $localConfigurationPathValuePairs['DB/host'] = $this->getConfiguredHost();
 
         // If host is "local" either by upgrading or by first install, we try a socket
         // connection first and use TCP/IP as fallback
-        if ($localConfigurationPathValuePairs['DB/Connections/Default/host'] === 'localhost'
-            || GeneralUtility::cmpIP($localConfigurationPathValuePairs['DB/Connections/Default/host'], '127.*.*.*')
-            || (string)$localConfigurationPathValuePairs['DB/Connections/Default/host'] === ''
+        if ($localConfigurationPathValuePairs['DB/host'] === 'localhost'
+            || \TYPO3\CMS\Core\Utility\GeneralUtility::cmpIP($localConfigurationPathValuePairs['DB/host'], '127.*.*.*')
+            || (string)$localConfigurationPathValuePairs['DB/host'] === ''
         ) {
             if ($this->isConnectionWithUnixDomainSocketPossible()) {
-                $localConfigurationPathValuePairs['DB/Connections/Default/host'] = 'localhost';
-                $localConfigurationPathValuePairs['DB/Connections/Default/unix_socket'] = $this->getConfiguredSocket();
+                $localConfigurationPathValuePairs['DB/host'] = 'localhost';
+                $localConfigurationPathValuePairs['DB/socket'] = $this->getConfiguredSocket();
             } else {
-                if (!GeneralUtility::isFirstPartOfStr($localConfigurationPathValuePairs['DB/Connections/Default/host'], '127.')) {
-                    $localConfigurationPathValuePairs['DB/Connections/Default/host'] = '127.0.0.1';
+                if (!\TYPO3\CMS\Core\Utility\GeneralUtility::isFirstPartOfStr($localConfigurationPathValuePairs['DB/host'], '127.')) {
+                    $localConfigurationPathValuePairs['DB/host'] = '127.0.0.1';
                 }
             }
         }
 
-        if (!isset($localConfigurationPathValuePairs['DB/Connections/Default/unix_socket'])) {
+        if (!isset($localConfigurationPathValuePairs['DB/socket'])) {
             // Make sure a default port is set if not configured yet
             // This is independent from any host configuration
             $port = $this->getConfiguredPort();
             if ($port > 0) {
-                $localConfigurationPathValuePairs['DB/Connections/Default/port'] = $port;
+                $localConfigurationPathValuePairs['DB/port'] = $port;
             } else {
-                $localConfigurationPathValuePairs['DB/Connections/Default/port'] = $this->getConfiguredOrDefaultPort();
+                $localConfigurationPathValuePairs['DB/port'] = $this->getConfiguredOrDefaultPort();
             }
         }
 
         /** @var \TYPO3\CMS\Core\Configuration\ConfigurationManager $configurationManager */
-        $configurationManager = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
+        $configurationManager = $this->objectManager->get(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
         $configurationManager->setLocalConfigurationValuesByPathValuePairs($localConfigurationPathValuePairs);
     }
 
@@ -478,7 +478,7 @@ class DatabaseConnect extends AbstractStepAction
     protected function getAvailableDbalDrivers()
     {
         $supportedDrivers = $this->getSupportedDbalDrivers();
-        $availableDrivers = array();
+        $availableDrivers = [];
         $selectedDbalDriver = $this->getSelectedDbalDriver();
         foreach ($supportedDrivers as $abstractionLayer => $drivers) {
             foreach ($drivers as $driver => $info) {
@@ -497,9 +497,9 @@ class DatabaseConnect extends AbstractStepAction
                 }
                 if ($isAvailable) {
                     if (!isset($availableDrivers[$abstractionLayer])) {
-                        $availableDrivers[$abstractionLayer] = array();
+                        $availableDrivers[$abstractionLayer] = [];
                     }
-                    $availableDrivers[$abstractionLayer][$driver] = array();
+                    $availableDrivers[$abstractionLayer][$driver] = [];
                     $availableDrivers[$abstractionLayer][$driver]['driver'] = $driver;
                     $availableDrivers[$abstractionLayer][$driver]['label'] = $info['label'];
                     $availableDrivers[$abstractionLayer][$driver]['selected'] = false;
@@ -520,28 +520,28 @@ class DatabaseConnect extends AbstractStepAction
      */
     protected function getSupportedDbalDrivers()
     {
-        $supportedDrivers = array(
-            'Native' => array(
-                'mssql' => array(
+        $supportedDrivers = [
+            'Native' => [
+                'mssql' => [
                     'label' => 'Microsoft SQL Server',
-                    'extensions' => array('mssql')
-                ),
-                'oci8' => array(
+                    'extensions' => ['mssql']
+                ],
+                'oci8' => [
                     'label' => 'Oracle OCI8',
-                    'extensions' => array('oci8')
-                ),
-                'postgres' => array(
+                    'extensions' => ['oci8']
+                ],
+                'postgres' => [
                     'label' => 'PostgreSQL',
-                    'extensions' => array('pgsql')
-                )
-            ),
-            'ODBC' => array(
-                'odbc_mssql' => array(
+                    'extensions' => ['pgsql']
+                ]
+            ],
+            'ODBC' => [
+                'odbc_mssql' => [
                     'label' => 'Microsoft SQL Server',
-                    'extensions' => array('odbc', 'mssql')
-                )
-            )
-        );
+                    'extensions' => ['odbc', 'mssql']
+                ]
+            ]
+        ];
         return $supportedDrivers;
     }
 
@@ -572,7 +572,7 @@ class DatabaseConnect extends AbstractStepAction
             ExtensionManagementUtility::loadExtension('dbal');
         }
         /** @var $errorStatus \TYPO3\CMS\Install\Status\WarningStatus */
-        $warningStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\WarningStatus::class);
+        $warningStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\WarningStatus::class);
         $warningStatus->setTitle('Loaded database abstraction layer');
         return $warningStatus;
     }
@@ -592,7 +592,7 @@ class DatabaseConnect extends AbstractStepAction
         }
         // @TODO: Remove configuration from TYPO3_CONF_VARS['EXTCONF']['dbal']
         /** @var $errorStatus \TYPO3\CMS\Install\Status\WarningStatus */
-        $warningStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\WarningStatus::class);
+        $warningStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\WarningStatus::class);
         $warningStatus->setTitle('Removed database abstraction layer');
         return $warningStatus;
     }
@@ -604,7 +604,7 @@ class DatabaseConnect extends AbstractStepAction
      */
     protected function getConfiguredUsername()
     {
-        $username = $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['user'] ?? '';
+        $username = isset($GLOBALS['TYPO3_CONF_VARS']['DB']['username']) ? $GLOBALS['TYPO3_CONF_VARS']['DB']['username'] : '';
         return $username;
     }
 
@@ -615,7 +615,7 @@ class DatabaseConnect extends AbstractStepAction
      */
     protected function getConfiguredPassword()
     {
-        $password = $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['password'] ?? '';
+        $password = isset($GLOBALS['TYPO3_CONF_VARS']['DB']['password']) ? $GLOBALS['TYPO3_CONF_VARS']['DB']['password'] : '';
         return $password;
     }
 
@@ -626,8 +626,8 @@ class DatabaseConnect extends AbstractStepAction
      */
     protected function getConfiguredHost()
     {
-        $host = $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['host'] ?? '';
-        $port = $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['port'] ?? '';
+        $host = isset($GLOBALS['TYPO3_CONF_VARS']['DB']['host']) ? $GLOBALS['TYPO3_CONF_VARS']['DB']['host'] : '';
+        $port = isset($GLOBALS['TYPO3_CONF_VARS']['DB']['port']) ? $GLOBALS['TYPO3_CONF_VARS']['DB']['port'] : '';
         if (strlen($port) < 1 && substr_count($host, ':') === 1) {
             list($host) = explode(':', $host);
         }
@@ -641,8 +641,8 @@ class DatabaseConnect extends AbstractStepAction
      */
     protected function getConfiguredPort()
     {
-        $host = $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['host'] ?? '';
-        $port = $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['port'] ?? '';
+        $host = isset($GLOBALS['TYPO3_CONF_VARS']['DB']['host']) ? $GLOBALS['TYPO3_CONF_VARS']['DB']['host'] : '';
+        $port = isset($GLOBALS['TYPO3_CONF_VARS']['DB']['port']) ? $GLOBALS['TYPO3_CONF_VARS']['DB']['port'] : '';
         if ($port === '' && substr_count($host, ':') === 1) {
             $hostPortArray = explode(':', $host);
             $port = $hostPortArray[1];
@@ -657,7 +657,7 @@ class DatabaseConnect extends AbstractStepAction
      */
     protected function getConfiguredSocket()
     {
-        $socket = $GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['unix_socket'] ?? '';
+        $socket = isset($GLOBALS['TYPO3_CONF_VARS']['DB']['socket']) ? $GLOBALS['TYPO3_CONF_VARS']['DB']['socket'] : '';
         return $socket;
     }
 }

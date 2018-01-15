@@ -7,21 +7,21 @@ if (TYPO3_MODE === 'BE') {
     $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['reports']['tx_reports']['status']['providers']['security'][] = \TYPO3\CMS\Install\Report\SecurityStatusReport::class;
 
     // Only add the environment status report if not in CLI mode
-    if (TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_CLI) {
+    if (!defined('TYPO3_cliMode') || !TYPO3_cliMode) {
         $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['reports']['tx_reports']['status']['providers']['system'][] = \TYPO3\CMS\Install\Report\EnvironmentStatusReport::class;
     }
 
-    \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addModule(
+    // Register backend module
+    \TYPO3\CMS\Extbase\Utility\ExtensionUtility::registerModule(
+        'TYPO3.CMS.Install',
         'system',
-        'extinstall',
-        '',
-        '',
-        array(
-            'routeTarget' => \TYPO3\CMS\Install\Controller\BackendModuleController::class . '::index',
+        'install', '', [
+            'BackendModule' => 'index, showEnableInstallToolButton, enableInstallTool',
+        ],
+        [
             'access' => 'admin',
-            'name' => 'system_extinstall',
             'icon' => 'EXT:install/Resources/Public/Icons/module-install.svg',
-            'labels' => 'LLL:EXT:install/Resources/Private/Language/BackendModule.xlf'
-        )
+            'labels' => 'LLL:EXT:install/Resources/Private/Language/BackendModule.xlf',
+        ]
     );
 }

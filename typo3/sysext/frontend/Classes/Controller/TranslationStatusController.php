@@ -17,9 +17,6 @@ namespace TYPO3\CMS\Frontend\Controller;
 
 use TYPO3\CMS\Backend\Tree\View\PageTreeView;
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Database\Query\Restriction\BackendWorkspaceRestriction;
-use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -33,12 +30,6 @@ class TranslationStatusController extends \TYPO3\CMS\Backend\Module\AbstractFunc
      * @var IconFactory
      */
     protected $iconFactory;
-
-    /**
-     * @var string
-     * static table for pages_language_overlay
-     */
-    protected static $pageLanguageOverlayTable = 'pages_language_overlay';
 
     /**
      * Construct for initialize class variables
@@ -56,21 +47,21 @@ class TranslationStatusController extends \TYPO3\CMS\Backend\Module\AbstractFunc
     public function modMenu()
     {
         $lang = $this->getLanguageService();
-        $menuArray = array(
-            'depth' => array(
+        $menuArray = [
+            'depth' => [
                 0 => $lang->sL('LLL:EXT:lang/locallang_core.xlf:labels.depth_0'),
                 1 => $lang->sL('LLL:EXT:lang/locallang_core.xlf:labels.depth_1'),
                 2 => $lang->sL('LLL:EXT:lang/locallang_core.xlf:labels.depth_2'),
                 3 => $lang->sL('LLL:EXT:lang/locallang_core.xlf:labels.depth_3'),
                 4 => $lang->sL('LLL:EXT:lang/locallang_core.xlf:labels.depth_4'),
                 999 => $lang->sL('LLL:EXT:lang/locallang_core.xlf:labels.depth_infi')
-            )
-        );
+            ]
+        ];
         // Languages:
         $lang = $this->getSystemLanguages();
-        $menuArray['lang'] = array(
+        $menuArray['lang'] = [
             0 => '[All]'
-        );
+        ];
         foreach ($lang as $langRec) {
             $menuArray['lang'][$langRec['uid']] = $langRec['title'];
         }
@@ -84,7 +75,7 @@ class TranslationStatusController extends \TYPO3\CMS\Backend\Module\AbstractFunc
      */
     public function main()
     {
-        $theOutput = '<h1>' . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:frontend/Resources/Private/Language/locallang_webinfo.xlf:lang_title')) . '</h1>';
+        $theOutput = $this->pObj->doc->header($this->getLanguageService()->sL('LLL:EXT:frontend/Resources/Private/Language/locallang_webinfo.xlf:lang_title'));
         if ($this->pObj->id) {
             // Depth selector:
             $theOutput .= '<div class="form-inline form-inline-spaced">';
@@ -105,10 +96,10 @@ class TranslationStatusController extends \TYPO3\CMS\Backend\Module\AbstractFunc
             $tree->addField('l18n_cfg');
             // Creating top icon; the current page
             $HTML = $this->iconFactory->getIconForRecord('pages', $treeStartingRecord, Icon::SIZE_SMALL)->render();
-            $tree->tree[] = array(
+            $tree->tree[] = [
                 'row' => $treeStartingRecord,
                 'HTML' => $HTML
-            );
+            ];
             // Create the tree from starting point:
             if ($depth) {
                 $tree->getTree($treeStartingPoint, $depth, '');
@@ -134,10 +125,10 @@ class TranslationStatusController extends \TYPO3\CMS\Backend\Module\AbstractFunc
         $titleLen = $this->getBackendUser()->uc['titleLen'];
         // Put together the TREE:
         $output = '';
-        $newOL_js = array();
-        $langRecUids = array();
+        $newOL_js = [];
+        $langRecUids = [];
         foreach ($tree->tree as $data) {
-            $tCells = array();
+            $tCells = [];
             $langRecUids[0][] = $data['row']['uid'];
             // Page icons / titles etc.
             $tCells[] = '<td' . ($data['row']['_CSSCLASS'] ? ' class="' . $data['row']['_CSSCLASS'] . '"' : '') . '>' .
@@ -172,15 +163,15 @@ class TranslationStatusController extends \TYPO3\CMS\Backend\Module\AbstractFunc
                 ) . '">' . $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render() . '</a>';
             $info .= str_replace('###LANG_UID###', '0', $viewPageLink);
             $info .= '&nbsp;';
-            $info .= GeneralUtility::hideIfDefaultLanguage($data['row']['l18n_cfg']) ? '<span title="' . htmlspecialchars($lang->sL('LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.l18n_cfg.I.1')) . '">D</span>' : '&nbsp;';
-            $info .= GeneralUtility::hideIfNotTranslated($data['row']['l18n_cfg']) ? '<span title="' . htmlspecialchars($lang->sL('LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.l18n_cfg.I.2')) . '">N</span>' : '&nbsp;';
+            $info .= GeneralUtility::hideIfDefaultLanguage($data['row']['l18n_cfg']) ? '<span title="' . $lang->sL('LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.l18n_cfg.I.1', true) . '">D</span>' : '&nbsp;';
+            $info .= GeneralUtility::hideIfNotTranslated($data['row']['l18n_cfg']) ? '<span title="' . $lang->sL('LLL:EXT:frontend/Resources/Private/Language/locallang_tca.xlf:pages.l18n_cfg.I.2', true) . '">N</span>' : '&nbsp;';
             // Put into cell:
-            $tCells[] = '<td class="' . $status . ' col-border-left btn-group">' . $info . '</td>';
+            $tCells[] = '<td class="' . $status . ' col-border-left"><div class="btn-group">' . $info . '</div></td>';
             $tCells[] = '<td class="' . $status . '" title="' . $lang->sL(
                     'LLL:EXT:frontend/Resources/Private/Language/locallang_webinfo.xlf:lang_renderl10n_CEcount'
                 ) . '" align="center">' . $this->getContentElementCount($data['row']['uid'], 0) . '</td>';
             $modSharedTSconfig = BackendUtility::getModTSconfig($data['row']['uid'], 'mod.SHARED');
-            $disableLanguages = isset($modSharedTSconfig['properties']['disableLanguages']) ? GeneralUtility::trimExplode(',', $modSharedTSconfig['properties']['disableLanguages'], true) : array();
+            $disableLanguages = isset($modSharedTSconfig['properties']['disableLanguages']) ? GeneralUtility::trimExplode(',', $modSharedTSconfig['properties']['disableLanguages'], true) : [];
             // Traverse system languages:
             foreach ($languages as $langRow) {
                 if ($this->pObj->MOD_SETTINGS['lang'] == 0 || (int)$this->pObj->MOD_SETTINGS['lang'] === (int)$langRow['uid']) {
@@ -218,7 +209,7 @@ class TranslationStatusController extends \TYPO3\CMS\Backend\Module\AbstractFunc
                                 'LLL:EXT:frontend/Resources/Private/Language/locallang_webinfo.xlf:lang_renderl10n_editLanguageOverlayRecord'
                             ) . '">' . $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render() . '</a>';
                         $info .= str_replace('###LANG_UID###', $langRow['uid'], $viewPageLink);
-                        $tCells[] = '<td class="' . $status . ' btn-group">' . $info . '</td>';
+                        $tCells[] = '<td class="' . $status . '"><div class="btn-group">' . $info . '</div></td>';
                         $tCells[] = '<td class="' . $status . '" title="' . $lang->sL(
                                 'LLL:EXT:frontend/Resources/Private/Language/locallang_webinfo.xlf:lang_renderl10n_CEcount'
                             ) . '" align="center">' . $this->getContentElementCount($data['row']['uid'], $langRow['uid']) . '</td>';
@@ -251,7 +242,7 @@ class TranslationStatusController extends \TYPO3\CMS\Backend\Module\AbstractFunc
 				</tr>';
         }
         // Put together HEADER:
-        $tCells = array();
+        $tCells = [];
         $tCells[] = '<td>' . $lang->sL('LLL:EXT:frontend/Resources/Private/Language/locallang_webinfo.xlf:lang_renderl10n_page') . ':</td>';
         if (is_array($langRecUids[0])) {
             $editUrl = BackendUtility::getModuleUrl('record_edit', [
@@ -340,25 +331,18 @@ class TranslationStatusController extends \TYPO3\CMS\Backend\Module\AbstractFunc
         if (!$this->getBackendUser()->user['admin'] && $this->getBackendUser()->groupData['allowed_languages'] !== '') {
             $allowed_languages = array_flip(explode(',', $this->getBackendUser()->groupData['allowed_languages']));
         }
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable('sys_language');
-        $queryBuilder
-            ->getRestrictions()
-            ->removeAll();
-        $queryBuilder
-            ->select('*')
-            ->from('sys_language');
-        $res = $queryBuilder->execute();
+        $res = $this->getDatabaseConnection()->exec_SELECTquery('*', 'sys_language', '1=1' . BackendUtility::deleteClause('sys_language'));
         $outputArray = [];
-        if (is_array($allowed_languages) && !empty($allowed_languages)) {
-            while ($output = $res->fetch()) {
-                if (isset($allowed_languages[$output['uid']])) {
-                    $outputArray[] = $output;
+        while ($row = $this->getDatabaseConnection()->sql_fetch_assoc($res)) {
+            if (is_array($allowed_languages) && !empty($allowed_languages)) {
+                if (isset($allowed_languages[$row['uid']])) {
+                    $outputArray[] = $row;
                 }
+            } else {
+                $outputArray[] = $row;
             }
-        } else {
-            $outputArray = $res->fetchAll();
         }
+        $this->getDatabaseConnection()->sql_free_result($res);
         return $outputArray;
     }
 
@@ -371,27 +355,20 @@ class TranslationStatusController extends \TYPO3\CMS\Backend\Module\AbstractFunc
      */
     public function getLangStatus($pageId, $langId)
     {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable(static::$pageLanguageOverlayTable);
-        $queryBuilder
-            ->getRestrictions()
-            ->removeAll()
-            ->add(GeneralUtility::makeInstance(BackendWorkspaceRestriction::class))
-            ->add(GeneralUtility::makeInstance(DeletedRestriction::class));
-        $result = $queryBuilder
-            ->select('*')
-            ->from(static::$pageLanguageOverlayTable)
-            ->where($queryBuilder->expr()->eq('pid', (int)$pageId))
-            ->andWhere($queryBuilder->expr()->eq('sys_language_uid', (int)$langId))
-            ->execute();
-
-        $row = $result->fetch();
-        BackendUtility::workspaceOL(static::$pageLanguageOverlayTable, $row);
+        $res = $this->getDatabaseConnection()->exec_SELECTquery(
+            '*',
+            'pages_language_overlay',
+            'pid=' . (int)$pageId .
+                ' AND sys_language_uid=' . (int)$langId .
+                BackendUtility::deleteClause('pages_language_overlay') .
+                BackendUtility::versioningPlaceholderClause('pages_language_overlay')
+        );
+        $row = $this->getDatabaseConnection()->sql_fetch_assoc($res);
+        BackendUtility::workspaceOL('pages_language_overlay', $row);
         if (is_array($row)) {
-            $row['_COUNT'] = $result->rowCount();
+            $row['_COUNT'] = $this->getDatabaseConnection()->sql_num_rows($res);
             $row['_HIDDEN'] = $row['hidden'] || (int)$row['endtime'] > 0 && (int)$row['endtime'] < $GLOBALS['EXEC_TIME'] || $GLOBALS['EXEC_TIME'] < (int)$row['starttime'];
         }
-        $result->closeCursor();
         return $row;
     }
 
@@ -404,23 +381,7 @@ class TranslationStatusController extends \TYPO3\CMS\Backend\Module\AbstractFunc
      */
     public function getContentElementCount($pageId, $sysLang)
     {
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable(static::$pageLanguageOverlayTable);
-        $queryBuilder->getRestrictions()
-            ->removeAll()
-            ->add(GeneralUtility::makeInstance(DeletedRestriction::class))
-            ->add(GeneralUtility::makeInstance(BackendWorkspaceRestriction::class));
-        $count = $queryBuilder
-            ->count('uid')
-            ->from('tt_content')
-            ->where(
-                $queryBuilder->expr()->eq('pid', (int)$pageId)
-            )
-            ->andWhere(
-                $queryBuilder->expr()->eq('sys_language_uid', (int)$sysLang)
-            )
-            ->execute()
-            ->fetchColumn(0);
+        $count = $this->getDatabaseConnection()->exec_SELECTcountRows('uid', 'tt_content', 'pid=' . (int)$pageId . ' AND sys_language_uid=' . (int)$sysLang . BackendUtility::deleteClause('tt_content') . BackendUtility::versioningPlaceholderClause('tt_content'));
         return $count ?: '-';
     }
 
@@ -432,6 +393,16 @@ class TranslationStatusController extends \TYPO3\CMS\Backend\Module\AbstractFunc
     protected function getLanguageService()
     {
         return $GLOBALS['LANG'];
+    }
+
+    /**
+     * Returns the database connection
+     *
+     * @return \TYPO3\CMS\Core\Database\DatabaseConnection
+     */
+    protected function getDatabaseConnection()
+    {
+        return $GLOBALS['TYPO3_DB'];
     }
 
     /**

@@ -50,7 +50,7 @@ class EditImageHandler implements LinkHandlerInterface, LinkParameterProviderInt
     public function initialize(AbstractLinkBrowserController $linkBrowser, $identifier, array $configuration)
     {
         if (!$linkBrowser instanceof SelectImageController) {
-            throw new \InvalidArgumentException('The given $linkBrowser must be of type SelectImageController."', 1460976644);
+            throw new \InvalidArgumentException('The given $linkBrowser must be of type SelectImageController."', 1455499721);
         }
         $this->selectImageController = $linkBrowser;
     }
@@ -113,7 +113,7 @@ class EditImageHandler implements LinkHandlerInterface, LinkParameterProviderInt
         GeneralUtility::makeInstance(PageRenderer::class)->loadRequireJsModule('TYPO3/CMS/Rtehtmlarea/EditImage');
 
         $buttonConfig = $this->selectImageController->getButtonConfiguration();
-        $removedProperties = array();
+        $removedProperties = [];
         if (is_array($buttonConfig['properties.'])) {
             if ($buttonConfig['properties.']['removeItems']) {
                 $removedProperties = GeneralUtility::trimExplode(',', $buttonConfig['properties.']['removeItems'], true);

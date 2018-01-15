@@ -211,8 +211,8 @@ class TypoScriptTemplateInformationModuleFunctionController extends AbstractFunc
                 || isset($POST['_saveandclosedok'])
             ) {
                 // Set the data to be saved
-                $recData = array();
-                $alternativeFileName = array();
+                $recData = [];
+                $alternativeFileName = [];
                 if (is_array($POST['data'])) {
                     foreach ($POST['data'] as $field => $val) {
                         switch ($field) {
@@ -229,7 +229,7 @@ class TypoScriptTemplateInformationModuleFunctionController extends AbstractFunc
                     $tce = GeneralUtility::makeInstance(DataHandler::class);
                     $tce->alternativeFileName = $alternativeFileName;
                     // Initialize
-                    $tce->start($recData, array());
+                    $tce->start($recData, []);
                     // Saved the stuff
                     $tce->process_datamap();
                     // Clear the cache (note: currently only admin-users can clear the cache in tce_main.php)
@@ -247,10 +247,10 @@ class TypoScriptTemplateInformationModuleFunctionController extends AbstractFunc
             if (isset($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ext/tstemplate_info/class.tx_tstemplateinfo.php']['postTCEProcessingHook'])) {
                 $postTCEProcessingHook = &$GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ext/tstemplate_info/class.tx_tstemplateinfo.php']['postTCEProcessingHook'];
                 if (is_array($postTCEProcessingHook)) {
-                    $hookParameters = array(
+                    $hookParameters = [
                         'POST' => $POST,
                         'tce' => $tce
-                    );
+                    ];
                     foreach ($postTCEProcessingHook as $hookFunction) {
                         GeneralUtility::callUserFunction($hookFunction, $hookParameters, $this);
                     }
@@ -318,13 +318,13 @@ class TypoScriptTemplateInformationModuleFunctionController extends AbstractFunc
             if (isset($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ext/tstemplate_info/class.tx_tstemplateinfo.php']['postOutputProcessingHook'])) {
                 $postOutputProcessingHook = &$GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ext/tstemplate_info/class.tx_tstemplateinfo.php']['postOutputProcessingHook'];
                 if (is_array($postOutputProcessingHook)) {
-                    $hookParameters = array(
+                    $hookParameters = [
                         'theOutput' => &$theOutput,
                         'POST' => $POST,
                         'e' => $e,
                         'tplRow' => $tplRow,
                         'numberOfRows' => $numberOfRows
-                    );
+                    ];
                     foreach ($postOutputProcessingHook as $hookFunction) {
                         GeneralUtility::callUserFunction($hookFunction, $hookParameters, $this);
                     }

@@ -119,8 +119,7 @@ class TcaSelectItemsTest extends UnitTestCase
             ],
         ];
 
-        $this->expectException(\UnexpectedValueException::class);
-        $this->expectExceptionCode(1439288036);
+        $this->setExpectedException(\UnexpectedValueException::class, $this->anything(), 1439288036);
 
         $this->subject->addData($input);
     }
@@ -231,8 +230,7 @@ class TcaSelectItemsTest extends UnitTestCase
             ],
         ];
 
-        $this->expectException(\UnexpectedValueException::class);
-        $this->expectExceptionCode(1439298496);
+        $this->setExpectedException(\UnexpectedValueException::class, $this->anything(), 1439298496);
 
         $this->subject->addData($input);
     }
@@ -577,6 +575,11 @@ class TcaSelectItemsTest extends UnitTestCase
         $GLOBALS['LANG'] = $languageService->reveal();
         $languageService->loadSingleTableDescription(Argument::cetera())->willReturn(null);
         $languageService->sL(Argument::cetera())->willReturnArgument(0);
+
+        // Needed to suppress a cache in xml2array
+        /** @var DatabaseConnection|ObjectProphecy $database */
+        $database = $this->prophesize(DatabaseConnection::class);
+        $GLOBALS['TYPO3_DB'] = $database->reveal();
 
         $expectedItems = [
             0 => [
@@ -1004,6 +1007,11 @@ class TcaSelectItemsTest extends UnitTestCase
                     'anItemKey' => [
                         0 => 'anItemTitle',
                     ],
+                    'anotherKey' => [
+                        0 => 'anotherTitle',
+                        1 => 'status-status-permission-denied',
+                        2 => 'aDescription',
+                    ],
                 ],
             ]
         ];
@@ -1020,6 +1028,12 @@ class TcaSelectItemsTest extends UnitTestCase
                 1 => 'aKey:anItemKey',
                 2 => 'empty-empty',
                 3 => null,
+            ],
+            2 => [
+                0 => 'anotherTitle',
+                1 => 'aKey:anotherKey',
+                2 => 'status-status-permission-denied',
+                3 => [ 'description' => 'aDescription' ],
             ],
         ];
 
@@ -1055,6 +1069,18 @@ class TcaSelectItemsTest extends UnitTestCase
         $languageService = $this->prophesize(LanguageService::class);
         $GLOBALS['LANG'] = $languageService->reveal();
         $languageService->sL(Argument::cetera())->willReturnArgument(0);
+        $languageService->moduleLabels = [
+            'tabs_images' => [
+                'aModule_tab' => PATH_site . 'aModuleTabIcon.gif',
+            ],
+            'labels' => [
+                'aModule_tablabel' => 'aModuleTabLabel',
+                'aModule_tabdescr' => 'aModuleTabDescription',
+            ],
+            'tabs' => [
+                'aModule_tab' => 'aModuleLabel',
+            ]
+        ];
 
         /** @var ModuleLoader|ObjectProphecy $moduleLoaderProphecy */
         $moduleLoaderProphecy = $this->prophesize(ModuleLoader::class);
@@ -1063,22 +1089,12 @@ class TcaSelectItemsTest extends UnitTestCase
         $moduleLoaderProphecy->modListGroup = [
             'aModule',
         ];
-        $moduleLoaderProphecy->modules = [
-            'aModule' => [
-                'iconIdentifier' => 'empty-empty'
-            ]
-        ];
-        $moduleLoaderProphecy->getLabelsForModule('aModule')->shouldBeCalled()->willReturn([
-            'shortdescription' => 'aModuleTabLabel',
-            'description' => 'aModuleTabDescription',
-            'title' => 'aModuleLabel'
-        ]);
 
         $expectedItems = [
             0 => [
                 0 => 'aModuleLabel',
                 1 => 'aModule',
-                2 => 'empty-empty',
+                2 => '../aModuleTabIcon.gif',
                 3 => [
                     'title' => 'aModuleTabLabel',
                     'description' => 'aModuleTabDescription',
@@ -1088,7 +1104,6 @@ class TcaSelectItemsTest extends UnitTestCase
 
         $result = $this->subject->addData($input);
 
-        $result['processedTca']['columns']['aField']['config']['items'][0][2] = str_replace([CR, LF, TAB], ['', '', ''], $result['processedTca']['columns']['aField']['config']['items'][0][2]);
         $this->assertSame($expectedItems, $result['processedTca']['columns']['aField']['config']['items']);
     }
 
@@ -1097,7 +1112,7 @@ class TcaSelectItemsTest extends UnitTestCase
      */
     public function addDataAddsFileItemsWithConfiguredFileFolder()
     {
-        $directory = $this->getUniqueId('typo3temp/var/tests/test-') . '/';
+        $directory = $this->getUniqueId('typo3temp/test-') . '/';
         $input = [
             'tableName' => 'aTable',
             'databaseRow' => [],
@@ -1132,13 +1147,13 @@ class TcaSelectItemsTest extends UnitTestCase
             0 => [
                 0 => 'anImage.gif',
                 1 => 'anImage.gif',
-                2 => PATH_site . $directory . 'anImage.gif',
+                2 => '../' . $directory . 'anImage.gif',
                 3 => null,
             ],
             1 => [
                 0 => 'subdir/anotherImage.gif',
                 1 => 'subdir/anotherImage.gif',
-                2 => PATH_site . $directory . 'subdir/anotherImage.gif',
+                2 => '../' . $directory . 'subdir/anotherImage.gif',
                 3 => null,
             ],
         ];
@@ -1146,6 +1161,31 @@ class TcaSelectItemsTest extends UnitTestCase
         $result = $this->subject->addData($input);
 
         $this->assertSame($expectedItems, $result['processedTca']['columns']['aField']['config']['items']);
+    }
+
+    /**
+     * @test
+     */
+    public function addDataThrowsExceptionForInvalidFileFolder()
+    {
+        $input = [
+            'tableName' => 'aTable',
+            'databaseRow' => [],
+            'processedTca' => [
+                'columns' => [
+                    'aField' => [
+                        'config' => [
+                            'type' => 'select',
+                            'renderType' => 'selectSingle',
+                            'fileFolder' => 'EXT:non_existing/Resources/Public/',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $this->setExpectedException(\RuntimeException::class, $this->anything(), 1479399227);
+        $this->subject->addData($input);
     }
 
     /**
@@ -1318,6 +1358,15 @@ class TcaSelectItemsTest extends UnitTestCase
                 'AND fTable.uid=###CURRENT_PID###',
                 'pages.uid=fTable.pid AND pages.deleted=0 AND 1=1 AND fTable.uid=43',
                 [],
+            ],
+            'replace CURRENT_PID within FlexForm' => [
+                'AND fTable.uid=###CURRENT_PID###',
+                'pages.uid=fTable.pid AND pages.deleted=0 AND 1=1 AND fTable.uid=77',
+                [
+                    'flexParentDatabaseRow' => [
+                        'pid' => '77',
+                    ],
+                ],
             ],
             'replace CURRENT_PID integer cast' => [
                 'AND fTable.uid=###CURRENT_PID###',
@@ -1563,8 +1612,7 @@ class TcaSelectItemsTest extends UnitTestCase
             ],
         ];
 
-        $this->expectException(\UnexpectedValueException::class);
-        $this->expectExceptionCode(1439569743);
+        $this->setExpectedException(\UnexpectedValueException::class, $this->anything(), 1439569743);
 
         $this->subject->addData($input);
     }
@@ -1807,7 +1855,11 @@ class TcaSelectItemsTest extends UnitTestCase
                 'selicon_field_path' => 'uploads/media',
             ],
             'columns' =>[
-                'icon' => [],
+                'icon' => [
+                    'config' => [
+                        'type' => 'group',
+                    ],
+                ],
             ],
         ];
 
@@ -1840,7 +1892,7 @@ class TcaSelectItemsTest extends UnitTestCase
             0 => [
                 0 => 'foo.jpg',
                 1 => 1,
-                2 => 'uploads/media/foo.jpg', // combination of selicon_field_path and the row value of field 'icon'
+                2 => '../uploads/media/foo.jpg', // combination of selicon_field_path and the row value of field 'icon'
                 3 => null,
             ],
         ];
@@ -2982,13 +3034,104 @@ class TcaSelectItemsTest extends UnitTestCase
     }
 
     /**
+     * @test
+     */
+    public function processSelectFieldValueReturnsDuplicateValuesForMultipleSelect()
+    {
+        $languageService = $this->prophesize(LanguageService::class);
+        $GLOBALS['LANG'] = $languageService->reveal();
+        $languageService->sL(Argument::cetera())->willReturnArgument(0);
+
+        $input = [
+            'tableName' => 'aTable',
+            'databaseRow' => [
+                'aField' => '1,foo,foo,2,bar',
+            ],
+            'processedTca' => [
+                'columns' => [
+                    'aField' => [
+                        'config' => [
+                            'type' => 'select',
+                            'renderType' => 'selectSingle',
+                            'multiple' => true,
+                            'maxitems' => 999,
+                            'items' => [
+                                ['1', '1', null, null],
+                                ['foo', 'foo', null, null],
+                                ['bar', 'bar', null, null],
+                                ['2', '2', null, null],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $expected = $input;
+        $expected['databaseRow']['aField'] = [
+            '1',
+            'foo',
+            'foo',
+            '2',
+            'bar'
+        ];
+
+        $this->assertEquals($expected, $this->subject->addData($input));
+    }
+
+    /**
+     * @test
+     */
+    public function processSelectFieldValueReturnsUniqueValuesForMultipleSelect()
+    {
+        $languageService = $this->prophesize(LanguageService::class);
+        $GLOBALS['LANG'] = $languageService->reveal();
+        $languageService->sL(Argument::cetera())->willReturnArgument(0);
+
+        $input = [
+            'tableName' => 'aTable',
+            'databaseRow' => [
+                'aField' => '1,foo,foo,2,bar',
+            ],
+            'processedTca' => [
+                'columns' => [
+                    'aField' => [
+                        'config' => [
+                            'type' => 'select',
+                            'renderType' => 'selectSingle',
+                            'multiple' => false,
+                            'maxitems' => 999,
+                            'items' => [
+                                ['1', '1', null, null],
+                                ['foo', 'foo', null, null],
+                                ['bar', 'bar', null, null],
+                                ['2', '2', null, null],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $expected = $input;
+        $expected['databaseRow']['aField'] = [
+            0 => '1',
+            1 => 'foo',
+            3 => '2',
+            4 => 'bar',
+        ];
+
+        $this->assertEquals($expected, $this->subject->addData($input));
+    }
+
+    /**
      * Data Provider
      *
      * @return array
      */
     public function processSelectFieldSetsCorrectValuesForMmRelationsDataProvider()
     {
-        return array(
+        return [
             'Relation with MM table and new status with default values' => [
                 [
                     'tableName' => 'aTable',
@@ -3098,7 +3241,7 @@ class TcaSelectItemsTest extends UnitTestCase
                 [],
                 []
             ]
-        );
+        ];
     }
 
     /**

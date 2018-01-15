@@ -52,22 +52,22 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
      *
      * @var array
      */
-    protected $workspaceStageCache = array();
+    protected $workspaceStageCache = [];
 
     /**
      * @var array
      */
-    protected $workspaceStageAllowedCache = array();
+    protected $workspaceStageAllowedCache = [];
 
     /**
      * @var array
      */
-    protected $fetchGroupsCache = array();
+    protected $fetchGroupsCache = [];
 
     /**
      * @var array
      */
-    protected $userGroups = array();
+    protected $userGroups = [];
 
     /**
      * Getter for current workspace id
@@ -88,11 +88,11 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function getPreviousStageForElementCollection(
         $workspaceItems,
-        array $byTableName = array('tt_content', 'pages', 'pages_language_overlay')
+        array $byTableName = ['tt_content', 'pages', 'pages_language_overlay']
     ) {
-        $currentStage = array();
-        $previousStage = array();
-        $usedStages = array();
+        $currentStage = [];
+        $previousStage = [];
+        $usedStages = [];
         $found = false;
         $availableStagesForWS = array_reverse($this->getStagesForWS());
         $availableStagesForWSUser = $this->getStagesForWSUser();
@@ -119,12 +119,12 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
             }
         }
         if ($found === false || !$this->isStageAllowedForUser($currentStage['uid'])) {
-            $previousStage = array();
+            $previousStage = [];
         }
-        return array(
+        return [
             $currentStage,
             $previousStage
-        );
+        ];
     }
 
     /**
@@ -136,11 +136,11 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
      */
     public function getNextStageForElementCollection(
         $workspaceItems,
-        array $byTableName = array('tt_content', 'pages', 'pages_language_overlay')
+        array $byTableName = ['tt_content', 'pages', 'pages_language_overlay']
     ) {
-        $currentStage = array();
-        $usedStages = array();
-        $nextStage = array();
+        $currentStage = [];
+        $usedStages = [];
+        $nextStage = [];
         $availableStagesForWS = $this->getStagesForWS();
         $availableStagesForWSUser = $this->getStagesForWSUser();
         $byTableName = array_flip($byTableName);
@@ -167,12 +167,12 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
             }
         }
         if ($found === false || !$this->isStageAllowedForUser($currentStage['uid'])) {
-            $nextStage = array();
+            $nextStage = [];
         }
-        return array(
+        return [
             $currentStage,
             $nextStage
-        );
+        ];
     }
 
     /**
@@ -185,7 +185,7 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
         if (isset($this->workspaceStageCache[$this->getWorkspaceId()])) {
             $stages = $this->workspaceStageCache[$this->getWorkspaceId()];
         } elseif ($this->getWorkspaceId() === 0) {
-            $stages = array();
+            $stages = [];
         } else {
             $stages = $this->prepareStagesArray($this->getWorkspaceRecord()->getStages());
             $this->workspaceStageCache[$this->getWorkspaceId()] = $stages;
@@ -205,7 +205,7 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
         }
 
         /** @var $allowedStages StageRecord[] */
-        $allowedStages = array();
+        $allowedStages = [];
         $stageRecords = $this->getWorkspaceRecord()->getStages();
 
         // Only use stages that are allowed for current backend user
@@ -227,7 +227,9 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
             }
         }
 
-        uasort($allowedStages, function (StageRecord $first, StageRecord $second) { return $first->determineOrder($second); });
+        uasort($allowedStages, function (StageRecord $first, StageRecord $second) {
+            return $first->determineOrder($second);
+        });
         return $this->prepareStagesArray($allowedStages);
     }
 
@@ -239,12 +241,12 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
      */
     protected function prepareStagesArray(array $stageRecords)
     {
-        $stagesArray = array();
+        $stagesArray = [];
         foreach ($stageRecords as $stageRecord) {
-            $stage = array(
+            $stage = [
                 'uid' => $stageRecord->getUid(),
                 'label' => $stageRecord->getTitle(),
-            );
+            ];
             if (!$stageRecord->isExecuteStage()) {
                 $stage['title'] = $GLOBALS['LANG']->sL(($this->pathToLocallang . ':actionSendToStage')) . ' "' . $stageRecord->getTitle() . '"';
             } else {
@@ -318,13 +320,14 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
                 }
                 next($workspaceStageRecs);
             }
+        } else {
         }
         if ($nextStage === false) {
-            $nextStage[] = array(
+            $nextStage[] = [
                 'uid' => self::STAGE_EDIT_ID,
                 'title' => $GLOBALS['LANG']->sL(($this->pathToLocallang . ':actionSendToStage')) . ' "'
                     . $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_mod_user_ws.xlf:stage_editing') . '"'
-            );
+            ];
         }
         return $nextStage;
     }
@@ -429,7 +432,7 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
             $stageRecord = $this->getWorkspaceRecord()->getStage($stageRecord);
         }
 
-        $recipientArray = array();
+        $recipientArray = [];
 
         if (!$selectDefaultUserField) {
             $backendUserIds = $stageRecord->getAllRecipients();
@@ -468,8 +471,8 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
     public function resolveBackendUserIds($backendUserGroupList)
     {
         $elements = GeneralUtility::trimExplode(',', $backendUserGroupList, true);
-        $backendUserIds = array();
-        $backendGroupIds = array();
+        $backendUserIds = [];
+        $backendGroupIds = [];
 
         foreach ($elements as $element) {
             if (strpos($element, 'be_users_') === 0) {
@@ -485,7 +488,7 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
         if (!empty($backendGroupIds)) {
             $allBeUserArray = BackendUtility::getUserNames();
             $backendGroupList = implode(',', $backendGroupIds);
-            $this->userGroups = array();
+            $this->userGroups = [];
             $backendGroups = $this->fetchGroups($backendGroupList);
             foreach ($backendGroups as $backendGroup) {
                 foreach ($allBeUserArray as $backendUserId => $backendUser) {
@@ -508,7 +511,7 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
     public function getBackendUsers($backendUserList)
     {
         if (empty($backendUserList)) {
-            return array();
+            return [];
         }
 
         $backendUserList = $this->getDatabaseConnection()->cleanIntList($backendUserList);
@@ -518,7 +521,7 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
         );
 
         if (empty($backendUsers)) {
-            $backendUsers = array();
+            $backendUsers = [];
         }
         return $backendUsers;
     }
@@ -555,13 +558,13 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
     private function fetchGroups($grList, $idList = '')
     {
         $cacheKey = md5($grList . $idList);
-        $groupList = array();
+        $groupList = [];
         if (isset($this->fetchGroupsCache[$cacheKey])) {
             $groupList = $this->fetchGroupsCache[$cacheKey];
         } else {
             if ($idList === '') {
                 // we're at the beginning of the recursion and therefore we need to reset the userGroups member
-                $this->userGroups = array();
+                $this->userGroups = [];
             }
             $groupList = $this->fetchGroupsRecursive($grList);
             $this->fetchGroupsCache[$cacheKey] = $groupList;
@@ -672,7 +675,7 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
                     }
                 }
         }
-        return array('position' => $position, 'count' => $countOfStages);
+        return ['position' => $position, 'count' => $countOfStages];
     }
 
     /**
@@ -753,6 +756,44 @@ class StagesService implements \TYPO3\CMS\Core\SingletonInterface
             }
         }
         return $isValid;
+    }
+
+    /**
+     * Returns the notification mode from stage configuration
+     *
+     * Return values:
+     * 0 = notify someone / old way / default setting
+     * 1 = notify all responsible users (some users checked per default and you're not allowed to uncheck them)
+     * 2 = notify all responsible users (all users are checked and nothing can be changed during stage change)
+     *
+     * @param int $stageId Stage id to return the notification mode for
+     * @return int
+     * @throws \InvalidArgumentException
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8. No replacement for this method. Notifications have been adjusted with issue #35245
+     */
+    public function getNotificationMode($stageId)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        if (!MathUtility::canBeInterpretedAsInteger($stageId)) {
+            throw new \InvalidArgumentException($GLOBALS['LANG']->sL('LLL:EXT:workspaces/Resources/Private/Language/locallang.xlf:error.stageId.integer'));
+        }
+        switch ($stageId) {
+            case self::STAGE_PUBLISH_EXECUTE_ID:
+
+            case self::STAGE_PUBLISH_ID:
+                $workspaceRecord = BackendUtility::getRecord('sys_workspace', $this->getWorkspaceId());
+                return $workspaceRecord['publish_notification_mode'];
+                break;
+            case self::STAGE_EDIT_ID:
+                $workspaceRecord = BackendUtility::getRecord('sys_workspace', $this->getWorkspaceId());
+                return $workspaceRecord['edit_notification_mode'];
+                break;
+            default:
+                $workspaceStage = BackendUtility::getRecord(self::TABLE_STAGE, $stageId);
+                if (is_array($workspaceStage) && isset($workspaceStage['notification_mode'])) {
+                    return $workspaceStage['notification_mode'];
+                }
+        }
     }
 
     /**

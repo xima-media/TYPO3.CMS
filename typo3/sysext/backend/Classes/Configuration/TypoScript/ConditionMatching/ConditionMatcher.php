@@ -139,17 +139,22 @@ class ConditionMatcher extends AbstractConditionMatcher
         if ($id = (int)GeneralUtility::_GP('id')) {
             $pageId = $id;
         } elseif (is_array($editStatement)) {
-            list($table, $uidAndAction) = each($editStatement);
-            list($uid, $action) = each($uidAndAction);
+            $table = key($editStatement);
+            $uidAndAction = current($editStatement);
+            $uid = key($uidAndAction);
+            $action = current($uidAndAction);
             if ($action === 'edit') {
                 $pageId = $this->getPageIdByRecord($table, $uid);
             } elseif ($action === 'new') {
                 $pageId = $this->getPageIdByRecord($table, $uid, true);
             }
         } elseif (is_array($commandStatement)) {
-            list($table, $uidActionAndTarget) = each($commandStatement);
-            list($uid, $actionAndTarget) = each($uidActionAndTarget);
-            list($action, $target) = each($actionAndTarget);
+            $table = key($commandStatement);
+            $uidActionAndTarget = current($commandStatement);
+            $uid = key($uidActionAndTarget);
+            $actionAndTarget = current($uidActionAndTarget);
+            $action = key($actionAndTarget);
+            $target = current($actionAndTarget);
             if ($action === 'delete') {
                 $pageId = $this->getPageIdByRecord($table, $uid);
             } elseif ($action === 'copy' || $action === 'move') {
@@ -282,7 +287,7 @@ class ConditionMatcher extends AbstractConditionMatcher
     protected function log($message)
     {
         if (is_object($this->getBackendUserAuthentication())) {
-            $this->getBackendUserAuthentication()->writelog(3, 0, 1, 0, $message, array());
+            $this->getBackendUserAuthentication()->writelog(3, 0, 1, 0, $message, []);
         }
     }
 

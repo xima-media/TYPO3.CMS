@@ -15,8 +15,9 @@ namespace TYPO3\CMS\Beuser\ViewHelpers;
  */
 
 use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
+use TYPO3\CMS\Fluid\Core\Rendering\RenderingContextInterface;
 use TYPO3\CMS\Fluid\Core\ViewHelper\AbstractViewHelper;
-use TYPO3Fluid\Fluid\Core\Rendering\RenderingContextInterface;
+use TYPO3\CMS\Fluid\Core\ViewHelper\Facets\CompilableInterface;
 
 /**
  * Render permission icon group (user / group / others) of the "Access" module.
@@ -24,19 +25,12 @@ use TYPO3Fluid\Fluid\Core\Rendering\RenderingContextInterface;
  * Most of that could be done in fluid directly, but this view helper
  * is much better performance wise.
  */
-class PermissionsViewHelper extends AbstractViewHelper
+class PermissionsViewHelper extends AbstractViewHelper implements CompilableInterface
 {
-    /**
-     * As this ViewHelper renders HTML, the output must not be escaped.
-     *
-     * @var bool
-     */
-    protected $escapeOutput = false;
-
     /**
      * @var array Cached labels for a single permission mask like "Delete page"
      */
-    protected static $permissionLabels = array();
+    protected static $permissionLabels = [];
 
     /**
      * Return permissions.
@@ -52,7 +46,7 @@ class PermissionsViewHelper extends AbstractViewHelper
     }
 
     /**
-     * Static rendering method
+     * Implementing CompilableInterface suppresses object instantiation of this view helper
      *
      * @param array $arguments
      * @param \Closure $renderChildrenClosure
@@ -62,7 +56,7 @@ class PermissionsViewHelper extends AbstractViewHelper
      */
     public static function renderStatic(array $arguments, \Closure $renderChildrenClosure, RenderingContextInterface $renderingContext)
     {
-        $masks = array(1, 16, 2, 4, 8);
+        $masks = [1, 16, 2, 4, 8];
 
         if (empty(static::$permissionLabels)) {
             foreach ($masks as $mask) {
@@ -83,18 +77,18 @@ class PermissionsViewHelper extends AbstractViewHelper
                 $mode = 'add';
             }
 
-            $label = static::$permissionLabels[$mask];
+            $label = htmlspecialchars(static::$permissionLabels[$mask]);
             $icon .= '<span style="cursor:pointer"'
-                . ' title="' . htmlspecialchars($label) . '"'
+                . ' title="' . $label . '"'
                 . ' data-toggle="tooltip"'
-                . ' data-page="' . htmlspecialchars($arguments['pageId']) . '"'
-                . ' data-permissions="' . htmlspecialchars($arguments['permission']) . '"'
-                . ' data-who="' . htmlspecialchars($arguments['scope']) . '"'
-                . ' data-bits="' . htmlspecialchars($mask) . '"'
-                . ' data-mode="' . htmlspecialchars($mode) . '"'
-                . ' class="t3-icon change-permission fa ' . htmlspecialchars($permissionClass) . '"></span>';
+                . ' data-page="' . $arguments['pageId'] . '"'
+                . ' data-permissions="' . $arguments['permission'] . '"'
+                . ' data-who="' . $arguments['scope'] . '"'
+                . ' data-bits="' . $mask . '"'
+                . ' data-mode="' . $mode . '"'
+                . ' class="t3-icon change-permission fa ' . $permissionClass . '"></span>';
         }
 
-        return '<span id="' . htmlspecialchars($arguments['pageId'] . '_' . $arguments['scope']) . '">' . $icon . '</span>';
+        return '<span id="' . $arguments['pageId'] . '_' . $arguments['scope'] . '">' . $icon . '</span>';
     }
 }

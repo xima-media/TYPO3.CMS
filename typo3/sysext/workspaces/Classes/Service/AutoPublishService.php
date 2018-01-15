@@ -45,14 +45,15 @@ class AutoPublishService
         $workspaceService = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Workspaces\Service\WorkspaceService::class);
         foreach ($workspaces as $rec) {
             // First, clear start/end time so it doesn't get select once again:
-            $fieldArray = $rec['publish_time'] != 0 ? array('publish_time' => 0) : array('unpublish_time' => 0);
+            $fieldArray = $rec['publish_time'] != 0 ? ['publish_time' => 0] : ['unpublish_time' => 0];
             $GLOBALS['TYPO3_DB']->exec_UPDATEquery('sys_workspace', 'uid=' . (int)$rec['uid'], $fieldArray);
             // Get CMD array:
             $cmd = $workspaceService->getCmdArrayForPublishWS($rec['uid'], $rec['swap_modes'] == 1);
             // $rec['swap_modes']==1 means that auto-publishing will swap versions, not just publish and empty the workspace.
             // Execute CMD array:
             $tce = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\DataHandling\DataHandler::class);
-            $tce->start(array(), $cmd);
+            $tce->stripslashes_values = 0;
+            $tce->start([], $cmd);
             $tce->process_cmdmap();
         }
         // Restore admin status

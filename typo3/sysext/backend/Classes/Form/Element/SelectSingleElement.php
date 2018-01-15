@@ -86,8 +86,8 @@ class SelectSingleElement extends AbstractFormElement
         // Prepare groups
         $selectItemCounter = 0;
         $selectItemGroupCount = 0;
-        $selectItemGroups = array();
-        $selectIcons = array();
+        $selectItemGroups = [];
+        $selectIcons = [];
         $selectedValue = '';
         $hasIcons = false;
 
@@ -101,34 +101,33 @@ class SelectSingleElement extends AbstractFormElement
                 if ($selectItemCounter !== 0) {
                     $selectItemGroupCount++;
                 }
-                $selectItemGroups[$selectItemGroupCount]['header'] = array(
+                $selectItemGroups[$selectItemGroupCount]['header'] = [
                     'title' => $item[0],
-                );
+                ];
             } else {
                 // IS ITEM
-                $title = htmlspecialchars($item['0'], ENT_COMPAT, 'UTF-8', false);
-                $icon = !empty($item[2]) ? FormEngineUtility::getIconHtml($item[2], $title, $title) : '';
+                $icon = !empty($item[2]) ? FormEngineUtility::getIconHtml($item[2], $item[0], $item[0]) : '';
                 $selected = $selectedValue === (string)$item[1];
 
                 if ($selected) {
                     $selectedIcon = $icon;
                 }
 
-                $selectItemGroups[$selectItemGroupCount]['items'][] = array(
-                    'title' => $title,
+                $selectItemGroups[$selectItemGroupCount]['items'][] = [
+                    'title' => $item[0],
                     'value' => $item[1],
                     'icon' => $icon,
                     'selected' => $selected,
                     'index' => $selectItemCounter
-                );
+                ];
 
                 // ICON
                 if ($icon) {
-                    $selectIcons[] = array(
-                        'title' => $title,
+                    $selectIcons[] = [
+                        'title' => $item[0],
                         'icon' => $icon,
                         'index' => $selectItemCounter,
-                    );
+                    ];
                 }
 
                 $selectItemCounter++;
@@ -155,7 +154,7 @@ class SelectSingleElement extends AbstractFormElement
                 foreach ($selectItemGroup['items'] as $item) {
                     $options .= '<option value="' . htmlspecialchars($item['value']) . '" data-icon="' .
                         htmlspecialchars($item['icon']) . '"'
-                        . ($item['selected'] ? ' selected="selected"' : '') . '>' . $item['title'] . '</option>';
+                        . ($item['selected'] ? ' selected="selected"' : '') . '>' . htmlspecialchars($item['title'], ENT_COMPAT, 'UTF-8', false) . '</option>';
                 }
                 $hasIcons = !empty($item['icon']);
             }
@@ -216,7 +215,7 @@ class SelectSingleElement extends AbstractFormElement
                 $html[] =            '<td>';
 
                 if (is_array($selectIcon)) {
-                    $html[] = '<a href="#" title="' . $selectIcon['title'] . '" data-select-index="' . $selectIcon['index'] . '">';
+                    $html[] = '<a href="#" title="' . htmlspecialchars($selectIcon['title'], ENT_COMPAT, 'UTF-8', false) . '" data-select-index="' . htmlspecialchars($selectIcon['index']) . '">';
                     $html[] = $selectIcon['icon'];
                     $html[] = '</a>';
                 }
@@ -235,7 +234,7 @@ class SelectSingleElement extends AbstractFormElement
         // Wizards:
         if (!$disabled) {
             $html = $this->renderWizards(
-                array($html),
+                [$html],
                 $config['wizards'],
                 $table,
                 $row,
@@ -250,14 +249,21 @@ class SelectSingleElement extends AbstractFormElement
         $resultArray['html'] = $html;
         $resultArray['requireJsModules'][] = ['TYPO3/CMS/Backend/FormEngine/Element/SelectSingleElement' => implode(LF, [
             'function(SelectSingleElement) {',
-                'SelectSingleElement.initialize(',
-                    GeneralUtility::quoteJSvalue('#' . $selectId) . ',',
-                    '{',
-                        'onChange: function() {',
-                            implode('', $parameterArray['fieldChangeFunc']),
-                        '}',
-                    '}',
-                ');',
+                'require([\'jquery\'], function($) {',
+                    '$(function() {',
+                        'SelectSingleElement.initialize(',
+                            GeneralUtility::quoteJSvalue('#' . $selectId) . ',',
+                            '{',
+                                'onChange: function() {',
+                                    implode('', $parameterArray['fieldChangeFunc']),
+                                '},',
+                                'onFocus: function() {',
+                                    $parameterArray['onFocus'],
+                                '}',
+                            '}',
+                        ');',
+                    '});',
+                '});',
             '}',
         ])];
 

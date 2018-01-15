@@ -37,10 +37,10 @@ class InstallationStateCssClassViewHelper extends AbstractViewHelper
     public function render($needle, array $haystack)
     {
         return static::renderStatic(
-            array(
+            [
                 'needle' => $needle,
                 'haystack' => $haystack,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

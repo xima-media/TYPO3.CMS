@@ -33,14 +33,14 @@ class CreatePagesWizardModuleFunctionController extends \TYPO3\CMS\Backend\Modul
      *
      * @var array
      */
-    protected $tsConfig = array();
+    protected $tsConfig = [];
 
     /**
      * Part of tsConfig with TCEFORM.pages. settings
      *
      * @var array
      */
-    protected $pagesTsConfig = array();
+    protected $pagesTsConfig = [];
 
     /**
      * The type select HTML
@@ -63,7 +63,7 @@ class CreatePagesWizardModuleFunctionController extends \TYPO3\CMS\Backend\Modul
         $this->getLanguageService()->includeLLFile('EXT:wizard_crpages/Resources/Private/Language/locallang.xlf');
         $theCode = '';
         $this->tsConfig = BackendUtility::getPagesTSconfig($this->pObj->id);
-        $this->pagesTsConfig = isset($this->tsConfig['TCEFORM.']['pages.']) ? $this->tsConfig['TCEFORM.']['pages.'] : array();
+        $this->pagesTsConfig = isset($this->tsConfig['TCEFORM.']['pages.']) ? $this->tsConfig['TCEFORM.']['pages.'] : [];
 
         // Create new pages here?
         $pageRecord = BackendUtility::getRecord('pages', $this->pObj->id, 'uid', ' AND ' . $this->getBackendUser()->getPagePermsClause(8));
@@ -101,12 +101,13 @@ class CreatePagesWizardModuleFunctionController extends \TYPO3\CMS\Backend\Modul
                 if (!empty($data['pages'])) {
                     reset($data);
                     $dataHandler = GeneralUtility::makeInstance(\TYPO3\CMS\Core\DataHandling\DataHandler::class);
+                    $dataHandler->stripslashes_values = 0;
                     // set default TCA values specific for the user
                     $TCAdefaultOverride = $this->getBackendUser()->getTSConfigProp('TCAdefaults');
                     if (is_array($TCAdefaultOverride)) {
                         $dataHandler->setDefaultsFromUserTS($TCAdefaultOverride);
                     }
-                    $dataHandler->start($data, array());
+                    $dataHandler->start($data, []);
                     $dataHandler->process_datamap();
                     BackendUtility::setUpdateSignal('updatePageTree');
                     $flashMessage = GeneralUtility::makeInstance(FlashMessage::class, '', $this->getLanguageService()->getLL('wiz_newPages_create'));
@@ -120,7 +121,7 @@ class CreatePagesWizardModuleFunctionController extends \TYPO3\CMS\Backend\Modul
                 $defaultFlashMessageQueue->enqueue($flashMessage);
                 // Display result:
                 $menuItems = $pageRepository->getMenu($this->pObj->id, '*', 'sorting', '', false);
-                $lines = array();
+                $lines = [];
                 foreach ($menuItems as $record) {
                     BackendUtility::workspaceOL('pages', $record);
                     if (is_array($record)) {
@@ -131,7 +132,7 @@ class CreatePagesWizardModuleFunctionController extends \TYPO3\CMS\Backend\Modul
             } else {
                 // Display create form
                 $this->typeSelectHtml = $this->getTypeSelectHtml();
-                $tableData = array();
+                $tableData = [];
                 for ($a = 0; $a < 5; $a++) {
                     $tableData[] = $this->getFormLine($a);
                 }
@@ -171,7 +172,7 @@ class CreatePagesWizardModuleFunctionController extends \TYPO3\CMS\Backend\Modul
                 $this->getPageRenderer()->loadJquery();
                 $this->getPageRenderer()->loadRequireJsModule('TYPO3/CMS/WizardCrpages/WizardCreatePages');
                 // Add inline code
-                $inlineJavaScriptCode = 'var tpl = "' . addslashes(str_replace(array(LF, TAB), array('', ''), $this->getFormLine('#'))) . '", i, line, div, bg, label;';
+                $inlineJavaScriptCode = 'var tpl = "' . addslashes(str_replace([LF, TAB], ['', ''], $this->getFormLine('#'))) . '", i, line, div, bg, label;';
                 $this->getPageRenderer()->addJsInlineCode('wizard_crpages', $inlineJavaScriptCode);
             }
         } else {
@@ -184,7 +185,7 @@ class CreatePagesWizardModuleFunctionController extends \TYPO3\CMS\Backend\Modul
         }
         // CSH
         $theCode .= BackendUtility::cshItem('_MOD_web_func', 'tx_wizardcrpages', null, '<span class="btn btn-default btn-sm">|</span>');
-        $out = '<h1>' . htmlspecialchars($this->getLanguageService()->getLL('wiz_crMany')) . '</h1>';
+        $out = $this->pObj->doc->header($this->getLanguageService()->getLL('wiz_crMany'));
         $out .= '<div>' . $theCode . '</div>';
         return $out;
     }
@@ -222,7 +223,7 @@ class CreatePagesWizardModuleFunctionController extends \TYPO3\CMS\Backend\Modul
                         '<div class="form-control-wrap">' .
                             '<div class="input-group">' .
                                 '<div id="page_new_icon_' . $index . '" class="input-group-addon input-group-icon">' .
-                                    $this->iconFactory->getIconForRecord('pages', array(), Icon::SIZE_SMALL)->render() .
+                                    $this->iconFactory->getIconForRecord('pages', [], Icon::SIZE_SMALL)->render() .
                                 '</div>' .
                                 '<select class="form-control form-control-adapt t3js-wizardcrpages-select-doktype" name="data[pages][NEW' . $index . '][doktype]" data-target="#page_new_icon_' . $index . '">' .
                                     $this->typeSelectHtml .
@@ -252,14 +253,14 @@ class CreatePagesWizardModuleFunctionController extends \TYPO3\CMS\Backend\Modul
         if (!$this->getBackendUser()->isAdmin() && isset($this->getBackendUser()->groupData['pagetypes_select'])) {
             $types = GeneralUtility::trimExplode(',', $this->getBackendUser()->groupData['pagetypes_select'], true);
         }
-        $removeItems = isset($this->pagesTsConfig['doktype.']['removeItems']) ? GeneralUtility::trimExplode(',', $this->pagesTsConfig['doktype.']['removeItems'], true) : array();
+        $removeItems = isset($this->pagesTsConfig['doktype.']['removeItems']) ? GeneralUtility::trimExplode(',', $this->pagesTsConfig['doktype.']['removeItems'], true) : [];
         $allowedDoktypes = array_diff($types, $removeItems);
 
         // fetch all doktypes in the TCA
         $availableDoktypes = $GLOBALS['TCA']['pages']['columns']['doktype']['config']['items'];
 
         // sort by group and allowedDoktypes
-        $groupedData = array();
+        $groupedData = [];
         foreach ($availableDoktypes as $doktypeData) {
             // if it is a group, save the group label for the children underneath
             if ($doktypeData[1] == '--div--') {
@@ -275,12 +276,12 @@ class CreatePagesWizardModuleFunctionController extends \TYPO3\CMS\Backend\Modul
         foreach ($groupedData as $groupLabel => $items) {
             $groupContent = '';
             foreach ($items as $item) {
-                $label = htmlspecialchars($this->getLanguageService()->sL($item[0]));
+                $label = $this->getLanguageService()->sL($item[0], true);
                 $value = $item[1];
                 $icon = !empty($item[2]) ? FormEngineUtility::getIconHtml($item[2], $label, $label) : '';
                 $groupContent .= '<option value="' . htmlspecialchars($value) . '" data-icon="' . htmlspecialchars($icon) . '">' . $label . '</option>';
             }
-            $groupLabel = htmlspecialchars($this->getLanguageService()->sL($groupLabel));
+            $groupLabel = $this->getLanguageService()->sL($groupLabel, true);
             $content .= '<optgroup label="' . $groupLabel . '">' . $groupContent . '</optgroup>';
         }
 

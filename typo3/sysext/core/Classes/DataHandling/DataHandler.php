@@ -18,9 +18,7 @@ use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Cache\CacheManager;
 use TYPO3\CMS\Core\Cache\Frontend\VariableFrontend;
-use TYPO3\CMS\Core\Charset\CharsetConverter;
 use TYPO3\CMS\Core\Configuration\FlexForm\FlexFormTools;
-use TYPO3\CMS\Core\Database\ConnectionPool;
 use TYPO3\CMS\Core\Database\DatabaseConnection;
 use TYPO3\CMS\Core\Database\ReferenceIndex;
 use TYPO3\CMS\Core\Database\RelationHandler;
@@ -28,7 +26,6 @@ use TYPO3\CMS\Core\Html\RteHtmlParser;
 use TYPO3\CMS\Core\Messaging\FlashMessage;
 use TYPO3\CMS\Core\Messaging\FlashMessageService;
 use TYPO3\CMS\Core\Resource\ResourceFactory;
-use TYPO3\CMS\Core\Service\OpcodeCacheService;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
 use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Core\Utility\File\BasicFileUtility;
@@ -88,6 +85,15 @@ class DataHandler
     public $checkSimilar = true;
 
     /**
+     * If TRUE, incoming values in the data-array have their slashes stripped. ALWAYS SET THIS TO ZERO and supply an
+     * unescaped data array instead. This switch may totally disappear in future versions of this class!
+     *
+     * @var bool
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public $stripslashes_values = true;
+
+    /**
      * This will read the record after having updated or inserted it. If anything is not properly submitted an error
      * is written to the log. This feature consumes extra time by selecting records
      *
@@ -130,6 +136,23 @@ class DataHandler
      * @var bool
      */
     public $dontProcessTransformations = false;
+
+    /**
+     * If set, .vDEFbase values are unset in flexforms.
+     *
+     * @var bool
+     * @deprecated since TYPO3 CMS 7, will be removed with TYPO3 CMS 8
+     */
+    public $clear_flexFormData_vDEFbase = false;
+
+    /**
+     * Will distinguish between translations (with parent) and localizations (without parent) while still using the same methods to copy the records
+     * TRUE: translation of a record connected to the default language
+     * FALSE: localization of a record without connection to the default language
+     *
+     * @var bool
+     */
+    protected $useTransOrigPointerField = true;
 
     /**
      * TRUE: (traditional) Updates when record is saved. For flexforms, updates if change is made to the localized value.
@@ -197,7 +220,7 @@ class DataHandler
      *
      * @var array
      */
-    public $defaultValues = array();
+    public $defaultValues = [];
 
     /**
      * [table][fields]=value: You can set this array on the form $overrideValues[$table][$field] = $value to
@@ -206,7 +229,7 @@ class DataHandler
      *
      * @var array
      */
-    public $overrideValues = array();
+    public $overrideValues = [];
 
     /**
      * [filename]=alternative_filename: Use this array to force another name onto a file.
@@ -215,14 +238,14 @@ class DataHandler
      *
      * @var array
      */
-    public $alternativeFileName = array();
+    public $alternativeFileName = [];
 
     /**
      * Array [filename]=alternative_filepath: Same as alternativeFileName but with relative path to the file
      *
      * @var array
      */
-    public $alternativeFilePath = array();
+    public $alternativeFilePath = [];
 
     /**
      * If entries are set in this array corresponding to fields for update, they are ignored and thus NOT updated.
@@ -231,7 +254,7 @@ class DataHandler
      *
      * @var array
      */
-    public $data_disableFields = array();
+    public $data_disableFields = [];
 
     /**
      * Use this array to validate suggested uids for tables by setting [table]:[uid]. This is a dangerous option
@@ -242,7 +265,7 @@ class DataHandler
      *
      * @var array
      */
-    public $suggestedInsertUids = array();
+    public $suggestedInsertUids = [];
 
     /**
      * Object. Call back object for FlexForm traversal. Useful when external classes wants to use the
@@ -260,63 +283,70 @@ class DataHandler
      *
      * @var array
      */
-    public $autoVersionIdMap = array();
+    public $autoVersionIdMap = [];
 
     /**
      * When new elements are created, this array contains a map between their "NEW..." string IDs and the eventual UID they got when stored in database
      *
      * @var array
      */
-    public $substNEWwithIDs = array();
+    public $substNEWwithIDs = [];
 
     /**
      * Like $substNEWwithIDs, but where each old "NEW..." id is mapped to the table it was from.
      *
      * @var array
      */
-    public $substNEWwithIDs_table = array();
+    public $substNEWwithIDs_table = [];
 
     /**
      * Holds the tables and there the ids of newly created child records from IRRE
      *
      * @var array
      */
-    public $newRelatedIDs = array();
+    public $newRelatedIDs = [];
 
     /**
      * This array is the sum of all copying operations in this class. May be READ from outside, thus partly public.
      *
      * @var array
      */
-    public $copyMappingArray_merged = array();
+    public $copyMappingArray_merged = [];
+
+    /**
+     * Per-table array with UIDs that have been deleted.
+     *
+     * @var array
+     */
+    protected $deletedRecords = [];
 
     /**
      * A map between input file name and final destination for files being attached to records.
      *
      * @var array
      */
-    public $copiedFileMap = array();
+    public $copiedFileMap = [];
 
     /**
      * Contains [table][id][field] of fiels where RTEmagic images was copied. Holds old filename as key and new filename as value.
      *
      * @var array
      */
-    public $RTEmagic_copyIndex = array();
+    public $RTEmagic_copyIndex = [];
 
     /**
      * Errors are collected in this variable.
      *
      * @var array
      */
-    public $errorLog = array();
+    public $errorLog = [];
 
     /**
      * Fields from the pages-table for which changes will trigger a pagetree refresh
      *
      * @var array
      */
-    public $pagetreeRefreshFieldsFromPages = array('pid', 'sorting', 'deleted', 'hidden', 'title', 'doktype', 'is_siteroot', 'fe_group', 'nav_hide', 'nav_title', 'module', 'starttime', 'endtime', 'content_from_pid');
+    public $pagetreeRefreshFieldsFromPages = ['pid', 'sorting', 'deleted', 'hidden', 'title', 'doktype', 'is_siteroot', 'fe_group', 'nav_hide', 'nav_title', 'module', 'starttime', 'endtime', 'content_from_pid'];
 
     /**
      * Indicates whether the pagetree needs a refresh because of important changes
@@ -364,18 +394,24 @@ class DataHandler
      *
      * @var array
      */
-    public $defaultPermissions = array(
+    public $defaultPermissions = [
         'user' => 'show,edit,delete,new,editcontent',
         'group' => 'show,edit,new,editcontent',
         'everybody' => ''
-    );
+    ];
 
     /**
      * The list of <table>-<fields> that cannot be edited by user. This is compiled from TCA/exclude-flag combined with non_exclude_fields for the user.
      *
      * @var array
      */
-    protected $excludedTablesAndFields = array();
+    protected $excludedTablesAndFields = [];
+
+    /**
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     * @var int
+     */
+    public $include_filefunctions;
 
     /**
      * Data submitted from the form view, used to control behaviours,
@@ -383,35 +419,35 @@ class DataHandler
      *
      * @var array
      */
-    protected $control = array();
+    protected $control = [];
 
     /**
      * Set with incoming data array
      *
      * @var array
      */
-    public $datamap = array();
+    public $datamap = [];
 
     /**
      * Set with incoming cmd array
      *
      * @var array
      */
-    public $cmdmap = array();
+    public $cmdmap = [];
 
     /**
      * List of changed old record ids to new records ids
      *
      * @var array
      */
-    protected $mmHistoryRecords = array();
+    protected $mmHistoryRecords = [];
 
     /**
      * List of changed old record ids to new records ids
      *
      * @var array
      */
-    protected $historyRecords = array();
+    protected $historyRecords = [];
 
     // Internal static:
     /**
@@ -419,7 +455,7 @@ class DataHandler
      *
      * @var array
      */
-    public $pMap = array(
+    public $pMap = [
         'show' => 1,
         // 1st bit
         'edit' => 2,
@@ -429,7 +465,7 @@ class DataHandler
         'new' => 8,
         // 4th bit
         'editcontent' => 16
-    );
+    ];
 
     /**
      * Integer: The interval between sorting numbers used with tables with a 'sorting' field defined. Min 1
@@ -444,49 +480,49 @@ class DataHandler
      *
      * @var array
      */
-    public $recUpdateAccessCache = array();
+    public $recUpdateAccessCache = [];
 
     /**
      * User by function checkRecordInsertAccess() to store whether a record can be inserted on a page id
      *
      * @var array
      */
-    public $recInsertAccessCache = array();
+    public $recInsertAccessCache = [];
 
     /**
      * Caching array for check of whether records are in a webmount
      *
      * @var array
      */
-    public $isRecordInWebMount_Cache = array();
+    public $isRecordInWebMount_Cache = [];
 
     /**
      * Caching array for page ids in webmounts
      *
      * @var array
      */
-    public $isInWebMount_Cache = array();
+    public $isInWebMount_Cache = [];
 
     /**
      * Caching for collecting TSconfig for page ids
      *
      * @var array
      */
-    public $cachedTSconfig = array();
+    public $cachedTSconfig = [];
 
     /**
      * Used for caching page records in pageInfo()
      *
      * @var array
      */
-    public $pageCache = array();
+    public $pageCache = [];
 
     /**
      * Array caching workspace access for BE_USER
      *
      * @var array
      */
-    public $checkWorkspaceCache = array();
+    public $checkWorkspaceCache = [];
 
     // Other arrays:
     /**
@@ -494,35 +530,35 @@ class DataHandler
      *
      * @var array
      */
-    public $dbAnalysisStore = array();
+    public $dbAnalysisStore = [];
 
     /**
      * For accumulation of files which must be deleted after processing of all input content
      *
      * @var array
      */
-    public $removeFilesStore = array();
+    public $removeFilesStore = [];
 
     /**
      * Uploaded files, set by process_uploads()
      *
      * @var array
      */
-    public $uploadedFileArray = array();
+    public $uploadedFileArray = [];
 
     /**
      * Used for tracking references that might need correction after operations
      *
      * @var array
      */
-    public $registerDBList = array();
+    public $registerDBList = [];
 
     /**
      * Used for tracking references that might need correction in pid field after operations (e.g. IRRE)
      *
      * @var array
      */
-    public $registerDBPids = array();
+    public $registerDBPids = [];
 
     /**
      * Used by the copy action to track the ids of new pages so subpages are correctly inserted!
@@ -534,14 +570,14 @@ class DataHandler
      *
      * @var array
      */
-    public $copyMappingArray = array();
+    public $copyMappingArray = [];
 
     /**
      * Array used for remapping uids and values at the end of process_datamap
      *
      * @var array
      */
-    public $remapStack = array();
+    public $remapStack = [];
 
     /**
      * Array used for remapping uids and values at the end of process_datamap
@@ -549,35 +585,35 @@ class DataHandler
      *
      * @var array
      */
-    public $remapStackRecords = array();
+    public $remapStackRecords = [];
 
     /**
      * Array used for checking whether new children need to be remapped
      *
      * @var array
      */
-    protected $remapStackChildIds = array();
+    protected $remapStackChildIds = [];
 
     /**
      * Array used for executing addition actions after remapping happened (set processRemapStack())
      *
      * @var array
      */
-    protected $remapStackActions = array();
+    protected $remapStackActions = [];
 
     /**
      * Array used for executing post-processing on the reference index
      *
      * @var array
      */
-    protected $remapStackRefIndex = array();
+    protected $remapStackRefIndex = [];
 
     /**
      * Array used for additional calls to $this->updateRefIndex
      *
      * @var array
      */
-    public $updateRefIndexStack = array();
+    public $updateRefIndexStack = [];
 
     /**
      * Tells, that this DataHandler instance was called from \TYPO3\CMS\Impext\ImportExport.
@@ -592,7 +628,7 @@ class DataHandler
      *
      * @var array
      */
-    public $newIndexMap = array();
+    public $newIndexMap = [];
 
     // Various
     /**
@@ -608,7 +644,7 @@ class DataHandler
      *
      * @var array
      */
-    public $checkValue_currentRecord = array();
+    public $checkValue_currentRecord = [];
 
     /**
      * A signal flag used to tell file processing that auto versioning has happened and hence certain action should be applied.
@@ -647,7 +683,7 @@ class DataHandler
      *
      * @var array
      */
-    protected static $recordsToClearCacheFor = array();
+    protected static $recordsToClearCacheFor = [];
 
     /**
      * Internal cache for pids of records which were deleted. It's not possible
@@ -655,7 +691,7 @@ class DataHandler
      *
      * @var array
      */
-    protected static $recordPidsForDeletedRecords = array();
+    protected static $recordPidsForDeletedRecords = [];
 
     /**
      * Database layer. Identical to $GLOBALS['TYPO3_DB']
@@ -825,7 +861,7 @@ class DataHandler
         if (is_array($subA)) {
             if (is_array($subA['name']) && is_array($subA['type']) && is_array($subA['tmp_name']) && is_array($subA['size'])) {
                 // Initialize the uploadedFilesArray:
-                $this->uploadedFileArray = array();
+                $this->uploadedFileArray = [];
                 // For each entry:
                 foreach ($subA as $key => $values) {
                     $this->process_uploads_traverseArray($this->uploadedFileArray, $values, $key);
@@ -886,11 +922,11 @@ class DataHandler
                 }
             }
         } else {
-            $this->remapStackRecords[$table][$id]['processDatamap_afterDatabaseOperations'] = array(
+            $this->remapStackRecords[$table][$id]['processDatamap_afterDatabaseOperations'] = [
                 'status' => $status,
                 'fieldArray' => $fieldArray,
                 'hookObjectsArr' => $hookObjectsArr
-            );
+            ];
         }
     }
 
@@ -904,7 +940,7 @@ class DataHandler
     protected function getCheckModifyAccessListHookObjects()
     {
         if (!isset($this->checkModifyAccessListHookObjects)) {
-            $this->checkModifyAccessListHookObjects = array();
+            $this->checkModifyAccessListHookObjects = [];
             if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['checkModifyAccessList'])) {
                 foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['checkModifyAccessList'] as $classData) {
                     $hookObject = GeneralUtility::getUserObj($classData);
@@ -934,7 +970,7 @@ class DataHandler
         $this->controlActiveElements();
 
         // Keep versionized(!) relations here locally:
-        $registerDBList = array();
+        $registerDBList = [];
         $this->registerElementsToBeDeleted();
         $this->datamap = $this->unsetElementsToBeDeleted($this->datamap);
         // Editing frozen:
@@ -945,7 +981,7 @@ class DataHandler
             return false;
         }
         // First prepare user defined objects (if any) for hooks which extend this function:
-        $hookObjectsArr = array();
+        $hookObjectsArr = [];
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processDatamapClass'])) {
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processDatamapClass'] as $classRef) {
                 $hookObject = GeneralUtility::getUserObj($classRef);
@@ -956,7 +992,7 @@ class DataHandler
             }
         }
         // Organize tables so that the pages-table is always processed first. This is required if you want to make sure that content pointing to a new page will be created.
-        $orderOfTables = array();
+        $orderOfTables = [];
         // Set pages first.
         if (isset($this->datamap['pages'])) {
             $orderOfTables[] = 'pages';
@@ -971,7 +1007,7 @@ class DataHandler
             //	   - permissions for tableaccess OK
             $modifyAccessList = $this->checkModifyAccessList($table);
             if ($this->enableLogging && !$modifyAccessList) {
-                $this->log($table, 0, 2, 0, 1, 'Attempt to modify table \'%s\' without permission', 1, array($table));
+                $this->log($table, 0, 2, 0, 1, 'Attempt to modify table \'%s\' without permission', 1, [$table]);
             }
             if (!isset($GLOBALS['TCA'][$table]) || $this->tableReadOnly($table) || !is_array($this->datamap[$table]) || !$modifyAccessList) {
                 continue;
@@ -1111,12 +1147,12 @@ class DataHandler
                     $status = 'new';
                 } else {
                     // Nope... $id is a number
-                    $fieldArray = array();
+                    $fieldArray = [];
                     $recordAccess = $this->checkRecordUpdateAccess($table, $id, $incomingFieldArray, $hookObjectsArr);
                     if (!$recordAccess) {
                         if ($this->enableLogging) {
                             $propArr = $this->getRecordProperties($table, $id);
-                            $this->log($table, $id, 2, 0, 1, 'Attempt to modify record \'%s\' (%s) without permission. Or non-existing page.', 2, array($propArr['header'], $table . ':' . $id), $propArr['event_pid']);
+                            $this->log($table, $id, 2, 0, 1, 'Attempt to modify record \'%s\' (%s) without permission. Or non-existing page.', 2, [$propArr['header'], $table . ':' . $id], $propArr['event_pid']);
                         }
                         continue;
                     }
@@ -1154,16 +1190,17 @@ class DataHandler
 
                                 /** @var $tce DataHandler */
                                 $tce = GeneralUtility::makeInstance(__CLASS__);
+                                $tce->stripslashes_values = false;
                                 $tce->enableLogging = $this->enableLogging;
                                 // Setting up command for creating a new version of the record:
-                                $cmd = array();
-                                $cmd[$table][$id]['version'] = array(
+                                $cmd = [];
+                                $cmd[$table][$id]['version'] = [
                                     'action' => 'new',
                                     'treeLevels' => -1,
                                     // Default is to create a version of the individual records... element versioning that is.
                                     'label' => 'Auto-created for WS #' . $this->BE_USER->workspace
-                                );
-                                $tce->start(array(), $cmd);
+                                ];
+                                $tce->start([], $cmd);
                                 $tce->process_cmdmap();
                                 $this->errorLog = array_merge($this->errorLog, $tce->errorLog);
                                 // If copying was successful, share the new uids (also of related children):
@@ -1211,7 +1248,7 @@ class DataHandler
                 }
                 // Processing of all fields in incomingFieldArray and setting them in $fieldArray
                 $fieldArray = $this->fillInFieldArray($table, $id, $fieldArray, $incomingFieldArray, $theRealPid, $status, $tscPID);
-                $newVersion_placeholderFieldArray = array();
+                $newVersion_placeholderFieldArray = [];
                 if ($createNewVersion) {
                     // create a placeholder array with already processed field content
                     $newVersion_placeholderFieldArray = $fieldArray;
@@ -1291,7 +1328,7 @@ class DataHandler
                             $phShadowId = $this->insertDB($table, $id, $fieldArray, true, 0, true);
                             if ($phShadowId) {
                                 // Processes fields of the placeholder record:
-                                $this->triggerRemapAction($table, $id, array($this, 'placeholderShadowing'), array($table, $phShadowId));
+                                $this->triggerRemapAction($table, $id, [$this, 'placeholderShadowing'], [$table, $phShadowId]);
                                 // Hold auto-versionized ids of placeholders:
                                 $this->autoVersionIdMap[$table][$this->substNEWwithIDs[$id]] = $phShadowId;
                             }
@@ -1346,7 +1383,7 @@ class DataHandler
         if ($liveRec = BackendUtility::getLiveVersionOfRecord($table, $id, '*')) {
             if (VersionState::cast($liveRec['t3ver_state'])->indicatesPlaceholder()) {
                 $justStoredRecord = BackendUtility::getRecord($table, $id);
-                $newRecord = array();
+                $newRecord = [];
                 $shadowCols = $GLOBALS['TCA'][$table]['ctrl']['shadowColumnsForNewPlaceholders'];
                 $shadowCols .= ',' . $GLOBALS['TCA'][$table]['ctrl']['languageField'];
                 $shadowCols .= ',' . $GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField'];
@@ -1451,6 +1488,18 @@ class DataHandler
                 continue;
             }
 
+            // Stripping slashes - will probably be removed the day $this->stripslashes_values is removed as an option...
+            // @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+            if ($this->stripslashes_values) {
+                GeneralUtility::deprecationLog(
+                    'The option stripslash_values is typically set to FALSE as data should be properly prepared before sending to DataHandler. Do not rely on DataHandler removing extra slashes. The option will be removed in TYPO3 CMS 8.'
+                );
+                if (is_array($fieldValue)) {
+                    GeneralUtility::stripSlashesOnArray($fieldValue);
+                } else {
+                    $fieldValue = stripslashes($fieldValue);
+                }
+            }
             switch ($field) {
                 case 'uid':
                 case 'pid':
@@ -1555,7 +1604,7 @@ class DataHandler
      * @param string $value Value to transform.
      * @param string $table The table name
      * @param string $field The field name
-     * @param array $defaultExtras Default extras configuration of this field - typically "richtext:rte_transform"
+     * @param array $defaultExtras Default extras configuration of this field - typically "richtext:rte_transform[mode=ts_css]"
      * @param array $thisConfig Configuration for RTEs; A mix between TSconfig and others. Configuration for additional transformation information
      * @param int $pid PID value of record (true parent page id)
      * @return string Transformed content
@@ -1563,11 +1612,16 @@ class DataHandler
     protected function transformRichtextContentToDatabase($value, $table, $field, $defaultExtras, $thisConfig, $pid)
     {
         if ($defaultExtras['rte_transform']) {
-            // Initialize transformation:
-            $parseHTML = GeneralUtility::makeInstance(RteHtmlParser::class);
-            $parseHTML->init($table . ':' . $field, $pid);
-            // Perform transformation:
-            $value = $parseHTML->RTE_transform($value, $defaultExtras, 'db', $thisConfig);
+            $parameters = BackendUtility::getSpecConfParametersFromArray($defaultExtras['rte_transform']['parameters']);
+            // There must be a mode set for transformation, this is typically 'ts_css'
+            if ($parameters['mode']) {
+                // Initialize transformation:
+                $parseHTML = GeneralUtility::makeInstance(RteHtmlParser::class);
+                $parseHTML->init($table . ':' . $field, $pid);
+                $parseHTML->setRelPath('');
+                // Perform transformation:
+                $value = $parseHTML->RTE_transform($value, $defaultExtras, 'db', $thisConfig);
+            }
         }
         return $value;
     }
@@ -1594,7 +1648,7 @@ class DataHandler
     public function checkValue($table, $field, $value, $id, $status, $realPid, $tscPID)
     {
         // Result array
-        $res = array();
+        $res = [];
 
         // Processing special case of field pages.doktype
         if (($table === 'pages' || $table === 'pages_language_overlay') && $field === 'doktype') {
@@ -1602,7 +1656,7 @@ class DataHandler
             if (!($this->admin || GeneralUtility::inList($this->BE_USER->groupData['pagetypes_select'], $value))) {
                 if ($this->enableLogging) {
                     $propArr = $this->getRecordProperties($table, $id);
-                    $this->log($table, $id, 5, 0, 1, 'You cannot change the \'doktype\' of page \'%s\' to the desired value.', 1, array($propArr['header']), $propArr['event_pid']);
+                    $this->log($table, $id, 5, 0, 1, 'You cannot change the \'doktype\' of page \'%s\' to the desired value.', 1, [$propArr['header']], $propArr['event_pid']);
                 }
                 return $res;
             }
@@ -1614,7 +1668,7 @@ class DataHandler
                     if ($theWrongTables) {
                         if ($this->enableLogging) {
                             $propArr = $this->getRecordProperties($table, $id);
-                            $this->log($table, $id, 5, 0, 1, '\'doktype\' of page \'%s\' could not be changed because the page contains records from disallowed tables; %s', 2, array($propArr['header'], $theWrongTables), $propArr['event_pid']);
+                            $this->log($table, $id, 5, 0, 1, '\'doktype\' of page \'%s\' could not be changed because the page contains records from disallowed tables; %s', 2, [$propArr['header'], $theWrongTables], $propArr['event_pid']);
                         }
                         return $res;
                     }
@@ -1673,7 +1727,7 @@ class DataHandler
     {
         // Convert to NULL value if defined in TCA
         if ($value === null && !empty($tcaFieldConf['eval']) && GeneralUtility::inList($tcaFieldConf['eval'], 'null')) {
-            $res = array('value' => null);
+            $res = ['value' => null];
             return $res;
         }
 
@@ -1717,6 +1771,23 @@ class DataHandler
     /**
      * Evaluate "text" type values.
      *
+     * @param array $res The result array. The processed value (if any!) is set in the "value" key.
+     * @param string $value The value to set.
+     * @param array $tcaFieldConf Field configuration from TCA
+     * @param array $PP Additional parameters in a numeric array: $table,$id,$curValue,$status,$realPid,$recFID
+     * @param string $field Field name
+     * @return array Modified $res array
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function checkValue_text($res, $value, $tcaFieldConf, $PP, $field = '')
+    {
+        GeneralUtility::logDeprecatedFunction();
+        return $this->checkValueForText($value, $tcaFieldConf);
+    }
+
+    /**
+     * Evaluate "text" type values.
+     *
      * @param string $value The value to set.
      * @param array $tcaFieldConf Field configuration from TCA
      * @return array $res The result array. The processed value (if any!) is set in the "value" key.
@@ -1724,7 +1795,7 @@ class DataHandler
     protected function checkValueForText($value, $tcaFieldConf)
     {
         if (!isset($tcaFieldConf['eval']) || $tcaFieldConf['eval'] === '') {
-            return array('value' => $value);
+            return ['value' => $value];
         }
         $cacheId = $this->getFieldEvalCacheIdentifier($tcaFieldConf['eval']);
         if ($this->runtimeCache->has($cacheId)) {
@@ -1734,6 +1805,24 @@ class DataHandler
             $this->runtimeCache->set($cacheId, $evalCodesArray);
         }
         return $this->checkValue_text_Eval($value, $evalCodesArray, $tcaFieldConf['is_in']);
+    }
+
+    /**
+     * Evaluate "input" type values.
+     *
+     * @param array $res The result array. The processed value (if any!) is set in the "value" key.
+     * @param string $value The value to set.
+     * @param array $tcaFieldConf Field configuration from TCA
+     * @param array $PP Additional parameters in a numeric array: $table,$id,$curValue,$status,$realPid,$recFID
+     * @param string $field Field name
+     * @return array Modified $res array
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function checkValue_input($res, $value, $tcaFieldConf, $PP, $field = '')
+    {
+        GeneralUtility::logDeprecatedFunction();
+        list($table, $id, , , $realPid) = $PP;
+        return $this->checkValueForInput($value, $tcaFieldConf, $table, $id, $realPid, $field);
     }
 
     /**
@@ -1770,9 +1859,7 @@ class DataHandler
         }
         // Secures the string-length to be less than max.
         if ((int)$tcaFieldConf['max'] > 0) {
-            /** @var CharsetConverter $charsetConverter */
-            $charsetConverter = GeneralUtility::makeInstance(CharsetConverter::class);
-            $value = $charsetConverter->substr('utf-8', (string)$value, 0, (int)$tcaFieldConf['max']);
+            $value = $GLOBALS['LANG']->csConvObj->substr($GLOBALS['LANG']->charSet, (string)$value, 0, (int)$tcaFieldConf['max']);
         }
         // Checking range of value:
         // @todo: The "checkbox" option was removed for type=input, this check could be probably relaxed?
@@ -1786,7 +1873,7 @@ class DataHandler
         }
 
         if (empty($tcaFieldConf['eval'])) {
-            $res = array('value' => $value);
+            $res = ['value' => $value];
         } else {
             // Process evaluation settings:
             $cacheId = $this->getFieldEvalCacheIdentifier($tcaFieldConf['eval']);
@@ -1825,6 +1912,24 @@ class DataHandler
      * @param array $res The result array. The processed value (if any!) is set in the 'value' key.
      * @param string $value The value to set.
      * @param array $tcaFieldConf Field configuration from TCA
+     * @param array $PP Additional parameters in a numeric array: $table,$id,$curValue,$status,$realPid,$recFID
+     * @param string $field Field name
+     * @return array Modified $res array
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function checkValue_check($res, $value, $tcaFieldConf, $PP, $field = '')
+    {
+        GeneralUtility::logDeprecatedFunction();
+        list($table, $id, , , $realPid) = $PP;
+        return $this->checkValueForCheck($res, $value, $tcaFieldConf, $table, $id, $realPid, $field);
+    }
+
+    /**
+     * Evaluates 'check' type values.
+     *
+     * @param array $res The result array. The processed value (if any!) is set in the 'value' key.
+     * @param string $value The value to set.
+     * @param array $tcaFieldConf Field configuration from TCA
      * @param string $table Table name
      * @param int $id UID of record
      * @param int $realPid The real PID value of the record. For updates, this is just the pid of the record. For new records this is the PID of the page where it is inserted. If $realPid is -1 it means that a new version of the record is being inserted.
@@ -1842,7 +1947,10 @@ class DataHandler
                 $tcaFieldConf, $tcaFieldConf['items']);
         }
 
-        $itemC = count($items);
+        $itemC = 0;
+        if ($items !== null) {
+            $itemC = count($items);
+        }
         if (!$itemC) {
             $itemC = 1;
         }
@@ -1861,7 +1969,7 @@ class DataHandler
         }
         if ($field && $realPid >= 0 && $value > 0 && !empty($tcaFieldConf['eval'])) {
             $evalCodesArray = GeneralUtility::trimExplode(',', $tcaFieldConf['eval'], true);
-            $otherRecordsWithSameValue = array();
+            $otherRecordsWithSameValue = [];
             $maxCheckedRecords = 0;
             if (in_array('maximumRecordsCheckedInPid', $evalCodesArray, true)) {
                 $otherRecordsWithSameValue = $this->getRecordsWithSameValue($table, $id, $field, $value, $realPid);
@@ -1877,12 +1985,29 @@ class DataHandler
             if ($maxCheckedRecords && count($otherRecordsWithSameValue) >= $maxCheckedRecords) {
                 $value = 0;
                 if ($this->enableLogging) {
-                    $this->log($table, $id, 5, 0, 1, 'Could not activate checkbox for field "%s". A total of %s record(s) can have this checkbox activated. Uncheck other records first in order to activate the checkbox of this record.', -1, array($GLOBALS['LANG']->sL(BackendUtility::getItemLabel($table, $field)), $maxCheckedRecords));
+                    $this->log($table, $id, 5, 0, 1, 'Could not activate checkbox for field "%s". A total of %s record(s) can have this checkbox activated. Uncheck other records first in order to activate the checkbox of this record.', -1, [$GLOBALS['LANG']->sL(BackendUtility::getItemLabel($table, $field)), $maxCheckedRecords]);
                 }
             }
         }
         $res['value'] = $value;
         return $res;
+    }
+
+    /**
+     * Evaluates 'radio' type values.
+     *
+     * @param array $res The result array. The processed value (if any!) is set in the 'value' key.
+     * @param string $value The value to set.
+     * @param array $tcaFieldConf Field configuration from TCA
+     * @param array $PP Additional parameters in a numeric array: $table,$id,$curValue,$status,$realPid,$recFID
+     * @return array Modified $res array
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function checkValue_radio($res, $value, $tcaFieldConf, $PP)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        // TODO find a way to get the field name; it should not be set in $recFID as this is only created for some record types, see checkValue()
+        return $this->checkValueForRadio($res, $value, $tcaFieldConf, $PP[0], $PP[1], $PP[4], '');
     }
 
     /**
@@ -1931,6 +2056,25 @@ class DataHandler
      * @param array $res The result array. The processed value (if any!) is set in the 'value' key.
      * @param string $value The value to set.
      * @param array $tcaFieldConf Field configuration from TCA
+     * @param array $PP Additional parameters in a numeric array: $table,$id,$curValue,$status,$realPid,$recFID
+     * @param array $uploadedFiles
+     * @param string $field Field name
+     * @return array Modified $res array
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function checkValue_group_select($res, $value, $tcaFieldConf, $PP, $uploadedFiles, $field)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        list($table, $id, $curValue, $status, , $recFID) = $PP;
+        return $this->checkValueForGroupSelect($res, $value, $tcaFieldConf, $table, $id, $curValue, $status, $recFID, $uploadedFiles, $field);
+    }
+
+    /**
+     * Evaluates 'group' or 'select' type values.
+     *
+     * @param array $res The result array. The processed value (if any!) is set in the 'value' key.
+     * @param string $value The value to set.
+     * @param array $tcaFieldConf Field configuration from TCA
      * @param string $table Table name
      * @param int $id UID of record
      * @param mixed $curValue Current value of the field
@@ -1960,7 +2104,7 @@ class DataHandler
             $exclusiveKeys = GeneralUtility::trimExplode(',', $tcaFieldConf['exclusiveKeys']);
             foreach ($valueArray as $index => $key) {
                 if (in_array($key, $exclusiveKeys, true)) {
-                    $valueArray = array($index => $key);
+                    $valueArray = [$index => $key];
                     break;
                 }
             }
@@ -1978,38 +2122,37 @@ class DataHandler
             }
             // During the check it turns out that the value / all values were removed - we respond by simply returning an empty array so nothing is written to DB for this field.
             if ($preCount && empty($valueArray)) {
-                return array();
+                return [];
             }
         }
         // For group types:
         if ($tcaFieldConf['type'] == 'group') {
             switch ($tcaFieldConf['internal_type']) {
                 case 'file_reference':
-
                 case 'file':
                     $valueArray = $this->checkValue_group_select_file($valueArray, $tcaFieldConf, $curValue, $uploadedFiles, $status, $table, $id, $recFID);
-                    break;
-                case 'db':
-                    $valueArray = $this->checkValue_group_select_processDBdata($valueArray, $tcaFieldConf, $id, $status, 'group', $table, $field);
                     break;
             }
         }
         // For select types which has a foreign table attached:
         $unsetResult = false;
-        if ($tcaFieldConf['type'] === 'select' && ($tcaFieldConf['foreign_table'] || isset($tcaFieldConf['special']) && $tcaFieldConf['special'] === 'languages')) {
+        if (
+            $tcaFieldConf['type'] === 'group' && $tcaFieldConf['internal_type'] === 'db'
+            || $tcaFieldConf['type'] === 'select' && ($tcaFieldConf['foreign_table'] || isset($tcaFieldConf['special']) && $tcaFieldConf['special'] === 'languages')
+        ) {
             // check, if there is a NEW... id in the value, that should be substituted later
             if (strpos($value, 'NEW') !== false) {
-                $this->remapStackRecords[$table][$id] = array('remapStackIndex' => count($this->remapStack));
+                $this->remapStackRecords[$table][$id] = ['remapStackIndex' => count($this->remapStack)];
                 $this->addNewValuesToRemapStackChildIds($valueArray);
-                $this->remapStack[] = array(
+                $this->remapStack[] = [
                     'func' => 'checkValue_group_select_processDBdata',
-                    'args' => array($valueArray, $tcaFieldConf, $id, $status, 'select', $table, $field),
-                    'pos' => array('valueArray' => 0, 'tcaFieldConf' => 1, 'id' => 2, 'table' => 5),
+                    'args' => [$valueArray, $tcaFieldConf, $id, $status, $tcaFieldConf['type'], $table, $field],
+                    'pos' => ['valueArray' => 0, 'tcaFieldConf' => 1, 'id' => 2, 'table' => 5],
                     'field' => $field
-                );
+                ];
                 $unsetResult = true;
             } else {
-                $valueArray = $this->checkValue_group_select_processDBdata($valueArray, $tcaFieldConf, $id, $status, 'select', $table, $field);
+                $valueArray = $this->checkValue_group_select_processDBdata($valueArray, $tcaFieldConf, $id, $status, $tcaFieldConf['type'], $table, $field);
             }
         }
         if (!$unsetResult) {
@@ -2038,7 +2181,7 @@ class DataHandler
             if (empty($filter['userFunc'])) {
                 continue;
             }
-            $parameters = $filter['parameters'] ?: array();
+            $parameters = $filter['parameters'] ?: [];
             $parameters['values'] = $values;
             $parameters['tcaFieldConfig'] = $tcaFieldConfiguration;
             $values = GeneralUtility::callUserFunction($filter['userFunc'], $parameters, $this);
@@ -2063,6 +2206,7 @@ class DataHandler
      * @return array Modified value array
      *
      * @throws \RuntimeException
+     * @see checkValue_group_select()
      */
     public function checkValue_group_select_file($valueArray, $tcaFieldConf, $curValue, $uploadedFileArray, $status, $table, $id, $recFID)
     {
@@ -2074,7 +2218,7 @@ class DataHandler
                 $uploadedFiles = $uploadedFileArray;
             } else {
                 // There is only one file
-                $uploadedFiles = array($uploadedFileArray);
+                $uploadedFiles = [$uploadedFileArray];
             }
             foreach ($uploadedFiles as $uploadedFileArray) {
                 if (!empty($uploadedFileArray['name']) && $uploadedFileArray['tmp_name'] !== 'none') {
@@ -2085,9 +2229,10 @@ class DataHandler
             // Creating fileFunc object.
             if (!$this->fileFunc) {
                 $this->fileFunc = GeneralUtility::makeInstance(BasicFileUtility::class);
+                $this->include_filefunctions = 1;
             }
             // Setting permitted extensions.
-            $all_files = array();
+            $all_files = [];
             $all_files['webspace']['allow'] = $tcaFieldConf['allowed'];
             $all_files['webspace']['deny'] = $tcaFieldConf['disallowed'] ?: '*';
             $all_files['ftpspace'] = $all_files['webspace'];
@@ -2122,7 +2267,7 @@ class DataHandler
                         }
                     }
                     // Finding the CURRENT files listed, either from MM or from the current record.
-                    $theFileValues = array();
+                    $theFileValues = [];
                     // If MM relations for the files also!
                     if ($tcaFieldConf['MM']) {
                         $dbAnalysis = $this->createRelationHandlerInstance();
@@ -2151,7 +2296,7 @@ class DataHandler
                             if (@is_file(($dest . '/' . $theFile))) {
                                 $this->removeFilesStore[] = $dest . '/' . $theFile;
                             } elseif ($this->enableLogging && $theFile) {
-                                $this->log($table, $id, 5, 0, 1, 'Could not delete file \'%s\' (does not exist). (%s)', 10, array($dest . '/' . $theFile, $recFID), $propArr['event_pid']);
+                                $this->log($table, $id, 5, 0, 1, 'Could not delete file \'%s\' (does not exist). (%s)', 10, [$dest . '/' . $theFile, $recFID], $propArr['event_pid']);
                             }
                         }
                     }
@@ -2204,19 +2349,19 @@ class DataHandler
                                         $this->copiedFileMap[$theFile] = $theDestFile;
                                         clearstatcache();
                                         if ($this->enableLogging && !@is_file($theDestFile)) {
-                                            $this->log($table, $id, 5, 0, 1, 'Copying file \'%s\' failed!: The destination path (%s) may be write protected. Please make it write enabled!. (%s)', 16, array($theFile, dirname($theDestFile), $recFID), $propArr['event_pid']);
+                                            $this->log($table, $id, 5, 0, 1, 'Copying file \'%s\' failed!: The destination path (%s) may be write protected. Please make it write enabled!. (%s)', 16, [$theFile, dirname($theDestFile), $recFID], $propArr['event_pid']);
                                         }
                                     } elseif ($this->enableLogging) {
-                                        $this->log($table, $id, 5, 0, 1, 'Copying file \'%s\' failed!: No destination file (%s) possible!. (%s)', 11, array($theFile, $theDestFile, $recFID), $propArr['event_pid']);
+                                        $this->log($table, $id, 5, 0, 1, 'Copying file \'%s\' failed!: No destination file (%s) possible!. (%s)', 11, [$theFile, $theDestFile, $recFID], $propArr['event_pid']);
                                     }
                                 } elseif ($this->enableLogging) {
-                                    $this->log($table, $id, 5, 0, 1, 'File extension \'%s\' not allowed. (%s)', 12, array($fI['fileext'], $recFID), $propArr['event_pid']);
+                                    $this->log($table, $id, 5, 0, 1, 'File extension \'%s\' not allowed. (%s)', 12, [$fI['fileext'], $recFID], $propArr['event_pid']);
                                 }
                             } elseif ($this->enableLogging) {
-                                $this->log($table, $id, 5, 0, 1, 'Filesize (%s) of file \'%s\' exceeds limit (%s). (%s)', 13, array(GeneralUtility::formatSize($fileSize), $theFile, GeneralUtility::formatSize($maxSize * 1024), $recFID), $propArr['event_pid']);
+                                $this->log($table, $id, 5, 0, 1, 'Filesize (%s) of file \'%s\' exceeds limit (%s). (%s)', 13, [GeneralUtility::formatSize($fileSize), $theFile, GeneralUtility::formatSize($maxSize * 1024), $recFID], $propArr['event_pid']);
                             }
                         } elseif ($this->enableLogging) {
-                            $this->log($table, $id, 5, 0, 1, 'The destination (%s) or the source file (%s) does not exist. (%s)', 14, array($dest, $theFile, $recFID), $propArr['event_pid']);
+                            $this->log($table, $id, 5, 0, 1, 'The destination (%s) or the source file (%s) does not exist. (%s)', 14, [$dest, $theFile, $recFID], $propArr['event_pid']);
                         }
                         // If the destination file was created, we will set the new filename in the value array, otherwise unset the entry in the value array!
                         if (@is_file($theDestFile)) {
@@ -2235,7 +2380,7 @@ class DataHandler
                 /** @var $dbAnalysis RelationHandler */
                 $dbAnalysis = $this->createRelationHandlerInstance();
                 // Dummy
-                $dbAnalysis->tableArray['files'] = array();
+                $dbAnalysis->tableArray['files'] = [];
                 foreach ($valueArray as $key => $theFile) {
                     // Explode files
                     $dbAnalysis->itemArray[]['id'] = $theFile;
@@ -2252,7 +2397,7 @@ class DataHandler
                         $this->mmHistoryRecords[$table . ':' . $id]['newRecord'][$recFieldName] = '';
                     }
                 } else {
-                    $this->dbAnalysisStore[] = array($dbAnalysis, $tcaFieldConf['MM'], $id, 0);
+                    $this->dbAnalysisStore[] = [$dbAnalysis, $tcaFieldConf['MM'], $id, 0];
                 }
                 $valueArray = $dbAnalysis->countItems();
             }
@@ -2297,16 +2442,16 @@ class DataHandler
                                             $this->copiedFileMap[$theFile] = $theDestFile;
                                             clearstatcache();
                                             if ($this->enableLogging && !@is_file($theDestFile)) {
-                                                $this->log($table, $id, 5, 0, 1, 'Copying file \'%s\' failed!: The destination path (%s) may be write protected. Please make it write enabled!. (%s)', 16, array($theFile, dirname($theDestFile), $recFID), $propArr['event_pid']);
+                                                $this->log($table, $id, 5, 0, 1, 'Copying file \'%s\' failed!: The destination path (%s) may be write protected. Please make it write enabled!. (%s)', 16, [$theFile, dirname($theDestFile), $recFID], $propArr['event_pid']);
                                             }
                                         } elseif ($this->enableLogging) {
-                                            $this->log($table, $id, 5, 0, 1, 'Copying file \'%s\' failed!: No destination file (%s) possible!. (%s)', 11, array($theFile, $theDestFile, $recFID), $propArr['event_pid']);
+                                            $this->log($table, $id, 5, 0, 1, 'Copying file \'%s\' failed!: No destination file (%s) possible!. (%s)', 11, [$theFile, $theDestFile, $recFID], $propArr['event_pid']);
                                         }
                                     } elseif ($this->enableLogging) {
-                                        $this->log($table, $id, 5, 0, 1, 'File extension \'%s\' not allowed. (%s)', 12, array($fI['fileext'], $recFID), $propArr['event_pid']);
+                                        $this->log($table, $id, 5, 0, 1, 'File extension \'%s\' not allowed. (%s)', 12, [$fI['fileext'], $recFID], $propArr['event_pid']);
                                     }
                                 } elseif ($this->enableLogging) {
-                                    $this->log($table, $id, 5, 0, 1, 'Filesize (%s) of file \'%s\' exceeds limit (%s). (%s)', 13, array(GeneralUtility::formatSize($fileSize), $theFile, GeneralUtility::formatSize($maxSize * 1024), $recFID), $propArr['event_pid']);
+                                    $this->log($table, $id, 5, 0, 1, 'Filesize (%s) of file \'%s\' exceeds limit (%s). (%s)', 13, [GeneralUtility::formatSize($fileSize), $theFile, GeneralUtility::formatSize($maxSize * 1024), $recFID], $propArr['event_pid']);
                                 }
                                 // If the destination file was created, we will set the new filename in the value array, otherwise unset the entry in the value array!
                                 if (@is_file($theDestFile)) {
@@ -2338,6 +2483,25 @@ class DataHandler
      * @param array $res The result array. The processed value (if any!) is set in the 'value' key.
      * @param string|array $value The value to set.
      * @param array $tcaFieldConf Field configuration from TCA
+     * @param array $PP Additional parameters in a numeric array: $table,$id,$curValue,$status,$realPid,$recFID
+     * @param array $uploadedFiles Uploaded files for the field
+     * @param string $field Field name
+     * @return array Modified $res array
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function checkValue_flex($res, $value, $tcaFieldConf, $PP, $uploadedFiles, $field)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        list($table, $id, $curValue, $status, $realPid, $recFID, $tscPID) = $PP;
+        $this->checkValueForFlex($res, $value, $tcaFieldConf, $table, $id, $curValue, $status, $realPid, $recFID, $tscPID, $uploadedFiles, $field);
+    }
+
+    /**
+     * Evaluates 'flex' type values.
+     *
+     * @param array $res The result array. The processed value (if any!) is set in the 'value' key.
+     * @param string|array $value The value to set.
+     * @param array $tcaFieldConf Field configuration from TCA
      * @param string $table Table name
      * @param int $id UID of record
      * @param mixed $curValue Current value of the field
@@ -2359,13 +2523,17 @@ class DataHandler
             $newRecordPidValue = $status == 'new' ? $realPid : 0;
             // Get current value array:
             $dataStructArray = BackendUtility::getFlexFormDS($tcaFieldConf, $this->checkValue_currentRecord, $table, $field, true, $newRecordPidValue);
-            $currentValueArray = (string)$curValue !== '' ? GeneralUtility::xml2array($curValue) : array();
+            $currentValueArray = (string)$curValue !== '' ? GeneralUtility::xml2array($curValue) : [];
             if (!is_array($currentValueArray)) {
-                $currentValueArray = array();
+                $currentValueArray = [];
+            }
+            if (isset($currentValueArray['meta']['currentLangId'])) {
+                // @deprecated call since TYPO3 7, will be removed with TYPO3 8
+                unset($currentValueArray['meta']['currentLangId']);
             }
             // Remove all old meta for languages...
             // Evaluation of input values:
-            $value['data'] = $this->checkValue_flex_procInData($value['data'], $currentValueArray['data'], $uploadedFiles['data'], $dataStructArray, array($table, $id, $curValue, $status, $realPid, $recFID, $tscPID));
+            $value['data'] = $this->checkValue_flex_procInData($value['data'], $currentValueArray['data'], $uploadedFiles['data'], $dataStructArray, [$table, $id, $curValue, $status, $realPid, $recFID, $tscPID]);
             // Create XML from input value:
             $xmlValue = $this->checkValue_flexArray2Xml($value, true);
 
@@ -2439,7 +2607,7 @@ class DataHandler
                 }
 
                 asort($actionCMDs[$key]);
-                $newValueArray = array();
+                $newValueArray = [];
                 foreach ($actionCMDs[$key] as $idx => $order) {
                     if (substr($idx, 0, 3) == 'ID-') {
                         $idx = $this->newIndexMap[$idx];
@@ -2502,16 +2670,16 @@ class DataHandler
         // Example for received data:
         // $value = 45,NEW4555fdf59d154,12,123
         // We need to decide whether we use the stack or can save the relation directly.
-        if (strpos($value, 'NEW') !== false || !MathUtility::canBeInterpretedAsInteger($id)) {
-            $this->remapStackRecords[$table][$id] = array('remapStackIndex' => count($this->remapStack));
+        if (!empty($value) && (strpos($value, 'NEW') !== false || !MathUtility::canBeInterpretedAsInteger($id))) {
+            $this->remapStackRecords[$table][$id] = ['remapStackIndex' => count($this->remapStack)];
             $this->addNewValuesToRemapStackChildIds($valueArray);
-            $this->remapStack[] = array(
+            $this->remapStack[] = [
                 'func' => 'checkValue_inline_processDBdata',
-                'args' => array($valueArray, $tcaFieldConf, $id, $status, $table, $field, $additionalData),
-                'pos' => array('valueArray' => 0, 'tcaFieldConf' => 1, 'id' => 2, 'table' => 4),
+                'args' => [$valueArray, $tcaFieldConf, $id, $status, $table, $field, $additionalData],
+                'pos' => ['valueArray' => 0, 'tcaFieldConf' => 1, 'id' => 2, 'table' => 4],
                 'additionalData' => $additionalData,
                 'field' => $field,
-            );
+            ];
             unset($res['value']);
         } elseif ($value || MathUtility::canBeInterpretedAsInteger($id)) {
             $res['value'] = $this->checkValue_inline_processDBdata($valueArray, $tcaFieldConf, $id, $status, $table, $field, $additionalData);
@@ -2538,7 +2706,7 @@ class DataHandler
         }
         // Checking for not too many elements
         // Dumping array to list
-        $newVal = array();
+        $newVal = [];
         foreach ($valueArray as $nextVal) {
             if ($valueArrayC == 0) {
                 break;
@@ -2610,7 +2778,7 @@ class DataHandler
      */
     public function getRecordsWithSameValue($tableName, $uid, $fieldName, $value, $pageId = 0)
     {
-        $result = array();
+        $result = [];
         if (!empty($GLOBALS['TCA'][$tableName]['columns'][$fieldName])) {
             $uid = (int)$uid;
             $pageId = (int)$pageId;
@@ -2628,7 +2796,7 @@ class DataHandler
      */
     public function checkValue_text_Eval($value, $evalArray, $is_in)
     {
-        $res = array();
+        $res = [];
         $set = true;
         foreach ($evalArray as $func) {
             switch ($func) {
@@ -2667,7 +2835,7 @@ class DataHandler
      */
     public function checkValue_input_Eval($value, $evalArray, $is_in)
     {
-        $res = array();
+        $res = [];
         $set = true;
         foreach ($evalArray as $func) {
             switch ($func) {
@@ -2687,13 +2855,13 @@ class DataHandler
                 case 'double2':
                     $value = preg_replace('/[^0-9,\\.-]/', '', $value);
                     $negative = $value[0] === '-';
-                    $value = strtr($value, array(',' => '.', '-' => ''));
+                    $value = strtr($value, [',' => '.', '-' => '']);
                     if (strpos($value, '.') === false) {
                         $value .= '.0';
                     }
                     $valueArray = explode('.', $value);
                     $dec = array_pop($valueArray);
-                    $value = join('', $valueArray) . '.' . $dec;
+                    $value = implode('', $valueArray) . '.' . $dec;
                     if ($negative) {
                         $value *= -1;
                     }
@@ -2708,14 +2876,10 @@ class DataHandler
                     $value = trim($value);
                     break;
                 case 'upper':
-                    /** @var CharsetConverter $charsetConverter */
-                    $charsetConverter = GeneralUtility::makeInstance(CharsetConverter::class);
-                    $value = $charsetConverter->conv_case('utf-8', $value, 'toUpper');
+                    $value = $GLOBALS['LANG']->csConvObj->conv_case($GLOBALS['LANG']->charSet, $value, 'toUpper');
                     break;
                 case 'lower':
-                    /** @var CharsetConverter $charsetConverter */
-                    $charsetConverter = GeneralUtility::makeInstance(CharsetConverter::class);
-                    $value = $charsetConverter->conv_case('utf-8', $value, 'toLower');
+                    $value = $GLOBALS['LANG']->csConvObj->conv_case($GLOBALS['LANG']->charSet, $value, 'toLower');
                     break;
                 case 'required':
                     if (!isset($value) || $value === '') {
@@ -2835,6 +2999,9 @@ class DataHandler
         $dbAnalysis->registerNonTableValues = !empty($tcaFieldConf['allowNonIdValues']);
         $dbAnalysis->start($newRelations, $tables, '', 0, $currentTable, $tcaFieldConf);
         if ($tcaFieldConf['MM']) {
+            // convert submitted items to use version ids instead of live ids
+            // (only required for MM relations in a workspace context)
+            $dbAnalysis->convertItemArray();
             if ($status == 'update') {
                 /** @var $oldRelations_dbAnalysis RelationHandler */
                 $oldRelations_dbAnalysis = $this->createRelationHandlerInstance();
@@ -2851,7 +3018,7 @@ class DataHandler
                     $this->mmHistoryRecords[$currentTable . ':' . $id]['newRecord'][$currentField] = '';
                 }
             } else {
-                $this->dbAnalysisStore[] = array($dbAnalysis, $tcaFieldConf['MM'], $id, $prep, $currentTable);
+                $this->dbAnalysisStore[] = [$dbAnalysis, $tcaFieldConf['MM'], $id, $prep, $currentTable];
             }
             $valueArray = $dbAnalysis->countItems();
         } else {
@@ -2893,7 +3060,7 @@ class DataHandler
      * @return array The modified 'data' part.
      * @see checkValue_flex_procInData_travDS()
      */
-    public function checkValue_flex_procInData($dataPart, $dataPart_current, $uploadedFiles, $dataStructArray, $pParams, $callBackFunc = '', array $workspaceOptions = array())
+    public function checkValue_flex_procInData($dataPart, $dataPart_current, $uploadedFiles, $dataStructArray, $pParams, $callBackFunc = '', array $workspaceOptions = [])
     {
         if (is_array($dataPart)) {
             foreach ($dataPart as $sKey => $sheetDef) {
@@ -2923,7 +3090,7 @@ class DataHandler
      * @return void
      * @see checkValue_flex_procInData()
      */
-    public function checkValue_flex_procInData_travDS(&$dataValues, $dataValues_current, $uploadedFiles, $DSelements, $pParams, $callBackFunc, $structurePath, array $workspaceOptions = array())
+    public function checkValue_flex_procInData_travDS(&$dataValues, $dataValues_current, $uploadedFiles, $DSelements, $pParams, $callBackFunc, $structurePath, array $workspaceOptions = [])
     {
         if (!is_array($DSelements)) {
             return;
@@ -2945,14 +3112,14 @@ class DataHandler
                         }
 
                         if (!is_array($dataValues_current[$key]['el'])) {
-                            $dataValues_current[$key]['el'] = array();
+                            $dataValues_current[$key]['el'] = [];
                         }
                         $theKey = key($el);
                         if (!is_array($dataValues[$key]['el'][$ik][$theKey]['el'])) {
                             continue;
                         }
 
-                        $this->checkValue_flex_procInData_travDS($dataValues[$key]['el'][$ik][$theKey]['el'], is_array($dataValues_current[$key]['el'][$ik]) ? $dataValues_current[$key]['el'][$ik][$theKey]['el'] : array(), $uploadedFiles[$key]['el'][$ik][$theKey]['el'], $DSelements[$key]['el'][$theKey]['el'], $pParams, $callBackFunc, $structurePath . $key . '/el/' . $ik . '/' . $theKey . '/el/', $workspaceOptions);
+                        $this->checkValue_flex_procInData_travDS($dataValues[$key]['el'][$ik][$theKey]['el'], is_array($dataValues_current[$key]['el'][$ik]) ? $dataValues_current[$key]['el'][$ik][$theKey]['el'] : [], $uploadedFiles[$key]['el'][$ik][$theKey]['el'], $DSelements[$key]['el'][$theKey]['el'], $pParams, $callBackFunc, $structurePath . $key . '/el/' . $ik . '/' . $theKey . '/el/', $workspaceOptions);
                         // If element is added dynamically in the flexform of TCEforms, we map the ID-string to the next numerical index we can have in that particular section of elements:
                         // The fact that the order changes is not important since order is controlled by a separately submitted index.
                         if (substr($ik, 0, 3) == 'ID-') {
@@ -2967,7 +3134,7 @@ class DataHandler
                     }
                 } else {
                     if (!isset($dataValues[$key]['el'])) {
-                        $dataValues[$key]['el'] = array();
+                        $dataValues[$key]['el'] = [];
                     }
                     $this->checkValue_flex_procInData_travDS($dataValues[$key]['el'], $dataValues_current[$key]['el'], $uploadedFiles[$key]['el'], $DSelements[$key]['el'], $pParams, $callBackFunc, $structurePath . $key . '/el/', $workspaceOptions);
                 }
@@ -2987,12 +3154,12 @@ class DataHandler
                         // Default
                         list($CVtable, $CVid, $CVcurValue, $CVstatus, $CVrealPid, $CVrecFID, $CVtscPID) = $pParams;
 
-                        $additionalData = array(
+                        $additionalData = [
                             'flexFormId' => $CVrecFID,
                             'flexFormPath' => trim(rtrim($structurePath, '/') . '/' . $key . '/' . $vKey, '/'),
-                        );
+                        ];
 
-                        $res = $this->checkValue_SW(array(), $dataValues[$key][$vKey], $dsConf['TCEforms']['config'], $CVtable, $CVid, $dataValues_current[$key][$vKey], $CVstatus, $CVrealPid, $CVrecFID, '', $uploadedFiles[$key][$vKey], $CVtscPID, $additionalData);
+                        $res = $this->checkValue_SW([], $dataValues[$key][$vKey], $dsConf['TCEforms']['config'], $CVtable, $CVid, $dataValues_current[$key][$vKey], $CVstatus, $CVrealPid, $CVrecFID, '', $uploadedFiles[$key][$vKey], $CVtscPID, $additionalData);
                         // Look for RTE transformation of field:
                         if ($dataValues[$key]['_TRANSFORM_' . $vKey] == 'RTE' && !$this->dontProcessTransformations) {
                             // Unsetting trigger field - we absolutely don't want that into the data storage!
@@ -3018,7 +3185,10 @@ class DataHandler
                     // Finally, check if new and old values are different (or no .vDEFbase value is found) and if so, we record the vDEF value for diff'ing.
                     // We do this after $dataValues has been updated since I expect that $dataValues_current holds evaluated values from database (so this must be the right value to compare with).
                     if (substr($vKey, -9) != '.vDEFbase') {
-                        if ($this->updateModeL10NdiffData && $GLOBALS['TYPO3_CONF_VARS']['BE']['flexFormXMLincludeDiffBase'] && $vKey !== 'vDEF' && ((string)$dataValues[$key][$vKey] !== (string)$dataValues_current[$key][$vKey] || !isset($dataValues_current[$key][$vKey . '.vDEFbase']) || $this->updateModeL10NdiffData === 'FORCE_FFUPD')) {
+                        // @deprecated: flexFormXMLincludeDiffBase is only enabled by ext:compatibility6 since TYPO3 CMS 7, vDEFbase can be unset / ignored with TYPO3 CMS 8
+                        if ($this->clear_flexFormData_vDEFbase) {
+                            $dataValues[$key][$vKey . '.vDEFbase'] = '';
+                        } elseif ($this->updateModeL10NdiffData && $GLOBALS['TYPO3_CONF_VARS']['BE']['flexFormXMLincludeDiffBase'] && $vKey !== 'vDEF' && ((string)$dataValues[$key][$vKey] !== (string)$dataValues_current[$key][$vKey] || !isset($dataValues_current[$key][$vKey . '.vDEFbase']) || $this->updateModeL10NdiffData === 'FORCE_FFUPD')) {
                             // Now, check if a vDEF value is submitted in the input data, if so we expect this has been processed prior to this operation (normally the case since those fields are higher in the form) and we can use that:
                             if (isset($dataValues[$key]['vDEF'])) {
                                 $diffValue = $dataValues[$key]['vDEF'];
@@ -3094,7 +3264,7 @@ class DataHandler
                 $valueData = $this->castReferenceValue(implode(',', $valueArray), $tcaFieldConf);
                 // If a valid translation of the 'keep' mode is active, update relations in the original(!) record:
                 if ($keepTranslation) {
-                    $this->updateDB($table, $transOrigPointer, array($field => $valueData));
+                    $this->updateDB($table, $transOrigPointer, [$field => $valueData]);
                 } else {
                     $newValue = $valueData;
                 }
@@ -3124,7 +3294,7 @@ class DataHandler
             return false;
         }
         // Hook initialization:
-        $hookObjectsArr = array();
+        $hookObjectsArr = [];
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processCmdmapClass'])) {
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['processCmdmapClass'] as $classRef) {
                 $hookObj = GeneralUtility::getUserObj($classRef);
@@ -3134,13 +3304,13 @@ class DataHandler
                 $hookObjectsArr[] = $hookObj;
             }
         }
-        $pasteDatamap = array();
+        $pasteDatamap = [];
         // Traverse command map:
         foreach ($this->cmdmap as $table => $_) {
             // Check if the table may be modified!
             $modifyAccessList = $this->checkModifyAccessList($table);
             if ($this->enableLogging && !$modifyAccessList) {
-                $this->log($table, 0, 2, 0, 1, 'Attempt to modify table \'%s\' without permission', 1, array($table));
+                $this->log($table, 0, 2, 0, 1, 'Attempt to modify table \'%s\' without permission', 1, [$table]);
             }
             // Check basic permissions and circumstances:
             if (!isset($GLOBALS['TCA'][$table]) || $this->tableReadOnly($table) || !is_array($this->cmdmap[$table]) || !$modifyAccessList) {
@@ -3175,7 +3345,7 @@ class DataHandler
                     // Init copyMapping array:
                     // Must clear this array before call from here to those functions:
                     // Contains mapping information between new and old id numbers.
-                    $this->copyMappingArray = array();
+                    $this->copyMappingArray = [];
                     // process the command
                     $commandIsProcessed = false;
                     foreach ($hookObjectsArr as $hookObj) {
@@ -3200,6 +3370,11 @@ class DataHandler
                                 $procId = $this->copyMappingArray[$table][$id];
                                 break;
                             case 'localize':
+                                $this->useTransOrigPointerField = true;
+                                $this->localize($table, $id, $value);
+                                break;
+                            case 'copyToLanguage':
+                                $this->useTransOrigPointerField = false;
                                 $this->localize($table, $id, $value);
                                 break;
                             case 'inlineLocalizeSynchronize':
@@ -3266,7 +3441,7 @@ class DataHandler
      * @param bool $ignoreLocalization If TRUE, any localization routine is skipped
      * @return int|null ID of new record, if any
      */
-    public function copyRecord($table, $uid, $destPid, $first = false, $overrideValues = array(), $excludeFields = '', $language = 0, $ignoreLocalization = false)
+    public function copyRecord($table, $uid, $destPid, $first = false, $overrideValues = [], $excludeFields = '', $language = 0, $ignoreLocalization = false)
     {
         $uid = ($origUid = (int)$uid);
         // Only copy if the table is defined in $GLOBALS['TCA'], a uid is given and the record wasn't copied before:
@@ -3275,7 +3450,7 @@ class DataHandler
         }
         if ($this->isRecordCopied($table, $uid)) {
             if (!empty($overrideValues)) {
-                $this->log($table, $uid, 5, 0, 1, 'Repeated attempt to copy record "' . $table . ':' . $uid . '" with override values');
+                $this->log($table, $uid, 1, 0, 1, 'Repeated attempt to copy record "%s:%s" with override values', -1, [$table, $uid]);
             }
             return null;
         }
@@ -3283,7 +3458,7 @@ class DataHandler
         // This checks if the record can be selected which is all that a copy action requires.
         if (!$this->doesRecordExist($table, $uid, 'show')) {
             if ($this->enableLogging) {
-                $this->log($table, $uid, 3, 0, 1, 'Attempt to copy record without permission');
+                $this->log($table, $uid, 1, 0, 1, 'Attempt to copy record "%s:%s" without permission', -1, [$table, $uid]);
             }
             return null;
         }
@@ -3291,7 +3466,7 @@ class DataHandler
         // Check if table is allowed on destination page
         if ($destPid >= 0 && !$this->isTableAllowedForThisPage($destPid, $table)) {
             if ($this->enableLogging) {
-                $this->log($table, $uid, 3, 0, 1, 'Attempt to insert record on a page that can\'t store record type.');
+                $this->log($table, $uid, 1, 0, 1, 'Attempt to insert record "%s:%s" on a page (%s) that can\'t store record type.', -1, [$table, $uid, $destPid]);
             }
             return null;
         }
@@ -3300,18 +3475,18 @@ class DataHandler
         //Used to check language and general editing rights
         if (!$ignoreLocalization && ($language <= 0 || !$this->BE_USER->checkLanguageAccess($language)) && !$this->BE_USER->recordEditAccessInternals($table, $uid, false, false, $fullLanguageCheckNeeded)) {
             if ($this->enableLogging) {
-                $this->log($table, $uid, 3, 0, 1, 'Attempt to copy record without having permissions to do so. [' . $this->BE_USER->errorMsg . '].');
+                $this->log($table, $uid, 1, 0, 1, 'Attempt to copy record "%s:%s" without having permissions to do so. [' . $this->BE_USER->errorMsg . '].', -1, [$table, $uid]);
             }
             return null;
         }
 
-        $data = array();
+        $data = [];
         $nonFields = array_unique(GeneralUtility::trimExplode(',', 'uid,perms_userid,perms_groupid,perms_user,perms_group,perms_everybody,t3ver_oid,t3ver_wsid,t3ver_id,t3ver_label,t3ver_state,t3ver_count,t3ver_stage,t3ver_tstamp,' . $excludeFields, true));
         // So it copies (and localized) content from workspace...
         $row = BackendUtility::getRecordWSOL($table, $uid);
         if (!is_array($row)) {
             if ($this->enableLogging) {
-                $this->log($table, $uid, 3, 0, 1, 'Attempt to copy record that did not exist!');
+                $this->log($table, $uid, 1, 0, 1, 'Attempt to copy record that did not exist!');
             }
             return null;
         }
@@ -3323,7 +3498,7 @@ class DataHandler
         // Getting default data:
         $defaultData = $this->newFieldArray($table);
         // Getting "copy-after" fields if applicable:
-        $copyAfterFields = $destPid < 0 ? $this->fixCopyAfterDuplFields($table, $uid, abs($destPid), 0) : array();
+        $copyAfterFields = $destPid < 0 ? $this->fixCopyAfterDuplFields($table, $uid, abs($destPid), 0) : [];
         // Page TSconfig related:
         // NOT using \TYPO3\CMS\Backend\Utility\BackendUtility::getTSCpid() because we need the real pid - not the ID of a page, if the input is a page...
         $tscPID = BackendUtility::getTSconfig_pidValue($table, $uid, $destPid);
@@ -3435,7 +3610,7 @@ class DataHandler
             // If we're going to copy recursively...:
             if ($theNewRootID && $this->copyTree) {
                 // Get ALL subpages to copy (read-permissions are respected!):
-                $CPtable = $this->int_pageTreeInfo(array(), $uid, (int)$this->copyTree, $theNewRootID);
+                $CPtable = $this->int_pageTreeInfo([], $uid, (int)$this->copyTree, $theNewRootID);
                 // Now copying the subpages:
                 foreach ($CPtable as $thePageUid => $thePagePid) {
                     $newPid = $this->copyMappingArray['pages'][$thePagePid];
@@ -3546,7 +3721,7 @@ class DataHandler
      * @param array $workspaceOptions Options to be forwarded if actions happen on a workspace currently
      * @return int Returns the new ID of the record (if applicable)
      */
-    public function copyRecord_raw($table, $uid, $pid, $overrideArray = array(), array $workspaceOptions = array())
+    public function copyRecord_raw($table, $uid, $pid, $overrideArray = [], array $workspaceOptions = [])
     {
         $uid = (int)$uid;
         // Stop any actions if the record is marked to be deleted:
@@ -3566,7 +3741,7 @@ class DataHandler
         }
 
         // Set up fields which should not be processed. They are still written - just passed through no-questions-asked!
-        $nonFields = array('uid', 'pid', 't3ver_id', 't3ver_oid', 't3ver_wsid', 't3ver_label', 't3ver_state', 't3ver_count', 't3ver_stage', 't3ver_tstamp', 'perms_userid', 'perms_groupid', 'perms_user', 'perms_group', 'perms_everybody');
+        $nonFields = ['uid', 'pid', 't3ver_id', 't3ver_oid', 't3ver_wsid', 't3ver_label', 't3ver_state', 't3ver_count', 't3ver_stage', 't3ver_tstamp', 'perms_userid', 'perms_groupid', 'perms_user', 'perms_group', 'perms_everybody'];
         // Select main record:
         $row = $this->recordInfo($table, $uid, '*');
         if (!is_array($row)) {
@@ -3601,7 +3776,7 @@ class DataHandler
         $theNewSQLID = $this->insertNewCopyVersion($table, $row, $pid);
         if ($theNewSQLID) {
             $this->dbAnalysisStoreExec();
-            $this->dbAnalysisStore = array();
+            $this->dbAnalysisStore = [];
             $this->copyRecord_fixRTEmagicImages($table, BackendUtility::wsMapId($table, $theNewSQLID));
             return $this->copyMappingArray[$table][$uid] = $theNewSQLID;
         }
@@ -3670,7 +3845,7 @@ class DataHandler
      * @access private
      * @see copyRecord()
      */
-    public function copyRecord_procBasedOnFieldType($table, $uid, $field, $value, $row, $conf, $realDestPid, $language = 0, array $workspaceOptions = array())
+    public function copyRecord_procBasedOnFieldType($table, $uid, $field, $value, $row, $conf, $realDestPid, $language = 0, array $workspaceOptions = [])
     {
         // Process references and files, currently that means only the files, prepending absolute paths (so the TCEmain engine will detect the file as new and one that should be made into a copy)
         $value = $this->copyRecord_procFilesRefs($conf, $uid, $value);
@@ -3690,7 +3865,7 @@ class DataHandler
             $currentValueArray = GeneralUtility::xml2array($value);
             // Traversing the XML structure, processing files:
             if (is_array($currentValueArray)) {
-                $currentValueArray['data'] = $this->checkValue_flex_procInData($currentValueArray['data'], array(), array(), $dataStructArray, array($table, $uid, $field, $realDestPid), 'copyRecord_flexFormCallBack', $workspaceOptions);
+                $currentValueArray['data'] = $this->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructArray, [$table, $uid, $field, $realDestPid], 'copyRecord_flexFormCallBack', $workspaceOptions);
                 // Setting value as an array! -> which means the input will be processed according to the 'flex' type when the new copy is created.
                 $value = $currentValueArray;
             }
@@ -3823,7 +3998,7 @@ class DataHandler
                         if (isset($this->copyMappingArray[$v['table']][$v['id']])) {
                             $newId = $this->copyMappingArray[$v['table']][$v['id']];
                         } else {
-                            $newId = $this->copyRecord_raw($v['table'], $v['id'], $realDestPid, array(), $workspaceOptions);
+                            $newId = $this->copyRecord_raw($v['table'], $v['id'], $realDestPid, [], $workspaceOptions);
                         }
                     }
                 }
@@ -3864,11 +4039,11 @@ class DataHandler
         $dataValue = $this->copyRecord_procFilesRefs($dsConf, $uid, $dataValue);
         // If references are set for this field, set flag so they can be corrected later (in ->remapListedDBRecords())
         if (($this->isReferenceField($dsConf) || $this->getInlineFieldType($dsConf) !== false) && (string)$dataValue !== '') {
-            $dataValue = $this->copyRecord_procBasedOnFieldType($table, $uid, $field, $dataValue, array(), $dsConf, $realDestPid, 0, $workspaceOptions);
+            $dataValue = $this->copyRecord_procBasedOnFieldType($table, $uid, $field, $dataValue, [], $dsConf, $realDestPid, 0, $workspaceOptions);
             $this->registerDBList[$table][$uid][$field] = 'FlexForm_reference';
         }
         // Return
-        return array('value' => $dataValue);
+        return ['value' => $dataValue];
     }
 
     /**
@@ -3891,7 +4066,7 @@ class DataHandler
 
         // Get an array with files as values:
         if ($conf['MM']) {
-            $theFileValues = array();
+            $theFileValues = [];
             /** @var $dbAnalysis RelationHandler */
             $dbAnalysis = $this->createRelationHandlerInstance();
             $dbAnalysis->start('', 'files', $conf['MM'], $uid);
@@ -3906,7 +4081,7 @@ class DataHandler
         // Traverse this array of files:
         $uploadFolder = $conf['internal_type'] == 'file' ? $conf['uploadfolder'] : '';
         $dest = $this->destPathFromUploadFolder($uploadFolder);
-        $newValue = array();
+        $newValue = [];
         foreach ($theFileValues as $file) {
             if (trim($file)) {
                 $realFile = str_replace('//', '/', $dest . '/' . trim($file));
@@ -3936,15 +4111,16 @@ class DataHandler
         // Creating fileFunc object.
         if (!$this->fileFunc) {
             $this->fileFunc = GeneralUtility::makeInstance(BasicFileUtility::class);
+            $this->include_filefunctions = 1;
         }
         // Select all RTEmagic files in the reference table from the table/ID
-        $where = join(' AND ', array(
+        $where = implode(' AND ', [
             'ref_table=' . $this->databaseConnection->fullQuoteStr('_FILE', 'sys_refindex'),
             'ref_string LIKE ' . $this->databaseConnection->fullQuoteStr('%/RTEmagic%', 'sys_refindex'),
             'softref_key=' . $this->databaseConnection->fullQuoteStr('images', 'sys_refindex'),
             'tablename=' . $this->databaseConnection->fullQuoteStr($table, 'sys_refindex'),
             'recuid=' . (int)$theNewSQLID,
-        ));
+        ]);
         $rteFileRecords = $this->databaseConnection->exec_SELECTgetRows('*', 'sys_refindex', $where, '', 'sorting DESC');
         // Traverse the files found and copy them:
         if (!is_array($rteFileRecords)) {
@@ -3955,7 +4131,7 @@ class DataHandler
             if (!GeneralUtility::isFirstPartOfStr($filename, 'RTEmagicC_')) {
                 continue;
             }
-            $fileInfo = array();
+            $fileInfo = [];
             $fileInfo['exists'] = @is_file((PATH_site . $rteFileRecord['ref_string']));
             $fileInfo['original'] = substr($rteFileRecord['ref_string'], 0, -strlen($filename)) . 'RTEmagicP_' . preg_replace('/\\.[[:alnum:]]+$/', '', substr($filename, 10));
             $fileInfo['original_exists'] = @is_file((PATH_site . $fileInfo['original']));
@@ -4015,7 +4191,7 @@ class DataHandler
      * @param string $excludeFields
      * @return void
      */
-    public function copyL10nOverlayRecords($table, $uid, $destPid, $first = false, $overrideValues = array(), $excludeFields = '')
+    public function copyL10nOverlayRecords($table, $uid, $destPid, $first = false, $overrideValues = [], $excludeFields = '')
     {
         // There's no need to perform this for page-records or for tables that are not localizable
         if (!BackendUtility::isTableLocalizable($table) || !empty($GLOBALS['TCA'][$table]['ctrl']['transForeignTable']) || !empty($GLOBALS['TCA'][$table]['ctrl']['transOrigPointerTable'])) {
@@ -4030,7 +4206,7 @@ class DataHandler
         // Get the localized records to be copied
         $l10nRecords = BackendUtility::getRecordsByField($table, $GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField'], $uid, $where);
         if (is_array($l10nRecords)) {
-            $localizedDestPids = array();
+            $localizedDestPids = [];
             // If $destPid < 0, then it is the uid of the original language record we are inserting after
             if ($destPid < 0) {
                 // Get the localized records of the record we are inserting after
@@ -4109,21 +4285,21 @@ class DataHandler
         // If moving is allowed, begin the processing:
         if (!$mayEditAccess) {
             if ($this->enableLogging) {
-                $this->log($table, $uid, 4, 0, 1, 'Attempt to move record "%s" (%s) without having permissions to do so. [' . $this->BE_USER->errorMsg . ']', 14, array($propArr['header'], $table . ':' . $uid), $propArr['event_pid']);
+                $this->log($table, $uid, 4, 0, 1, 'Attempt to move record "%s" (%s) without having permissions to do so. [' . $this->BE_USER->errorMsg . ']', 14, [$propArr['header'], $table . ':' . $uid], $propArr['event_pid']);
             }
             return;
         }
 
         if (!$mayMoveAccess) {
             if ($this->enableLogging) {
-                $this->log($table, $uid, 4, 0, 1, 'Attempt to move record \'%s\' (%s) without having permissions to do so.', 14, array($propArr['header'], $table . ':' . $uid), $propArr['event_pid']);
+                $this->log($table, $uid, 4, 0, 1, 'Attempt to move record \'%s\' (%s) without having permissions to do so.', 14, [$propArr['header'], $table . ':' . $uid], $propArr['event_pid']);
             }
             return;
         }
 
         if (!$mayInsertAccess) {
             if ($this->enableLogging) {
-                $this->log($table, $uid, 4, 0, 1, 'Attempt to move record \'%s\' (%s) without having permissions to insert.', 14, array($propArr['header'], $table . ':' . $uid), $propArr['event_pid']);
+                $this->log($table, $uid, 4, 0, 1, 'Attempt to move record \'%s\' (%s) without having permissions to insert.', 14, [$propArr['header'], $table . ':' . $uid], $propArr['event_pid']);
             }
             return;
         }
@@ -4169,14 +4345,14 @@ class DataHandler
         $propArr = $this->getRecordProperties($table, $uid);
         $moveRec = $this->getRecordProperties($table, $uid, true);
         // Prepare user defined objects (if any) for hooks which extend this function:
-        $hookObjectsArr = array();
+        $hookObjectsArr = [];
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['moveRecordClass'])) {
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['moveRecordClass'] as $classRef) {
                 $hookObjectsArr[] = GeneralUtility::getUserObj($classRef);
             }
         }
         // Timestamp field:
-        $updateFields = array();
+        $updateFields = [];
         if ($GLOBALS['TCA'][$table]['ctrl']['tstamp']) {
             $updateFields[$GLOBALS['TCA'][$table]['ctrl']['tstamp']] = $GLOBALS['EXEC_TIME'];
         }
@@ -4212,12 +4388,12 @@ class DataHandler
                         // Logged to old page
                         $newPropArr = $this->getRecordProperties($table, $uid);
                         $newpagePropArr = $this->getRecordProperties('pages', $destPid);
-                        $this->log($table, $uid, 4, $destPid, 0, 'Moved record \'%s\' (%s) to page \'%s\' (%s)', 2, array($propArr['header'], $table . ':' . $uid, $newpagePropArr['header'], $newPropArr['pid']), $propArr['pid']);
+                        $this->log($table, $uid, 4, $destPid, 0, 'Moved record \'%s\' (%s) to page \'%s\' (%s)', 2, [$propArr['header'], $table . ':' . $uid, $newpagePropArr['header'], $newPropArr['pid']], $propArr['pid']);
                         // Logged to new page
-                        $this->log($table, $uid, 4, $destPid, 0, 'Moved record \'%s\' (%s) from page \'%s\' (%s)', 3, array($propArr['header'], $table . ':' . $uid, $oldpagePropArr['header'], $propArr['pid']), $destPid);
+                        $this->log($table, $uid, 4, $destPid, 0, 'Moved record \'%s\' (%s) from page \'%s\' (%s)', 3, [$propArr['header'], $table . ':' . $uid, $oldpagePropArr['header'], $propArr['pid']], $destPid);
                     } else {
                         // Logged to new page
-                        $this->log($table, $uid, 4, $destPid, 0, 'Moved record \'%s\' (%s) on page \'%s\' (%s)', 4, array($propArr['header'], $table . ':' . $uid, $oldpagePropArr['header'], $propArr['pid']), $destPid);
+                        $this->log($table, $uid, 4, $destPid, 0, 'Moved record \'%s\' (%s) on page \'%s\' (%s)', 4, [$propArr['header'], $table . ':' . $uid, $oldpagePropArr['header'], $propArr['pid']], $destPid);
                     }
                 }
                 // Clear cache after moving
@@ -4229,7 +4405,7 @@ class DataHandler
                 }
             } elseif ($this->enableLogging) {
                 $destPropArr = $this->getRecordProperties('pages', $destPid);
-                $this->log($table, $uid, 4, 0, 1, 'Attempt to move page \'%s\' (%s) to inside of its own rootline (at page \'%s\' (%s))', 10, array($propArr['header'], $uid, $destPropArr['header'], $destPid), $propArr['pid']);
+                $this->log($table, $uid, 4, 0, 1, 'Attempt to move page \'%s\' (%s) to inside of its own rootline (at page \'%s\' (%s))', 10, [$propArr['header'], $uid, $destPropArr['header'], $destPid], $propArr['pid']);
             }
         } else {
             // Put after another record
@@ -4267,12 +4443,12 @@ class DataHandler
                                 // Logged to old page
                                 $newPropArr = $this->getRecordProperties($table, $uid);
                                 $newpagePropArr = $this->getRecordProperties('pages', $destPid);
-                                $this->log($table, $uid, 4, 0, 0, 'Moved record \'%s\' (%s) to page \'%s\' (%s)', 2, array($propArr['header'], $table . ':' . $uid, $newpagePropArr['header'], $newPropArr['pid']), $propArr['pid']);
+                                $this->log($table, $uid, 4, 0, 0, 'Moved record \'%s\' (%s) to page \'%s\' (%s)', 2, [$propArr['header'], $table . ':' . $uid, $newpagePropArr['header'], $newPropArr['pid']], $propArr['pid']);
                                 // Logged to old page
-                                $this->log($table, $uid, 4, 0, 0, 'Moved record \'%s\' (%s) from page \'%s\' (%s)', 3, array($propArr['header'], $table . ':' . $uid, $oldpagePropArr['header'], $propArr['pid']), $destPid);
+                                $this->log($table, $uid, 4, 0, 0, 'Moved record \'%s\' (%s) from page \'%s\' (%s)', 3, [$propArr['header'], $table . ':' . $uid, $oldpagePropArr['header'], $propArr['pid']], $destPid);
                             } else {
                                 // Logged to old page
-                                $this->log($table, $uid, 4, 0, 0, 'Moved record \'%s\' (%s) on page \'%s\' (%s)', 4, array($propArr['header'], $table . ':' . $uid, $oldpagePropArr['header'], $propArr['pid']), $destPid);
+                                $this->log($table, $uid, 4, 0, 0, 'Moved record \'%s\' (%s) on page \'%s\' (%s)', 4, [$propArr['header'], $table . ':' . $uid, $oldpagePropArr['header'], $propArr['pid']], $destPid);
                             }
                         }
                         // Clear cache after moving
@@ -4285,11 +4461,11 @@ class DataHandler
                         }
                     } elseif ($this->enableLogging) {
                         $destPropArr = $this->getRecordProperties('pages', $destPid);
-                        $this->log($table, $uid, 4, 0, 1, 'Attempt to move page \'%s\' (%s) to inside of its own rootline (at page \'%s\' (%s))', 10, array($propArr['header'], $uid, $destPropArr['header'], $destPid), $propArr['pid']);
+                        $this->log($table, $uid, 4, 0, 1, 'Attempt to move page \'%s\' (%s) to inside of its own rootline (at page \'%s\' (%s))', 10, [$propArr['header'], $uid, $destPropArr['header'], $destPid], $propArr['pid']);
                     }
                 }
             } elseif ($this->enableLogging) {
-                $this->log($table, $uid, 4, 0, 1, 'Attempt to move record \'%s\' (%s) to after another record, although the table has no sorting row.', 13, array($propArr['header'], $table . ':' . $uid), $propArr['event_pid']);
+                $this->log($table, $uid, 4, 0, 1, 'Attempt to move record \'%s\' (%s) to after another record, although the table has no sorting row.', 13, [$propArr['header'], $table . ':' . $uid], $propArr['event_pid']);
             }
         }
     }
@@ -4374,7 +4550,7 @@ class DataHandler
         }
         $l10nRecords = BackendUtility::getRecordsByField($table, $GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField'], $uid, $where);
         if (is_array($l10nRecords)) {
-            $localizedDestPids = array();
+            $localizedDestPids = [];
             // If $$originalRecordDestinationPid < 0, then it is the uid of the original language record we are inserting after
             if ($originalRecordDestinationPid < 0) {
                 // Get the localized records of the record we are inserting after
@@ -4416,7 +4592,10 @@ class DataHandler
         }
 
         $this->registerNestedElementCall($table, $uid, 'localize');
-        if ((!$GLOBALS['TCA'][$table]['ctrl']['languageField'] || !$GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField'] || $GLOBALS['TCA'][$table]['ctrl']['transOrigPointerTable']) && $table !== 'pages') {
+        if ((!$GLOBALS['TCA'][$table]['ctrl']['languageField']
+                || !$GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']
+                || $table === 'pages_language_overlay')
+            && $table !== 'pages') {
             if ($this->enableLogging) {
                 $this->newlog('Localization failed; "languageField" and "transOrigPointerField" must be defined for the table!', 1);
             }
@@ -4447,16 +4626,28 @@ class DataHandler
             return false;
         }
 
-        if ($row[$GLOBALS['TCA'][$table]['ctrl']['languageField']] > 0 && $table !== 'pages') {
-            if ($this->enableLogging) {
-                $this->newlog('Localization failed; Source record had another language than "Default" or "All" defined!', 1);
+        // Make sure that records which are translated from another language than the default language have a correct
+        // localization source set themselves, before translating them to another language.
+        if ((int)$row[$GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']] !== 0
+            && $row[$GLOBALS['TCA'][$table]['ctrl']['languageField']] > 0
+            && $table !== 'pages') {
+            $localizationParentRecord = BackendUtility::getRecord(
+                $table,
+                $row[$GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']]);
+            if ((int)$localizationParentRecord[$GLOBALS['TCA'][$table]['ctrl']['languageField']] !== 0) {
+                if ($this->enableLogging) {
+                    $this->newlog('Localization failed; Source record contained a reference to an original record that is not a default record (which is strange)!', 1);
+                }
+                return false;
             }
-            return false;
         }
 
-        if ($row[$GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']] != 0 && $table !== 'pages') {
+        // Default language records must never have a localization parent as they are the origin of any translation.
+        if ((int)$row[$GLOBALS['TCA'][$table]['ctrl']['transOrigPointerField']] !== 0
+            && (int)$row[$GLOBALS['TCA'][$table]['ctrl']['languageField']] === 0
+            && $table !== 'pages') {
             if ($this->enableLogging) {
-                $this->newlog('Localization failed; Source record contained a reference to an original default record (which is strange)!', 1);
+                $this->newlog('Localization failed; Source record contained a reference to an original default record but is a default record itself (which is strange)!', 1);
             }
             return false;
         }
@@ -4477,17 +4668,27 @@ class DataHandler
         }
 
         // Initialize:
-        $overrideValues = array();
-        $excludeFields = array();
+        $overrideValues = [];
+        $excludeFields = [];
         // Set override values:
         $overrideValues[$GLOBALS['TCA'][$Ttable]['ctrl']['languageField']] = $langRec['uid'];
-        $overrideValues[$GLOBALS['TCA'][$Ttable]['ctrl']['transOrigPointerField']] = $uid;
+        // If the translated record is a default language record, set it's uid as localization parent of the new record.
+        // If translating from any other language, no override is needed; we just can copy the localization parent of
+        // the original record (which is pointing to the correspondent default language record) to the new record.
+        // In copy / free mode the TransOrigPointer field is always set to 0, as no connection to the localization parent is wanted in that case.
+        if (($this->useTransOrigPointerField && (int)$row[$GLOBALS['TCA'][$table]['ctrl']['languageField']] === 0)
+            || $table === 'pages') {
+            $overrideValues[$GLOBALS['TCA'][$Ttable]['ctrl']['transOrigPointerField']] = $uid;
+        } elseif (!$this->useTransOrigPointerField) {
+            $overrideValues[$GLOBALS['TCA'][$Ttable]['ctrl']['transOrigPointerField']] = 0;
+        }
         // Copy the type (if defined in both tables) from the original record so that translation has same type as original record
         if (isset($GLOBALS['TCA'][$table]['ctrl']['type']) && isset($GLOBALS['TCA'][$Ttable]['ctrl']['type'])) {
             $overrideValues[$GLOBALS['TCA'][$Ttable]['ctrl']['type']] = $row[$GLOBALS['TCA'][$table]['ctrl']['type']];
         }
         // Set exclude Fields:
         foreach ($GLOBALS['TCA'][$Ttable]['columns'] as $fN => $fCfg) {
+            $translateToMsg = '';
             // Check if we are just prefixing:
             if ($fCfg['l10n_mode'] == 'prefixLangTitle') {
                 if (($fCfg['config']['type'] == 'text' || $fCfg['config']['type'] == 'input') && (string)$row[$fN] !== '') {
@@ -4521,13 +4722,13 @@ class DataHandler
             $newId = $this->copyRecord($table, $uid, -$previousUid, 1, $overrideValues, implode(',', $excludeFields), $language);
             $autoVersionNewId = $this->getAutoVersionId($table, $newId);
             if (is_null($autoVersionNewId) === false) {
-                $this->triggerRemapAction($table, $newId, array($this, 'placeholderShadowing'), array($table, $autoVersionNewId), true);
+                $this->triggerRemapAction($table, $newId, [$this, 'placeholderShadowing'], [$table, $autoVersionNewId], true);
             }
         } else {
             // Create new record:
             /** @var $copyTCE DataHandler */
             $copyTCE = $this->getLocalTCE();
-            $copyTCE->start(array($Ttable => array('NEW' => $overrideValues)), '', $this->BE_USER);
+            $copyTCE->start([$Ttable => ['NEW' => $overrideValues]], '', $this->BE_USER);
             $copyTCE->process_datamap();
             // Getting the new UID as if it had been copied:
             $theNewSQLID = $copyTCE->substNEWwithIDs['NEW'];
@@ -4566,7 +4767,7 @@ class DataHandler
         if (!is_array($command)) {
             // <field>, (localize | synchronize | <uid>):
             $parts = GeneralUtility::trimExplode(',', $command);
-            $command = array();
+            $command = [];
             $command['field'] = $parts[0];
             // The previous process expected $id to point to the localized record already
             $command['language'] = (int)$parentRecord[$GLOBALS['TCA'][$table]['ctrl']['languageField']];
@@ -4574,7 +4775,7 @@ class DataHandler
             if (!MathUtility::canBeInterpretedAsInteger($parts[1])) {
                 $command['action'] = $parts[1];
             } else {
-                $command['ids'] = array($parts[1]);
+                $command['ids'] = [$parts[1]];
             }
         }
 
@@ -4623,13 +4824,13 @@ class DataHandler
             return;
         }
 
-        $removeArray = array();
+        $removeArray = [];
         $mmTable = $inlineSubType == 'mm' && isset($config['MM']) && $config['MM'] ? $config['MM'] : '';
         // Fetch children from original language parent:
         /** @var $dbAnalysisOriginal RelationHandler */
         $dbAnalysisOriginal = $this->createRelationHandlerInstance();
         $dbAnalysisOriginal->start($transOrigRecord[$field], $foreignTable, $mmTable, $transOrigRecord['uid'], $transOrigTable, $config);
-        $elementsOriginal = array();
+        $elementsOriginal = [];
         foreach ($dbAnalysisOriginal->itemArray as $item) {
             $elementsOriginal[$item['id']] = $item;
         }
@@ -4677,21 +4878,22 @@ class DataHandler
         if (is_array($removeArray) && !empty($removeArray)) {
             /** @var DataHandler $tce */
             $tce = GeneralUtility::makeInstance(__CLASS__);
+            $tce->stripslashes_values = false;
             $tce->enableLogging = $this->enableLogging;
-            $tce->start(array(), $removeArray);
+            $tce->start([], $removeArray);
             $tce->process_cmdmap();
             unset($tce);
         }
-        $updateFields = array();
+        $updateFields = [];
         // Handle, reorder and store relations:
         if ($inlineSubType == 'list') {
-            $updateFields = array($field => $value);
+            $updateFields = [$field => $value];
         } elseif ($inlineSubType == 'field') {
             $dbAnalysisCurrent->writeForeignField($config, $id);
-            $updateFields = array($field => $dbAnalysisCurrent->countItems(false));
+            $updateFields = [$field => $dbAnalysisCurrent->countItems(false)];
         } elseif ($inlineSubType == 'mm') {
             $dbAnalysisCurrent->writeMM($config['MM'], $id);
-            $updateFields = array($field => $dbAnalysisCurrent->countItems(false));
+            $updateFields = [$field => $dbAnalysisCurrent->countItems(false)];
         }
         // Update field referencing to child records of localized parent record:
         if (!empty($updateFields)) {
@@ -4839,9 +5041,9 @@ class DataHandler
         $this->registerRecordIdForPageCacheClearing($table, $uid, $parentUid);
         $deleteField = $GLOBALS['TCA'][$table]['ctrl']['delete'];
         if ($deleteField && !$forceHardDelete) {
-            $updateFields = array(
+            $updateFields = [
                 $deleteField => $undeleteRecord ? 0 : 1
-            );
+            ];
             if ($GLOBALS['TCA'][$table]['ctrl']['tstamp']) {
                 $updateFields[$GLOBALS['TCA'][$table]['ctrl']['tstamp']] = $GLOBALS['EXEC_TIME'];
             }
@@ -4854,6 +5056,7 @@ class DataHandler
             $this->databaseConnection->exec_UPDATEquery($table, 'uid=' . (int)$uid, $updateFields);
             // Delete all l10n records as well, impossible during undelete because it might bring too many records back to life
             if (!$undeleteRecord) {
+                $this->deletedRecords[$table][] = (int)$uid;
                 $this->deleteL10nOverlayRecords($table, $uid);
             }
         } else {
@@ -4885,6 +5088,7 @@ class DataHandler
             }
             // Delete the hard way...:
             $this->databaseConnection->exec_DELETEquery($table, 'uid=' . (int)$uid);
+            $this->deletedRecords[$table][] = (int)$uid;
             $this->deleteL10nOverlayRecords($table, $uid);
         }
         if ($this->enableLogging) {
@@ -4899,23 +5103,34 @@ class DataHandler
                 $propArr = $this->getRecordProperties($table, $uid);
                 $pagePropArr = $this->getRecordProperties('pages', $propArr['pid']);
 
-                $this->log($table, $uid, $state, 0, 0, $message, 0, array(
+                $this->log($table, $uid, $state, 0, 0, $message, 0, [
                     $propArr['header'],
                     $table . ':' . $uid,
                     $pagePropArr['header'],
                     $propArr['pid']
-                ), $propArr['event_pid']);
+                ], $propArr['event_pid']);
             } else {
                 $this->log($table, $uid, $state, 0, 100, $this->databaseConnection->sql_error());
             }
         }
         // Update reference index:
         $this->updateRefIndex($table, $uid);
+
+        // We track calls to update the reference index as to avoid calling it twice
+        // with the same arguments. This is done because reference indexing is quite
+        // costly and the update reference index stack usually contain duplicates.
+        // NB: also filled and checked in loop below. The initialisation prevents
+        // running the "root" record twice if it appears in the stack twice.
+        $updateReferenceIndexCalls = [[$table, $uid]];
+
         // If there are entries in the updateRefIndexStack
         if (is_array($this->updateRefIndexStack[$table]) && is_array($this->updateRefIndexStack[$table][$uid])) {
             while ($args = array_pop($this->updateRefIndexStack[$table][$uid])) {
-                // $args[0]: table, $args[1]: uid
-                $this->updateRefIndex($args[0], $args[1]);
+                if (!in_array($args, $updateReferenceIndexCalls, true)) {
+                    // $args[0]: table, $args[1]: uid
+                    $this->updateRefIndex($args[0], $args[1]);
+                    $updateReferenceIndexCalls[] = $args;
+                }
             }
             unset($this->updateRefIndexStack[$table][$uid]);
         }
@@ -5046,18 +5261,19 @@ class DataHandler
                 // If move placeholder exists, copy to new location
                 // This will create a New placeholder on the new location
                 // and a version for this new placeholder
-                $command = array(
-                    $table => array(
-                        $uid => array(
+                $command = [
+                    $table => [
+                        $uid => [
                             'copy' => '-' . $movePlaceholder['uid']
-                        )
-                    )
-                );
+                        ]
+                    ]
+                ];
                 /** @var DataHandler $dataHandler */
                 $dataHandler = GeneralUtility::makeInstance(__CLASS__);
+                $dataHandler->stripslashes_values = false;
                 $dataHandler->enableLogging = $this->enableLogging;
                 $dataHandler->neverHideAtCopy = true;
-                $dataHandler->start(array(), $command);
+                $dataHandler->start([], $command);
                 $dataHandler->process_cmdmap();
                 unset($dataHandler);
 
@@ -5112,7 +5328,7 @@ class DataHandler
             }
 
             if ($this->BE_USER->recordEditAccessInternals('pages', $uid, false, false, true)) {
-                return array($uid);
+                return [$uid];
             } else {
                 return 'Attempt to delete page which has prohibited localizations.';
             }
@@ -5232,7 +5448,7 @@ class DataHandler
             $dbAnalysis = $this->createRelationHandlerInstance();
             $dbAnalysis->start($value, $allowedTables, $conf['MM'], $uid, $table, $conf);
             foreach ($dbAnalysis->itemArray as $v) {
-                $this->updateRefIndexStack[$table][$uid][] = array($v['table'], $v['id']);
+                $this->updateRefIndexStack[$table][$uid][] = [$v['table'], $v['id']];
             }
         }
     }
@@ -5347,7 +5563,7 @@ class DataHandler
         // Look for version number of the current:
         $subVer = $row['t3ver_id'] . '.' . ($highestVerNumber + 1);
         // Set up the values to override when making a raw-copy:
-        $overrideArray = array(
+        $overrideArray = [
             't3ver_id' => $highestVerNumber + 1,
             't3ver_oid' => $id,
             't3ver_label' => $label ?: $subVer . ' / ' . date('d-m-Y H:m:s'),
@@ -5356,7 +5572,7 @@ class DataHandler
             't3ver_count' => 0,
             't3ver_stage' => 0,
             't3ver_tstamp' => 0
-        );
+        ];
         if ($GLOBALS['TCA'][$table]['ctrl']['editlock']) {
             $overrideArray[$GLOBALS['TCA'][$table]['ctrl']['editlock']] = 0;
         }
@@ -5372,10 +5588,10 @@ class DataHandler
             // as well as the information whether the record shall be removed
             // must be forwarded (creating remove placeholders on a workspace are
             // done by copying the record and override several fields).
-            $workspaceOptions = array(
+            $workspaceOptions = [
                 'delete' => $delete,
                 'label' => $label,
-            );
+            ];
             return $this->copyRecord_raw($table, $id, -1, $overrideArray, $workspaceOptions);
         // Reuse the existing record and return its uid
         // (prior to TYPO3 CMS 6.2, an error was thrown here, which
@@ -5400,7 +5616,7 @@ class DataHandler
         // Actually, selecting the records fully is only need if flexforms are found inside... This could be optimized ...
         $currentRec = BackendUtility::getRecord($table, $id);
         $swapRec = BackendUtility::getRecord($table, $swapWith);
-        $this->version_remapMMForVersionSwap_reg = array();
+        $this->version_remapMMForVersionSwap_reg = [];
         foreach ($GLOBALS['TCA'][$table]['columns'] as $field => $fConf) {
             $conf = $fConf['config'];
             if ($this->isReferenceField($conf)) {
@@ -5411,13 +5627,13 @@ class DataHandler
                     $dbAnalysis = $this->createRelationHandlerInstance();
                     $dbAnalysis->start('', $allowedTables, $conf['MM'], $id, $table, $conf);
                     if (!empty($dbAnalysis->getValueArray($prependName))) {
-                        $this->version_remapMMForVersionSwap_reg[$id][$field] = array($dbAnalysis, $conf['MM'], $prependName);
+                        $this->version_remapMMForVersionSwap_reg[$id][$field] = [$dbAnalysis, $conf['MM'], $prependName];
                     }
                     /** @var $dbAnalysis RelationHandler */
                     $dbAnalysis = $this->createRelationHandlerInstance();
                     $dbAnalysis->start('', $allowedTables, $conf['MM'], $swapWith, $table, $conf);
                     if (!empty($dbAnalysis->getValueArray($prependName))) {
-                        $this->version_remapMMForVersionSwap_reg[$swapWith][$field] = array($dbAnalysis, $conf['MM'], $prependName);
+                        $this->version_remapMMForVersionSwap_reg[$swapWith][$field] = [$dbAnalysis, $conf['MM'], $prependName];
                     }
                 }
             } elseif ($conf['type'] == 'flex') {
@@ -5425,13 +5641,13 @@ class DataHandler
                 $dataStructArray = BackendUtility::getFlexFormDS($conf, $currentRec, $table, $field);
                 $currentValueArray = GeneralUtility::xml2array($currentRec[$field]);
                 if (is_array($currentValueArray)) {
-                    $this->checkValue_flex_procInData($currentValueArray['data'], array(), array(), $dataStructArray, array($table, $id, $field), 'version_remapMMForVersionSwap_flexFormCallBack');
+                    $this->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructArray, [$table, $id, $field], 'version_remapMMForVersionSwap_flexFormCallBack');
                 }
                 // Swap record
                 $dataStructArray = BackendUtility::getFlexFormDS($conf, $swapRec, $table, $field);
                 $currentValueArray = GeneralUtility::xml2array($swapRec[$field]);
                 if (is_array($currentValueArray)) {
-                    $this->checkValue_flex_procInData($currentValueArray['data'], array(), array(), $dataStructArray, array($table, $swapWith, $field), 'version_remapMMForVersionSwap_flexFormCallBack');
+                    $this->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructArray, [$table, $swapWith, $field], 'version_remapMMForVersionSwap_flexFormCallBack');
                 }
             }
         }
@@ -5462,7 +5678,7 @@ class DataHandler
                 /** @var $dbAnalysis RelationHandler */
                 $dbAnalysis = $this->createRelationHandlerInstance();
                 $dbAnalysis->start('', $allowedTables, $dsConf['MM'], $uid, $table, $dsConf);
-                $this->version_remapMMForVersionSwap_reg[$uid][$field . '/' . $path] = array($dbAnalysis, $dsConf['MM'], $prependName);
+                $this->version_remapMMForVersionSwap_reg[$uid][$field . '/' . $path] = [$dbAnalysis, $dsConf['MM'], $prependName];
             }
         }
     }
@@ -5505,17 +5721,23 @@ class DataHandler
     /**
      * Returns an instance of DataHandler for handling local datamaps/cmdmaps
      *
+     * @param bool $stripslashesValues If TRUE, incoming values in the data-array have their slashes stripped.
+     * @param bool $dontProcessTransformations If set, then transformations are NOT performed on the input.
      * @return DataHandler
      */
-    protected function getLocalTCE()
+    protected function getLocalTCE($stripslashesValues = false, $dontProcessTransformations = true)
     {
         $copyTCE = GeneralUtility::makeInstance(__CLASS__);
+        $copyTCE->stripslashes_values = $stripslashesValues;
         $copyTCE->copyTree = $this->copyTree;
         $copyTCE->enableLogging = $this->enableLogging;
         // Copy forth the cached TSconfig
         $copyTCE->cachedTSconfig = $this->cachedTSconfig;
         // Transformations should NOT be carried out during copy
-        $copyTCE->dontProcessTransformations = true;
+        $copyTCE->dontProcessTransformations = $dontProcessTransformations;
+        // make sure the isImporting flag is transferred, so all hooks know if
+        // the current process is an import process
+        $copyTCE->isImporting = $this->isImporting;
         return $copyTCE;
     }
 
@@ -5529,7 +5751,7 @@ class DataHandler
         if (!empty($this->registerDBList)) {
             foreach ($this->registerDBList as $table => $records) {
                 foreach ($records as $uid => $fields) {
-                    $newData = array();
+                    $newData = [];
                     $theUidToUpdate = $this->copyMappingArray_merged[$table][$uid];
                     $theUidToUpdate_saveTo = BackendUtility::wsMapId($table, $theUidToUpdate);
                     foreach ($fields as $fieldName => $value) {
@@ -5553,7 +5775,7 @@ class DataHandler
                                         $dataStructArray = BackendUtility::getFlexFormDS($conf, $origRecordRow, $table, $fieldName);
                                         $currentValueArray = GeneralUtility::xml2array($origRecordRow[$fieldName]);
                                         // Do recursive processing of the XML data:
-                                        $currentValueArray['data'] = $this->checkValue_flex_procInData($currentValueArray['data'], array(), array(), $dataStructArray, array($table, $theUidToUpdate, $fieldName), 'remapListedDBRecords_flexFormCallBack');
+                                        $currentValueArray['data'] = $this->checkValue_flex_procInData($currentValueArray['data'], [], [], $dataStructArray, [$table, $theUidToUpdate, $fieldName], 'remapListedDBRecords_flexFormCallBack');
                                         // The return value should be compiled back into XML, ready to insert directly in the field (as we call updateDB() directly later):
                                         if (is_array($currentValueArray['data'])) {
                                             $newData[$fieldName] = $this->checkValue_flexArray2Xml($currentValueArray, true);
@@ -5600,7 +5822,7 @@ class DataHandler
             }
         }
         // Return
-        return array('value' => $dataValue);
+        return ['value' => $dataValue];
     }
 
     /**
@@ -5714,7 +5936,12 @@ class DataHandler
                 }
                 // Update child records if change to pid is required (only if the current record is not on a workspace):
                 if ($thePidToUpdate) {
-                    $updateValues = array('pid' => $thePidToUpdate);
+                    // ensure, only live page ids are used as 'pid' values
+                    $liveId = BackendUtility::getLiveVersionIdOfRecord('pages', $theUidToUpdate);
+                    if ($liveId !== null) {
+                        $thePidToUpdate = $liveId;
+                    }
+                    $updateValues = ['pid' => $thePidToUpdate];
                     foreach ($originalItemArray as $v) {
                         if ($v['id'] && $v['table'] && is_null(BackendUtility::getLiveVersionIdOfRecord($v['table'], $v['id']))) {
                             $this->databaseConnection->exec_UPDATEquery($v['table'], 'uid=' . (int)$v['id'], $updateValues);
@@ -5735,7 +5962,8 @@ class DataHandler
     {
         // Processes the remap stack:
         if (is_array($this->remapStack)) {
-            $remapFlexForms = array();
+            $remapFlexForms = [];
+            $hookPayload = [];
 
             foreach ($this->remapStack as $remapAction) {
                 // If no position index for the arguments was set, skip this remap action:
@@ -5762,23 +5990,34 @@ class DataHandler
                 }
                 // Replace relations to NEW...-IDs in field value (uids of child records):
                 if (is_array($valueArray)) {
-                    $foreign_table = $tcaFieldConf['foreign_table'];
                     foreach ($valueArray as $key => $value) {
                         if (strpos($value, 'NEW') !== false) {
+                            if (strpos($value, '_') === false) {
+                                $affectedTable = $tcaFieldConf['foreign_table'];
+                                $prependTable = false;
+                            } else {
+                                $parts = explode('_', $value);
+                                $value = array_pop($parts);
+                                $affectedTable = implode('_', $parts);
+                                $prependTable = true;
+                            }
                             $value = $this->substNEWwithIDs[$value];
                             // The record is new, but was also auto-versionized and has another new id:
-                            if (isset($this->autoVersionIdMap[$foreign_table][$value])) {
-                                $value = $this->autoVersionIdMap[$foreign_table][$value];
+                            if (isset($this->autoVersionIdMap[$affectedTable][$value])) {
+                                $value = $this->autoVersionIdMap[$affectedTable][$value];
+                            }
+                            if ($prependTable) {
+                                $value = $affectedTable . '_' . $value;
                             }
                             // Set a hint that this was a new child record:
-                            $this->newRelatedIDs[$foreign_table][] = $value;
+                            $this->newRelatedIDs[$affectedTable][] = $value;
                             $valueArray[$key] = $value;
                         }
                     }
                     $remapAction['args'][$remapAction['pos']['valueArray']] = $valueArray;
                 }
                 // Process the arguments with the defined function:
-                $newValue = call_user_func_array(array($this, $remapAction['func']), $remapAction['args']);
+                $newValue = call_user_func_array([$this, $remapAction['func']], $remapAction['args']);
                 // If array is returned, check for maxitems condition, if string is returned this was already done:
                 if (is_array($newValue)) {
                     $newValue = implode(',', $this->checkValue_checkMax($tcaFieldConf, $newValue));
@@ -5788,36 +6027,53 @@ class DataHandler
                 }
                 // Update in database (list of children (csv) or number of relations (foreign_field)):
                 if (!empty($field)) {
-                    $this->updateDB($table, $id, array($field => $newValue));
+                    $this->updateDB($table, $id, [$field => $newValue]);
                 // Collect data to update FlexForms
                 } elseif (!empty($additionalData['flexFormId']) && !empty($additionalData['flexFormPath'])) {
                     $flexFormId = $additionalData['flexFormId'];
                     $flexFormPath = $additionalData['flexFormPath'];
 
                     if (!isset($remapFlexForms[$flexFormId])) {
-                        $remapFlexForms[$flexFormId] = array();
+                        $remapFlexForms[$flexFormId] = [];
                     }
 
                     $remapFlexForms[$flexFormId][$flexFormPath] = $newValue;
                 }
-                // Process waiting Hook: processDatamap_afterDatabaseOperations:
+
+                // Collect elements that shall trigger processDatamap_afterDatabaseOperations
                 if (isset($this->remapStackRecords[$table][$rawId]['processDatamap_afterDatabaseOperations'])) {
                     $hookArgs = $this->remapStackRecords[$table][$rawId]['processDatamap_afterDatabaseOperations'];
-                    // Update field with remapped data:
-                    $hookArgs['fieldArray'][$field] = $newValue;
-                    // Process waiting hook objects:
-                    $hookObjectsArr = $hookArgs['hookObjectsArr'];
-                    foreach ($hookObjectsArr as $hookObj) {
-                        if (method_exists($hookObj, 'processDatamap_afterDatabaseOperations')) {
-                            $hookObj->processDatamap_afterDatabaseOperations($hookArgs['status'], $table, $rawId, $hookArgs['fieldArray'], $this);
-                        }
+                    if (!isset($hookPayload[$table][$rawId])) {
+                        $hookPayload[$table][$rawId] = [
+                            'status' => $hookArgs['status'],
+                            'fieldArray' => $hookArgs['fieldArray'],
+                            'hookObjects' => $hookArgs['hookObjectsArr'],
+                        ];
                     }
+                    $hookPayload[$table][$rawId]['fieldArray'][$field] = $newValue;
                 }
             }
 
             if ($remapFlexForms) {
                 foreach ($remapFlexForms as $flexFormId => $modifications) {
                     $this->updateFlexFormData($flexFormId, $modifications);
+                }
+            }
+
+            foreach ($hookPayload as $tableName => $rawIdPayload) {
+                foreach ($rawIdPayload as $rawId => $payload) {
+                    foreach ($payload['hookObjects'] as $hookObject) {
+                        if (!method_exists($hookObject, 'processDatamap_afterDatabaseOperations')) {
+                            continue;
+                        }
+                        $hookObject->processDatamap_afterDatabaseOperations(
+                            $payload['status'],
+                            $tableName,
+                            $rawId,
+                            $payload['fieldArray'],
+                            $this
+                        );
+                    }
                 }
             }
         }
@@ -5837,10 +6093,10 @@ class DataHandler
             }
         }
         // Reset:
-        $this->remapStack = array();
-        $this->remapStackRecords = array();
-        $this->remapStackActions = array();
-        $this->remapStackRefIndex = array();
+        $this->remapStack = [];
+        $this->remapStackRecords = [];
+        $this->remapStackActions = [];
+        $this->remapStackRefIndex = [];
     }
 
     /**
@@ -5878,9 +6134,9 @@ class DataHandler
 
         if (is_array($valueStructure['data'])) {
             // The return value should be compiled back into XML
-            $values = array(
+            $values = [
                 $field => $this->checkValue_flexArray2Xml($valueStructure, true),
-            );
+            ];
 
             $this->updateDB($table, $uid, $values);
         }
@@ -5922,14 +6178,14 @@ class DataHandler
      */
     public function addRemapAction($table, $id, array $callback, array $arguments)
     {
-        $this->remapStackActions[] = array(
-            'affects' => array(
+        $this->remapStackActions[] = [
+            'affects' => [
                 'table' => $table,
                 'id' => $id
-            ),
+            ],
             'callback' => $callback,
             'arguments' => $arguments
-        );
+        ];
     }
 
     /**
@@ -5962,7 +6218,7 @@ class DataHandler
             foreach ($incomingFieldArray as $field => $value) {
                 $fieldConf = $GLOBALS['TCA'][$table]['columns'][$field]['config'];
                 if ($registerDBList[$table][$id][$field] && ($foreignTable = $fieldConf['foreign_table'])) {
-                    $newValueArray = array();
+                    $newValueArray = [];
                     $origValueArray = explode(',', $value);
                     // Update the uids of the copied records, but also take care about new records:
                     foreach ($origValueArray as $childId) {
@@ -6108,11 +6364,11 @@ class DataHandler
                 $this->recInsertAccessCache[$insertTable][$pid] = $res;
             } elseif ($this->enableLogging) {
                 $propArr = $this->getRecordProperties('pages', $pid);
-                $this->log($insertTable, $pid, $action, 0, 1, 'Attempt to insert record on page \'%s\' (%s) where this table, %s, is not allowed', 11, array($propArr['header'], $pid, $insertTable), $propArr['event_pid']);
+                $this->log($insertTable, $pid, $action, 0, 1, 'Attempt to insert record on page \'%s\' (%s) where this table, %s, is not allowed', 11, [$propArr['header'], $pid, $insertTable], $propArr['event_pid']);
             }
         } elseif ($this->enableLogging) {
             $propArr = $this->getRecordProperties('pages', $pid);
-            $this->log($insertTable, $pid, $action, 0, 1, 'Attempt to insert a record on page \'%s\' (%s) from table \'%s\' without permissions. Or non-existing page.', 12, array($propArr['header'], $pid, $insertTable), $propArr['event_pid']);
+            $this->log($insertTable, $pid, $action, 0, 1, 'Attempt to insert a record on page \'%s\' (%s) from table \'%s\' without permissions. Or non-existing page.', 12, [$propArr['header'], $pid, $insertTable], $propArr['event_pid']);
         }
         return $res;
     }
@@ -6343,7 +6599,7 @@ class DataHandler
      */
     public function getExcludeListArray()
     {
-        $list = array();
+        $list = [];
         $nonExcludeFieldsArray = array_flip(GeneralUtility::trimExplode(',', $this->BE_USER->groupData['non_exclude_fields']));
         foreach ($GLOBALS['TCA'] as $table => $_) {
             if (isset($GLOBALS['TCA'][$table]['columns'])) {
@@ -6378,7 +6634,7 @@ class DataHandler
             // OK...
             return false;
         }
-        $tableList = array();
+        $tableList = [];
         foreach ($GLOBALS['TCA'] as $table => $_) {
             // If the table is not in the allowed list, check if there are records...
             if (!in_array($table, $allowedArray, true)) {
@@ -6448,7 +6704,7 @@ class DataHandler
      */
     public function getRecordProperties($table, $id, $noWSOL = false)
     {
-        $row = $table == 'pages' && !$id ? array('title' => '[root-level]', 'uid' => 0, 'pid' => 0) : $this->recordInfo($table, $id, '*');
+        $row = $table == 'pages' && !$id ? ['title' => '[root-level]', 'uid' => 0, 'pid' => 0] : $this->recordInfo($table, $id, '*');
         if (!$noWSOL) {
             BackendUtility::workspaceOL($table, $row);
         }
@@ -6466,13 +6722,13 @@ class DataHandler
     {
         if ($GLOBALS['TCA'][$table]) {
             BackendUtility::fixVersioningPid($table, $row);
-            $out = array(
+            $out = [
                 'header' => BackendUtility::getRecordTitle($table, $row),
                 'pid' => $row['pid'],
                 'event_pid' => $this->eventPid($table, isset($row['_ORIG_pid']) ? $row['t3ver_oid'] : $row['uid'], $row['pid']),
                 't3ver_state' => $GLOBALS['TCA'][$table]['ctrl']['versioningWS'] ? $row['t3ver_state'] : '',
                 '_ORIG_pid' => $row['_ORIG_pid']
-            );
+            ];
             return $out;
         }
         return null;
@@ -6517,13 +6773,13 @@ class DataHandler
                     // Update reference index:
                     $this->updateRefIndex($table, $id);
                     if ($this->enableLogging) {
-                        $newRow = array();
+                        $newRow = [];
                         if ($this->checkStoredRecords) {
                             $newRow = $this->checkStoredRecord($table, $id, $fieldArray, 2);
                         }
                         // Set log entry:
                         $propArr = $this->getRecordPropertiesFromRow($table, $newRow);
-                        $theLogId = $this->log($table, $id, 2, $propArr['pid'], 0, 'Record \'%s\' (%s) was updated.' . ($propArr['_ORIG_pid'] == -1 ? ' (Offline version).' : ' (Online).'), 10, array($propArr['header'], $table . ':' . $id), $propArr['event_pid']);
+                        $theLogId = $this->log($table, $id, 2, $propArr['pid'], 0, 'Record \'%s\' (%s) was updated.' . ($propArr['_ORIG_pid'] == -1 ? ' (Offline version).' : ' (Online).'), 10, [$propArr['header'], $table . ':' . $id], $propArr['event_pid']);
                         // Set History data:
                         $this->setHistory($table, $id, $theLogId);
                     }
@@ -6534,7 +6790,7 @@ class DataHandler
                         unset($this->pageCache[$id]);
                     }
                 } elseif ($this->enableLogging) {
-                    $this->log($table, $id, 2, 0, 2, 'SQL error: \'%s\' (%s)', 12, array($this->databaseConnection->sql_error(), $table . ':' . $id));
+                    $this->log($table, $id, 2, 0, 2, 'SQL error: \'%s\' (%s)', 12, [$this->databaseConnection->sql_error(), $table . ':' . $id]);
                 }
             }
         }
@@ -6584,7 +6840,7 @@ class DataHandler
                         $this->substNEWwithIDs[$NEW_id] = $id;
                         $this->substNEWwithIDs_table[$NEW_id] = $table;
                     }
-                    $newRow = array();
+                    $newRow = [];
                     // Checking the record is properly saved and writing to log
                     if ($this->enableLogging && $this->checkStoredRecords) {
                         $newRow = $this->checkStoredRecord($table, $id, $fieldArray, 1);
@@ -6594,20 +6850,20 @@ class DataHandler
                     if ($newVersion) {
                         if ($this->enableLogging) {
                             $propArr = $this->getRecordPropertiesFromRow($table, $newRow);
-                            $this->log($table, $id, 1, 0, 0, 'New version created of table \'%s\', uid \'%s\'. UID of new version is \'%s\'', 10, array($table, $fieldArray['t3ver_oid'], $id), $propArr['event_pid'], $NEW_id);
+                            $this->log($table, $id, 1, 0, 0, 'New version created of table \'%s\', uid \'%s\'. UID of new version is \'%s\'', 10, [$table, $fieldArray['t3ver_oid'], $id], $propArr['event_pid'], $NEW_id);
                         }
                     } else {
                         if ($this->enableLogging) {
                             $propArr = $this->getRecordPropertiesFromRow($table, $newRow);
                             $page_propArr = $this->getRecordProperties('pages', $propArr['pid']);
-                            $this->log($table, $id, 1, 0, 0, 'Record \'%s\' (%s) was inserted on page \'%s\' (%s)', 10, array($propArr['header'], $table . ':' . $id, $page_propArr['header'], $newRow['pid']), $newRow['pid'], $NEW_id);
+                            $this->log($table, $id, 1, 0, 0, 'Record \'%s\' (%s) was inserted on page \'%s\' (%s)', 10, [$propArr['header'], $table . ':' . $id, $page_propArr['header'], $newRow['pid']], $newRow['pid'], $NEW_id);
                         }
                         // Clear cache for relevant pages:
                         $this->registerRecordIdForPageCacheClearing($table, $id);
                     }
                     return $id;
                 } elseif ($this->enableLogging) {
-                    $this->log($table, $id, 1, 0, 2, 'SQL error: \'%s\' (%s)', 12, array($this->databaseConnection->sql_error(), $table . ':' . $id));
+                    $this->log($table, $id, 1, 0, 2, 'SQL error: \'%s\' (%s)', 12, [$this->databaseConnection->sql_error(), $table . ':' . $id]);
                 }
             }
         }
@@ -6631,7 +6887,7 @@ class DataHandler
             $res = $this->databaseConnection->exec_SELECTquery('*', $table, 'uid=' . (int)$id);
             if ($row = $this->databaseConnection->sql_fetch_assoc($res)) {
                 // Traverse array of values that was inserted into the database and compare with the actually stored value:
-                $errors = array();
+                $errors = [];
                 foreach ($fieldArray as $key => $value) {
                     if ($this->checkStoredRecords_loose && !$value && !$row[$key]) {
                     } elseif ((string)$value !== (string)$row[$key]) {
@@ -6667,7 +6923,7 @@ class DataHandler
     public function setHistory($table, $id, $logId)
     {
         if (isset($this->historyRecords[$table . ':' . $id]) && (int)$logId > 0) {
-            $fields_values = array();
+            $fields_values = [];
             $fields_values['history_data'] = serialize($this->historyRecords[$table . ':' . $id]);
             $fields_values['fieldlist'] = implode(',', array_keys($this->historyRecords[$table . ':' . $id]['newRecord']));
             $fields_values['tstamp'] = $GLOBALS['EXEC_TIME'];
@@ -6777,12 +7033,12 @@ class DataHandler
                         }
                         $this->databaseConnection->sql_free_result($subres);
                     }
-                    return array('pid' => $row['pid'], 'sortNumber' => $sortNumber);
+                    return ['pid' => $row['pid'], 'sortNumber' => $sortNumber];
                 } else {
                     if ($this->enableLogging) {
                         $propArr = $this->getRecordProperties($table, $uid);
                         // OK, don't insert $propArr['event_pid'] here...
-                        $this->log($table, $uid, 4, 0, 1, 'Attempt to move record \'%s\' (%s) to after a non-existing record (uid=%s)', 1, array($propArr['header'], $table . ':' . $uid, abs($pid)), $propArr['pid']);
+                        $this->log($table, $uid, 4, 0, 1, 'Attempt to move record \'%s\' (%s) to after a non-existing record (uid=%s)', 1, [$propArr['header'], $table . ':' . $uid, abs($pid)], $propArr['pid']);
                     }
                     // There MUST be a page or else this cannot work
                     return false;
@@ -6814,7 +7070,7 @@ class DataHandler
             while ($row = $this->databaseConnection->sql_fetch_assoc($res)) {
                 $uid = (int)$row['uid'];
                 if ($uid) {
-                    $this->databaseConnection->exec_UPDATEquery($table, 'uid=' . (int)$uid, array($sortRow => $i));
+                    $this->databaseConnection->exec_UPDATEquery($table, 'uid=' . (int)$uid, [$sortRow => $i]);
                     // This is used to return a sortingValue if the list is resorted because of inserting records inside the list and not in the top
                     if ($uid == $return_SortNumber_After_This_Uid) {
                         $i = $i + $intervals;
@@ -6911,7 +7167,7 @@ class DataHandler
      */
     public function newFieldArray($table)
     {
-        $fieldArray = array();
+        $fieldArray = [];
         if (is_array($GLOBALS['TCA'][$table]['columns'])) {
             foreach ($GLOBALS['TCA'][$table]['columns'] as $field => $content) {
                 if (isset($this->defaultValues[$table][$field])) {
@@ -6945,7 +7201,7 @@ class DataHandler
         if ($GLOBALS['TCA'][$table]['ctrl']['languageField']) {
             if (!isset($incomingFieldArray[$GLOBALS['TCA'][$table]['ctrl']['languageField']])) {
                 // Language field must be found in input row - otherwise it does not make sense.
-                $rows = array_merge(array(array('uid' => 0)), $this->databaseConnection->exec_SELECTgetRows('uid', 'sys_language', 'pid=0' . BackendUtility::deleteClause('sys_language')), array(array('uid' => -1)));
+                $rows = array_merge([['uid' => 0]], $this->databaseConnection->exec_SELECTgetRows('uid', 'sys_language', 'pid=0' . BackendUtility::deleteClause('sys_language')), [['uid' => -1]]);
                 foreach ($rows as $r) {
                     if ($this->BE_USER->checkLanguageAccess($r['uid'])) {
                         $incomingFieldArray[$GLOBALS['TCA'][$table]['ctrl']['languageField']] = $r['uid'];
@@ -6989,7 +7245,7 @@ class DataHandler
         if (is_array($currentRecord)) {
             // Read all field types:
             $c = 0;
-            $cRecTypes = array();
+            $cRecTypes = [];
             foreach ($currentRecord as $col => $val) {
                 $cRecTypes[$col] = $this->databaseConnection->sql_field_type($res, $c);
                 $c++;
@@ -7020,7 +7276,7 @@ class DataHandler
             }
         } else {
             // If the current record does not exist this is an error anyways and we just return an empty array here.
-            $fieldArray = array();
+            $fieldArray = [];
         }
         return $fieldArray;
     }
@@ -7164,7 +7420,7 @@ class DataHandler
             return self::$recordPidsForDeletedRecords[$table][$uid];
         }
         list($parentUid) = BackendUtility::getTSCpid($table, $uid, '');
-        return array($parentUid);
+        return [$parentUid];
     }
 
     /**
@@ -7191,8 +7447,8 @@ class DataHandler
      */
     public function getTableEntries($table, $TSconfig)
     {
-        $tA = is_array($TSconfig['table.'][$table . '.']) ? $TSconfig['table.'][$table . '.'] : array();
-        $dA = is_array($TSconfig['default.']) ? $TSconfig['default.'] : array();
+        $tA = is_array($TSconfig['table.'][$table . '.']) ? $TSconfig['table.'][$table . '.'] : [];
+        $dA = is_array($TSconfig['default.']) ? $TSconfig['default.'] : [];
         ArrayUtility::mergeRecursiveWithOverrule($dA, $tA);
         return $dA;
     }
@@ -7324,7 +7580,7 @@ class DataHandler
         }
 
         $curData = $this->recordInfo($table, $uid, '*');
-        $newData = array();
+        $newData = [];
         foreach ($GLOBALS['TCA'][$table]['columns'] as $field => $conf) {
             if ($conf['config']['type'] === 'input' && (string)$curData[$field] !== '') {
                 $evalCodesArray = GeneralUtility::trimExplode(',', $conf['config']['eval'], true);
@@ -7353,7 +7609,7 @@ class DataHandler
      * @param array $newData Input array. If fields are already specified AND $update is not set, values are not set in output array.
      * @return array Output array (For when the copying operation needs to get the information instead of updating the info)
      */
-    public function fixCopyAfterDuplFields($table, $uid, $prevUid, $update, $newData = array())
+    public function fixCopyAfterDuplFields($table, $uid, $prevUid, $update, $newData = [])
     {
         if ($GLOBALS['TCA'][$table] && $GLOBALS['TCA'][$table]['ctrl']['copyAfterDuplFields']) {
             $prevData = $this->recordInfo($table, $prevUid, '*');
@@ -7378,7 +7634,7 @@ class DataHandler
      */
     public function extFileFields($table)
     {
-        $listArr = array();
+        $listArr = [];
         if (isset($GLOBALS['TCA'][$table]['columns'])) {
             foreach ($GLOBALS['TCA'][$table]['columns'] as $field => $configArr) {
                 if ($configArr['config']['type'] == 'group' && ($configArr['config']['internal_type'] == 'file' || $configArr['config']['internal_type'] == 'file_reference')) {
@@ -7631,12 +7887,12 @@ class DataHandler
     public function registerRecordIdForPageCacheClearing($table, $uid, $pid = null)
     {
         if (!is_array(static::$recordsToClearCacheFor[$table])) {
-            static::$recordsToClearCacheFor[$table] = array();
+            static::$recordsToClearCacheFor[$table] = [];
         }
         static::$recordsToClearCacheFor[$table][] = (int)$uid;
         if ($pid !== null) {
             if (!is_array(static::$recordPidsForDeletedRecords[$table])) {
-                static::$recordPidsForDeletedRecords[$table] = array();
+                static::$recordPidsForDeletedRecords[$table] = [];
             }
             static::$recordPidsForDeletedRecords[$table][$uid][] = (int)$pid;
         }
@@ -7648,8 +7904,8 @@ class DataHandler
      */
     protected function processClearCacheQueue()
     {
-        $tagsToClear = array();
-        $clearCacheCommands = array();
+        $tagsToClear = [];
+        $clearCacheCommands = [];
 
         foreach (static::$recordsToClearCacheFor as $table => $uids) {
             foreach (array_unique($uids) as $uid) {
@@ -7679,10 +7935,10 @@ class DataHandler
         }
 
         // Reset the cache clearing array
-        static::$recordsToClearCacheFor = array();
+        static::$recordsToClearCacheFor = [];
 
         // Reset the original pid array
-        static::$recordPidsForDeletedRecords = array();
+        static::$recordPidsForDeletedRecords = [];
     }
 
     /**
@@ -7696,14 +7952,14 @@ class DataHandler
      */
     protected function prepareCacheFlush($table, $uid, $pid)
     {
-        $tagsToClear = array();
-        $clearCacheCommands = array();
+        $tagsToClear = [];
+        $clearCacheCommands = [];
         $pageUid = 0;
         // Get Page TSconfig relevant:
         $TSConfig = $this->getTCEMAIN_TSconfig($pid);
         if (empty($TSConfig['clearCache_disable'])) {
             // If table is "pages":
-            $pageIdsThatNeedCacheFlush = array();
+            $pageIdsThatNeedCacheFlush = [];
             if ($table === 'pages' || $table === 'pages_language_overlay') {
                 if ($table === 'pages_language_overlay') {
                     $pageUid = $this->getPID($table, $uid);
@@ -7711,11 +7967,11 @@ class DataHandler
                     $pageUid = $uid;
                 }
                 // Builds list of pages on the SAME level as this page (siblings)
-                $res_tmp = $this->databaseConnection->exec_SELECTquery('A.pid AS pid, B.uid AS uid', 'pages A, pages B', 'A.uid=' . (int)$pageUid . ' AND B.pid=A.pid AND B.deleted=0');
+                $res_tmp = $this->databaseConnection->exec_SELECTquery('A.pid AS pid, B.uid AS uid', 'pages A, pages B', 'A.uid=' . (int)$pageUid . ' AND B.pid=A.pid AND B.deleted=0 AND A.pid >= 0');
                 $pid_tmp = 0;
                 while ($row_tmp = $this->databaseConnection->sql_fetch_assoc($res_tmp)) {
                     $pageIdsThatNeedCacheFlush[] = (int)$row_tmp['uid'];
-                    $pid_tmp = $row_tmp['pid'];
+                    $pid_tmp = (int)$row_tmp['pid'];
                     // Add children as well:
                     if ($TSConfig['clearCache_pageSiblingChildren']) {
                         $res_tmp2 = $this->databaseConnection->exec_SELECTquery('uid', 'pages', 'pid=' . (int)$row_tmp['uid'] . ' AND deleted=0');
@@ -7727,7 +7983,9 @@ class DataHandler
                 }
                 $this->databaseConnection->sql_free_result($res_tmp);
                 // Finally, add the parent page as well:
-                $pageIdsThatNeedCacheFlush[] = (int)$pid_tmp;
+                if ($pid_tmp > 0) {
+                    $pageIdsThatNeedCacheFlush[] = $pid_tmp;
+                }
                 // Add grand-parent as well:
                 if ($TSConfig['clearCache_pageGrandParent']) {
                     $res_tmp = $this->databaseConnection->exec_SELECTquery('pid', 'pages', 'uid=' . (int)$pid_tmp);
@@ -7743,7 +8001,7 @@ class DataHandler
             // Call pre-processing function for clearing of cache for page ids:
             if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['clearPageCacheEval'])) {
                 foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['clearPageCacheEval'] as $funcName) {
-                    $_params = array('pageIdArray' => &$pageIdsThatNeedCacheFlush, 'table' => $table, 'uid' => $uid, 'functionID' => 'clear_cache()');
+                    $_params = ['pageIdArray' => &$pageIdsThatNeedCacheFlush, 'table' => $table, 'uid' => $uid, 'functionID' => 'clear_cache()'];
                     // Returns the array of ids to clear, FALSE if nothing should be cleared! Never an empty array!
                     GeneralUtility::callUserFunction($funcName, $_params, $this);
                 }
@@ -7768,15 +8026,15 @@ class DataHandler
         }
         // Call post processing function for clear-cache:
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['clearCachePostProc'])) {
-            $_params = array('table' => $table, 'uid' => $uid, 'uid_page' => $pageUid, 'TSConfig' => $TSConfig);
+            $_params = ['table' => $table, 'uid' => $uid, 'uid_page' => $pageUid, 'TSConfig' => $TSConfig];
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['clearCachePostProc'] as $_funcRef) {
                 GeneralUtility::callUserFunction($_funcRef, $_params, $this);
             }
         }
-        return array(
+        return [
             $tagsToClear,
             $clearCacheCommands
-        );
+        ];
     }
 
     /**
@@ -7821,8 +8079,9 @@ class DataHandler
     public function clear_cacheCmd($cacheCmd)
     {
         if (is_object($this->BE_USER)) {
-            $this->BE_USER->writelog(3, 1, 0, 0, 'User %s has cleared the cache (cacheCmd=%s)', array($this->BE_USER->user['username'], $cacheCmd));
+            $this->BE_USER->writelog(3, 1, 0, 0, 'User %s has cleared the cache (cacheCmd=%s)', [$this->BE_USER->user['username'], $cacheCmd]);
         }
+        // Clear cache for either ALL pages or ALL tables!
         switch (strtolower($cacheCmd)) {
             case 'pages':
                 if ($this->admin || $this->BE_USER->getTSConfigVal('options.clearCache.pages')) {
@@ -7830,39 +8089,30 @@ class DataHandler
                 }
                 break;
             case 'all':
-                // allow to clear all caches if the TS config option is enabled or the option is not explicitly
-                // disabled for admins (which could clear all caches by default). The latter option is useful
-                // for big production sites where it should be possible to restrict the cache clearing for some admins.
-                if ($this->BE_USER->getTSConfigVal('options.clearCache.all') || ($this->admin && $this->BE_USER->getTSConfigVal('options.clearCache.all') !== '0')) {
-                    $this->getCacheManager()->flushCaches();
-                    GeneralUtility::makeInstance(ConnectionPool::class)
-                        ->getConnectionForTable('cache_treelist')
-                        ->truncate('cache_treelist');
-
-                    // Delete Opcode Cache
-                    GeneralUtility::makeInstance(OpcodeCacheService::class)->clearAllActive();
+                if ($this->admin || $this->BE_USER->getTSConfigVal('options.clearCache.all')) {
+                    // Clear cache group "all" of caching framework caches
+                    $this->getCacheManager()->flushCachesInGroup('all');
+                    $this->databaseConnection->exec_TRUNCATEquery('cache_treelist');
                 }
+
                 break;
             case 'temp_cached':
             case 'system':
-                GeneralUtility::deprecationLog(
-                    'Calling clear_cacheCmd() with arguments \'temp_cached\' or \'system\', using'
-                    . ' the TS config option \'options.clearCache.system\' has been deprecated.'
-                );
-                if ($this->admin || $this->BE_USER->getTSConfigVal('options.clearCache.system')) {
+                if ($this->admin || $this->BE_USER->getTSConfigVal('options.clearCache.system')
+                    || ((bool)$GLOBALS['TYPO3_CONF_VARS']['SYS']['clearCacheSystem'] === true && $this->admin)) {
                     $this->getCacheManager()->flushCachesInGroup('system');
                 }
                 break;
         }
 
-        $tagsToFlush = array();
+        $tagsToFlush = [];
         // Clear cache for a page ID!
         if (MathUtility::canBeInterpretedAsInteger($cacheCmd)) {
-            $list_cache = array($cacheCmd);
+            $list_cache = [$cacheCmd];
             // Call pre-processing function for clearing of cache for page ids:
             if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['clearPageCacheEval'])) {
                 foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['clearPageCacheEval'] as $funcName) {
-                    $_params = array('pageIdArray' => &$list_cache, 'cacheCmd' => $cacheCmd, 'functionID' => 'clear_cacheCmd()');
+                    $_params = ['pageIdArray' => &$list_cache, 'cacheCmd' => $cacheCmd, 'functionID' => 'clear_cacheCmd()'];
                     // Returns the array of ids to clear, FALSE if nothing should be cleared! Never an empty array!
                     GeneralUtility::callUserFunction($funcName, $_params, $this);
                 }
@@ -7888,7 +8138,7 @@ class DataHandler
 
         // Call post processing function for clear-cache:
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['clearCachePostProc'])) {
-            $_params = array('cacheCmd' => strtolower($cacheCmd));
+            $_params = ['cacheCmd' => strtolower($cacheCmd)];
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_tcemain.php']['clearCachePostProc'] as $_funcRef) {
                 GeneralUtility::callUserFunction($_funcRef, $_params, $this);
             }
@@ -7915,7 +8165,7 @@ class DataHandler
      * @param string $NEWid NEW id for new records
      * @return int Log entry UID (0 if no log entry was written or logging is disabled)
      */
-    public function log($table, $recuid, $action, $recpid, $error, $details, $details_nr = -1, $data = array(), $event_pid = -1, $NEWid = '')
+    public function log($table, $recuid, $action, $recpid, $error, $details, $details_nr = -1, $data = [], $event_pid = -1, $NEWid = '')
     {
         if (!$this->enableLogging) {
             return 0;
@@ -7961,11 +8211,15 @@ class DataHandler
      */
     public function newlog2($message, $table, $uid, $pid = null, $error = 0)
     {
+        if ($pid === false) {
+            GeneralUtility::deprecationLog('Setting the $pid parameter of DataHandler::newlog2 to FALSE is deprecated since TYPO3 CMS 7. Either provide an integer or NULL. FALSE will not be supported any more in TYPO3 CMS 8');
+            $pid = null;
+        }
         if (is_null($pid)) {
             $propArr = $this->getRecordProperties($table, $uid);
             $pid = $propArr['pid'];
         }
-        return $this->log($table, $uid, 0, 0, $error, $message, -1, array(), $this->eventPid($table, $uid, $pid));
+        return $this->log($table, $uid, 0, 0, $error, $message, -1, [], $this->eventPid($table, $uid, $pid));
     }
 
     /**
@@ -8020,6 +8274,22 @@ class DataHandler
             }
         }
         return $result;
+    }
+
+    /**
+     * Determines whether a particular record has been deleted
+     * using DataHandler::deleteRecord() in this instance.
+     *
+     * @param string $tableName
+     * @param string $uid
+     * @return bool
+     */
+    public function hasDeletedRecord($tableName, $uid)
+    {
+        return
+            !empty($this->deletedRecords[$tableName])
+            && in_array($uid, $this->deletedRecords[$tableName])
+        ;
     }
 
     /**
@@ -8095,7 +8365,7 @@ class DataHandler
         $resolver->setKeepLiveIds(true);
         $recordIds = $resolver->get();
 
-        $records = array();
+        $records = [];
         foreach ($recordIds as $recordId) {
             $records[$recordId] = BackendUtility::getRecord($tableName, $recordId, $fieldNames);
         }
@@ -8115,7 +8385,7 @@ class DataHandler
         if (!isset($this->outerMostInstance)) {
             $stack = array_reverse(debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT | DEBUG_BACKTRACE_IGNORE_ARGS));
             foreach ($stack as $stackItem) {
-                if (isset($stackItem['object']) && $stackItem['object'] instanceof DataHandler) {
+                if (isset($stackItem['object']) && $stackItem['object'] instanceof self) {
                     $this->outerMostInstance = $stackItem['object'];
                     break;
                 }
@@ -8252,7 +8522,7 @@ class DataHandler
      */
     protected function getCommandMapElements($needle)
     {
-        $elements = array();
+        $elements = [];
         foreach ($this->cmdmap as $tableName => $idArray) {
             foreach ($idArray as $id => $commandArray) {
                 foreach ($commandArray as $command => $value) {

@@ -22,6 +22,7 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  */
 class ExtensionManagerTables extends AbstractUpdate
 {
+
     /**
      * @var string
      */
@@ -51,10 +52,10 @@ class ExtensionManagerTables extends AbstractUpdate
      */
     protected function getUpdateStatements()
     {
-        $updateStatements = array();
+        $updateStatements = [];
 
         // Get all necessary statements for ext_tables.sql file
-        $rawDefinitions = file_get_contents(ExtensionManagementUtility::extPath('extensionmanager', 'ext_tables.sql'));
+        $rawDefinitions = GeneralUtility::getUrl(ExtensionManagementUtility::extPath('extensionmanager') . '/ext_tables.sql');
         $fieldDefinitionsFromFile = $this->getInstallToolSqlParser()->getFieldDefinitions_fileContent($rawDefinitions);
         if (count($fieldDefinitionsFromFile)) {
             $fieldDefinitionsFromCurrentDatabase = $this->getInstallToolSqlParser()->getFieldDefinitions_database();
@@ -136,9 +137,9 @@ class ExtensionManagerTables extends AbstractUpdate
             $result = ($result || $this->hasError($customMessages));
         }
 
-        // Perform statics import anyway
-        $rawDefinitions = file_get_contents(ExtensionManagementUtility::extPath('extensionmanager', 'ext_tables_static+adt.sql'));
-        $statements = $this->getInstallToolSqlParser()->getStatementArray($rawDefinitions, 1);
+        // Perform statis import anyway
+        $rawDefinitions = GeneralUtility::getUrl(ExtensionManagementUtility::extPath('extensionmanager') . 'ext_tables_static+adt.sql');
+        $statements = $this->getInstallToolSqlParser()->getStatementarray($rawDefinitions, 1);
         foreach ($statements as $statement) {
             if (trim($statement) !== '') {
                 $this->getDatabaseConnection()->admin_query($statement);

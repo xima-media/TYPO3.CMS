@@ -34,7 +34,8 @@ class IntegerValidatorTest extends AbstractValidatorTest
      */
     protected function setUp()
     {
-        $this->currentLocale = setlocale(LC_NUMERIC, 0);
+        parent::setUp();
+        $this->currentLocale = setlocale(LC_NUMERIC, null);
     }
 
     /**
@@ -42,66 +43,55 @@ class IntegerValidatorTest extends AbstractValidatorTest
      */
     protected function tearDown()
     {
-        setlocale(LC_NUMERIC, $this->currentLocale);
         parent::tearDown();
+        setlocale(LC_NUMERIC, $this->currentLocale);
     }
 
-    public function validateForValidInputHasEmptyErrorResultDataProvider()
+    public function validIntegerProvider()
     {
         return [
-            '12 for de locale' => [
-                12,
-                'de_DE.utf8'
-            ],
+            '12 for de locale'    => [[12, 'de']],
+        ];
+    }
+
+    public function invalidIntegerProvider()
+    {
+        return [
+            '12.1 for en_US locale' => [[12.1, 'en_US']],
+            // @todo de_DE disabled currently, works locally but not on travis-ci.org
+            // '12,1 for de_DE locale' => array(array('12,1', 'de_DE'))
         ];
     }
 
     /**
      * @test
-     * @dataProvider validateForValidInputHasEmptyErrorResultDataProvider
+     * @dataProvider validIntegerProvider
      */
-    public function validateForValidInputHasEmptyErrorResult($value, $locale)
+    public function validateForValidInputHasEmptyErrorResult($input)
     {
-        setlocale(LC_NUMERIC, $locale);
+        setlocale(LC_NUMERIC, $input[1]);
 
-        $options = array('element' => uniqid('test'), 'errorMessage' => uniqid('error'));
+        $options = ['element' => uniqid('test'), 'errorMessage' => uniqid('error')];
         $subject = $this->createSubject($options);
 
         $this->assertEmpty(
-            $subject->validate($value)->getErrors()
+            $subject->validate($input[0])->getErrors()
         );
-    }
-
-    public function validateForInvalidInputHasNotEmptyErrorResultDataProvider()
-    {
-        return [
-            '12.1 for en_US locale' => [
-                12.1,
-                'en_US.utf8'
-            ],
-            // @todo de_DE disabled currently, works locally but not on travis-ci.org
-            /**
-            '12,1 for de_DE locale' => [
-                '12,1',
-                'de_DE.utf8'
-            ],
-             */
-        ];
     }
 
     /**
      * @test
-     * @dataProvider validateForInvalidInputHasNotEmptyErrorResultDataProvider
+     * @dataProvider invalidIntegerProvider
      */
-    public function validateForInvalidInputHasNotEmptyErrorResult($value, $locale)
+    public function validateForInvalidInputHasNotEmptyErrorResult($input)
     {
-        setlocale(LC_NUMERIC, $locale);
+        setlocale(LC_NUMERIC, $input[1]);
 
-        $options = array('element' => uniqid('test'), 'errorMessage' => uniqid('error'));
+        $options = ['element' => uniqid('test'), 'errorMessage' => uniqid('error')];
         $subject = $this->createSubject($options);
 
         $this->assertNotEmpty(
-            $subject->validate($value)->getErrors()
+            $subject->validate($input[0])->getErrors()
         );
     }
 }

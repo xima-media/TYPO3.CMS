@@ -16,6 +16,7 @@ namespace TYPO3\CMS\Backend\Form\Element;
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
 use TYPO3\CMS\Core\Imaging\Icon;
+use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Core\Utility\StringUtility;
@@ -32,6 +33,10 @@ class InputTextElement extends AbstractFormElement
      */
     public function render()
     {
+        /** @var IconFactory $iconFactory */
+        $iconFactory = GeneralUtility::makeInstance(IconFactory::class);
+        $languageService = $this->getLanguageService();
+
         $table = $this->data['tableName'];
         $fieldName = $this->data['fieldName'];
         $row = $this->data['databaseRow'];
@@ -43,8 +48,21 @@ class InputTextElement extends AbstractFormElement
         $specConf = BackendUtility::getSpecConfParts($parameterArray['fieldConf']['defaultExtras']);
         $size = MathUtility::forceIntegerInRange($config['size'] ?: $this->defaultInputWidth, $this->minimumInputWidth, $this->maxInputWidth);
         $evalList = GeneralUtility::trimExplode(',', $config['eval'], true);
-        $classes = array();
-        $attributes = array();
+        $classes = [];
+        $attributes = [];
+
+        // set all date times available
+        $dateFormats = [
+            'date' => '%d-%m-%Y',
+            'year' => '%Y',
+            'time' => '%H:%M',
+            'timesec' => '%H:%M:%S'
+        ];
+        if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['USdateFormat']) {
+            $dateFormats['date'] = '%m-%d-%Y';
+        }
+        $dateFormats['datetime'] = $dateFormats['time'] . ' ' . $dateFormats['date'];
+        $dateFormats['datetimesec'] = $dateFormats['timesec'] . ' ' . $dateFormats['date'];
 
         // readonly
         if ($config['readOnly']) {
@@ -60,12 +78,12 @@ class InputTextElement extends AbstractFormElement
                 $itemFormElValue = $itemFormElValue ? '*********' : '';
             }
             $options = $this->data;
-            $options['parameterArray'] = array(
-                'fieldConf' => array(
+            $options['parameterArray'] = [
+                'fieldConf' => [
                     'config' => $config,
-                ),
+                ],
                 'itemFormElValue' => $itemFormElValue,
-            );
+            ];
             $options['renderType'] = 'none';
             return $this->nodeFactory->create($options)->render();
         }
@@ -76,8 +94,10 @@ class InputTextElement extends AbstractFormElement
             $isDateField = true;
             if (in_array('datetime', $evalList)) {
                 $attributes['data-date-type'] = 'datetime';
+                $dateFormat = $dateFormats['datetime'];
             } elseif (in_array('date', $evalList)) {
                 $attributes['data-date-type'] = 'date';
+                $dateFormat = $dateFormats['date'];
             }
             if (((int)$parameterArray['itemFormElValue']) !== 0) {
                 $parameterArray['itemFormElValue'] += date('Z', $parameterArray['itemFormElValue']);
@@ -89,10 +109,12 @@ class InputTextElement extends AbstractFormElement
                 $attributes['data-date-maxDate'] = (int)$config['range']['upper'];
             }
         } elseif (in_array('time', $evalList)) {
+            $dateFormat = $dateFormats['time'];
             $isDateField = true;
             $classes[] = 't3js-datetimepicker';
             $attributes['data-date-type'] = 'time';
         } elseif (in_array('timesec', $evalList)) {
+            $dateFormat = $dateFormats['timesec'];
             $isDateField = true;
             $classes[] = 't3js-datetimepicker';
             $attributes['data-date-type'] = 'timesec';
@@ -102,7 +124,7 @@ class InputTextElement extends AbstractFormElement
         foreach ($evalList as $func) {
             switch ($func) {
                 case 'required':
-                    $attributes['data-formengine-validation-rules'] = $this->getValidationDataAsJsonString(array('required' => true));
+                    $attributes['data-formengine-validation-rules'] = $this->getValidationDataAsJsonString(['required' => true]);
                     break;
                 default:
                     // @todo: This is ugly: The code should find out on it's own whether a eval definition is a
@@ -112,20 +134,20 @@ class InputTextElement extends AbstractFormElement
                         if (class_exists($func)) {
                             $evalObj = GeneralUtility::makeInstance($func);
                             if (method_exists($evalObj, 'deevaluateFieldValue')) {
-                                $_params = array(
+                                $_params = [
                                     'value' => $parameterArray['itemFormElValue']
-                                );
+                                ];
                                 $parameterArray['itemFormElValue'] = $evalObj->deevaluateFieldValue($_params);
                             }
                         }
                     }
             }
         }
-        $paramsList = array(
+        $paramsList = [
             'field' => $parameterArray['itemFormElName'],
             'evalList' => implode(',', $evalList),
             'is_in' => trim($config['is_in']),
-        );
+        ];
         // set classes
         $classes[] = 'form-control';
         $classes[] = 't3js-clearable';
@@ -159,7 +181,10 @@ class InputTextElement extends AbstractFormElement
             $attributeString .= ' ' . $attributeName . '="' . htmlspecialchars($attributeValue) . '"';
         }
 
-        $html = '<input type="text"' . $attributeString . ' />';
+        $html = '
+			<input type="text"'
+                . $attributeString
+                . $parameterArray['onFocus'] . ' />';
 
         // This is the ACTUAL form field - values from the EDITABLE field must be transferred to this field which is the one that is written to the database.
         $html .= '<input type="hidden" name="' . $parameterArray['itemFormElName'] . '" value="' . htmlspecialchars($parameterArray['itemFormElValue']) . '" />';
@@ -184,7 +209,7 @@ class InputTextElement extends AbstractFormElement
 					' . $html . '
 					<span class="input-group-btn">
 						<label class="btn btn-default" for="' . $attributes['id'] . '">
-							' . $this->iconFactory->getIcon('actions-edit-pick-date', Icon::SIZE_SMALL)->render() . '
+							' . $iconFactory->getIcon('actions-edit-pick-date', Icon::SIZE_SMALL)->render() . '
 						</label>
 					</span>
 				</div>';
@@ -192,7 +217,7 @@ class InputTextElement extends AbstractFormElement
 
         // Wrap a wizard around the item?
         $html = $this->renderWizards(
-            array($html),
+            [$html],
             $config['wizards'],
             $table,
             $row,

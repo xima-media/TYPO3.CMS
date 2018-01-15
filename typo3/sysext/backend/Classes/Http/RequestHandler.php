@@ -16,7 +16,7 @@ namespace TYPO3\CMS\Backend\Http;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
-use TYPO3\CMS\Backend\Routing\Exception\RouteNotFoundException;
+use TYPO3\CMS\Backend\Routing\Exception\InvalidRequestTokenException;
 use TYPO3\CMS\Core\Core\Bootstrap;
 use TYPO3\CMS\Core\Http\RequestHandlerInterface;
 use TYPO3\CMS\Core\Http\Response;
@@ -24,10 +24,17 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
  * General RequestHandler for the TYPO3 Backend. This is used for all Backend requests except for CLI
- * or AJAX calls.
+ * or AJAX calls. Unlike all other RequestHandlers in the TYPO3 CMS Core, the actual logic for choosing
+ * the controller is still done inside places like each single file.
+ * This RequestHandler here serves solely to check and set up all requirements needed for a TYPO3 Backend.
+ * This class might be changed in the future.
  *
- * If a get/post parameter "route" is set, the Backend Routing is called and searches for a
- * matching route inside the Router. The corresponding controller / action is called then which returns the response.
+ * At first, this request handler serves as a replacement to typo3/init.php. It is called but does not exit
+ * so any typical script that is not dispatched, is just running through the handleRequest() method and then
+ * calls its own code.
+ *
+ * However, if a get/post parameter "route" is set, the unified Backend Routing is called and searches for a
+ * matching route inside the Router. The corresponding controller / action is called then which returns content.
  *
  * The following get/post parameters are evaluated here:
  *   - route
@@ -55,20 +62,47 @@ class RequestHandler implements RequestHandlerInterface
      * Handles any backend request
      *
      * @param ServerRequestInterface $request
-     * @return ResponseInterface
+     * @return NULL|ResponseInterface
      */
     public function handleRequest(ServerRequestInterface $request)
     {
-        // Allow the login page to be displayed if routing is not used and on index.php
-        $pathToRoute = (string)$request->getQueryParams()['route'] ?: '/login';
-        $request = $request->withAttribute('routePath', $pathToRoute);
+        // enable dispatching via Request/Response logic only for typo3/index.php
+        // This fallback will be removed in TYPO3 CMS 8, as only index.php will be allowed
+        $path = substr($request->getUri()->getPath(), strlen(GeneralUtility::getIndpEnv('TYPO3_SITE_PATH')));
+        $routingEnabled = ($path === TYPO3_mainDir . 'index.php' || $path === TYPO3_mainDir);
+        $proceedIfNoUserIsLoggedIn = false;
 
-        // skip the BE user check on the login page
-        // should be handled differently in the future by checking the Bootstrap directly
-        $this->boot($pathToRoute === '/login');
+        if ($routingEnabled) {
+            $pathToRoute = (string)$request->getQueryParams()['route'];
+            // Allow the login page to be displayed if routing is not used and on index.php
+            if (empty($pathToRoute)) {
+                $pathToRoute = '/login';
+            }
+            $request = $request->withAttribute('routePath', $pathToRoute);
+
+            // Evaluate the constant for skipping the BE user check for the bootstrap
+            // should be handled differently in the future by checking the Bootstrap directly
+            if ($pathToRoute === '/login') {
+                $proceedIfNoUserIsLoggedIn = true;
+            }
+        }
+
+        $this->boot($proceedIfNoUserIsLoggedIn);
 
         // Check if the router has the available route and dispatch.
-        return $this->dispatch($request);
+        if ($routingEnabled) {
+            try {
+                return $this->dispatch($request);
+
+                // When token was invalid redirect to login
+            } catch (InvalidRequestTokenException $e) {
+                $url = GeneralUtility::getIndpEnv('TYPO3_SITE_URL') . TYPO3_mainDir;
+                \TYPO3\CMS\Core\Utility\HttpUtility::redirect($url);
+            }
+        }
+
+        // No route found, so the system proceeds in called entrypoint as fallback.
+        return null;
     }
 
     /**
@@ -85,6 +119,7 @@ class RequestHandler implements RequestHandlerInterface
             ->checkSslBackendAndRedirectIfNeeded()
             ->initializeBackendRouter()
             ->loadExtensionTables(true)
+            ->initializeSpriteManager()
             ->initializeBackendUser()
             ->initializeBackendAuthentication($proceedIfNoUserIsLoggedIn)
             ->initializeLanguageObject()
@@ -102,7 +137,7 @@ class RequestHandler implements RequestHandlerInterface
      */
     public function canHandleRequest(ServerRequestInterface $request)
     {
-        return (TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_BE && !(TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_CLI));
+        return TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_BE && !(TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_CLI);
     }
 
     /**
@@ -121,7 +156,7 @@ class RequestHandler implements RequestHandlerInterface
      *
      * @param ServerRequestInterface $request
      * @return ResponseInterface
-     * @throws RouteNotFoundException when no route is registered
+     * @throws InvalidRequestTokenException if the request could not be verified
      * @throws \InvalidArgumentException when a route is found but the target of the route cannot be called
      */
     protected function dispatch($request)

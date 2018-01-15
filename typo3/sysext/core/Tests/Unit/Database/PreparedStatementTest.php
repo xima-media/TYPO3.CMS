@@ -14,16 +14,13 @@ namespace TYPO3\CMS\Core\Tests\Unit\Database;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Database\DatabaseConnection;
-use TYPO3\CMS\Core\Database\PreparedStatement;
-
 /**
  * Test case
  */
 class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
 {
     /**
-     * @var \PHPUnit_Framework_MockObject_MockObject|DatabaseConnection
+     * @var \PHPUnit_Framework_MockObject_MockObject|\TYPO3\CMS\Core\Database\DatabaseConnection
      */
     protected $databaseStub;
 
@@ -49,9 +46,9 @@ class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     private function setUpAndReturnDatabaseStub()
     {
         $GLOBALS['TYPO3_DB'] = $this->getAccessibleMock(
-            DatabaseConnection::class,
-            array('prepare_PREPAREDquery'),
-            array(),
+            \TYPO3\CMS\Core\Database\DatabaseConnection::class,
+            ['prepare_PREPAREDquery'],
+            [],
             '',
             false,
             false
@@ -64,11 +61,11 @@ class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      * Create an object fo the subject to be tested.
      *
      * @param string $query
-     * @return PreparedStatement
+     * @return \TYPO3\CMS\Core\Database\PreparedStatement
      */
     private function createPreparedStatement($query)
     {
-        return new PreparedStatement($query, 'pages');
+        return new \TYPO3\CMS\Core\Database\PreparedStatement($query, 'pages');
     }
 
     ////////////////////////////////////
@@ -81,7 +78,7 @@ class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function setUpAndReturnDatabaseStubReturnsMockObjectOfDatabaseConnection()
     {
-        $this->assertTrue($this->setUpAndReturnDatabaseStub() instanceof DatabaseConnection);
+        $this->assertTrue($this->setUpAndReturnDatabaseStub() instanceof \TYPO3\CMS\Core\Database\DatabaseConnection);
     }
 
     /**
@@ -90,7 +87,7 @@ class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function createPreparedStatementReturnsInstanceOfPreparedStatementClass()
     {
-        $this->assertTrue($this->createPreparedStatement('dummy') instanceof PreparedStatement);
+        $this->assertTrue($this->createPreparedStatement('dummy') instanceof \TYPO3\CMS\Core\Database\PreparedStatement);
     }
 
     ///////////////////////////////////////
@@ -106,31 +103,11 @@ class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function parametersAndQueriesDataProvider()
     {
         return [
-            'one named integer parameter' => [
-                'SELECT * FROM pages WHERE pid=:pid',
-                [':pid' => 1],
-                'SELECT * FROM pages WHERE pid=?'
-            ],
-            'one unnamed integer parameter' => [
-                'SELECT * FROM pages WHERE pid=?',
-                [1],
-                'SELECT * FROM pages WHERE pid=?'
-            ],
-            'one named integer parameter is replaced multiple times' => [
-                'SELECT * FROM pages WHERE pid=:pid OR uid=:pid',
-                [':pid' => 1],
-                'SELECT * FROM pages WHERE pid=? OR uid=?'
-            ],
-            'two named integer parameters are replaced' => [
-                'SELECT * FROM pages WHERE pid=:pid OR uid=:uid',
-                [':pid' => 1, ':uid' => 10],
-                'SELECT * FROM pages WHERE pid=? OR uid=?'
-            ],
-            'two unnamed integer parameters are replaced' => [
-                'SELECT * FROM pages WHERE pid=? OR uid=?',
-                [1, 1],
-                'SELECT * FROM pages WHERE pid=? OR uid=?'
-            ],
+            'one named integer parameter' => ['SELECT * FROM pages WHERE pid=:pid', [':pid' => 1], 'SELECT * FROM pages WHERE pid=?'],
+            'one unnamed integer parameter' => ['SELECT * FROM pages WHERE pid=?', [1], 'SELECT * FROM pages WHERE pid=?'],
+            'one named integer parameter is replaced multiple times' => ['SELECT * FROM pages WHERE pid=:pid OR uid=:pid', [':pid' => 1], 'SELECT * FROM pages WHERE pid=? OR uid=?'],
+            'two named integer parameters are replaced' => ['SELECT * FROM pages WHERE pid=:pid OR uid=:uid', [':pid' => 1, ':uid' => 10], 'SELECT * FROM pages WHERE pid=? OR uid=?'],
+            'two unnamed integer parameters are replaced' => ['SELECT * FROM pages WHERE pid=? OR uid=?', [1, 1], 'SELECT * FROM pages WHERE pid=? OR uid=?'],
         ];
     }
 
@@ -148,9 +125,7 @@ class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function parametersAreReplacedByQuestionMarkInQueryByCallingExecute($query, $parameters, $expectedResult)
     {
         $statement = $this->createPreparedStatement($query);
-        $this->databaseStub->expects($this->any())
-            ->method('prepare_PREPAREDquery')
-            ->with($this->equalTo($expectedResult));
+        $this->databaseStub->expects($this->any())->method('prepare_PREPAREDquery')->with($this->equalTo($expectedResult));
         $statement->execute($parameters);
     }
 
@@ -168,9 +143,7 @@ class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function parametersAreReplacedInQueryWhenBoundWithBindValues($query, $parameters, $expectedResult)
     {
         $statement = $this->createPreparedStatement($query);
-        $this->databaseStub->expects($this->any())
-            ->method('prepare_PREPAREDquery')
-            ->with($this->equalTo($expectedResult));
+        $this->databaseStub->expects($this->any())->method('prepare_PREPAREDquery')->with($this->equalTo($expectedResult));
         $statement->bindValues($parameters);
         $statement->execute();
     }
@@ -184,51 +157,15 @@ class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function invalidParameterTypesPassedToBindValueThrowsExceptionDataProvider()
     {
         return [
-            'integer passed with param type NULL' => [
-                1,
-                PreparedStatement::PARAM_NULL,
-                1282489834
-            ],
-            'string passed with param type NULL' => [
-                '1',
-                PreparedStatement::PARAM_NULL,
-                1282489834
-            ],
-            'bool passed with param type NULL' => [
-                true,
-                PreparedStatement::PARAM_NULL,
-                1282489834
-            ],
-            'NULL passed with param type INT' => [
-                null,
-                PreparedStatement::PARAM_INT,
-                1281868686
-            ],
-            'string passed with param type INT' => [
-                '1',
-                PreparedStatement::PARAM_INT,
-                1281868686
-            ],
-            'bool passed with param type INT' => [
-                true,
-                PreparedStatement::PARAM_INT,
-                1281868686
-            ],
-            'NULL passed with param type BOOL' => [
-                null,
-                PreparedStatement::PARAM_BOOL,
-                1281868687
-            ],
-            'string passed with param type BOOL' => [
-                '1',
-                PreparedStatement::PARAM_BOOL,
-                1281868687
-            ],
-            'integer passed with param type BOOL' => [
-                1,
-                PreparedStatement::PARAM_BOOL,
-                1281868687
-            ]
+            'integer passed with param type NULL' => [1, \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_NULL],
+            'string passed with param type NULL' => ['1', \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_NULL],
+            'bool passed with param type NULL' => [true, \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_NULL],
+            'NULL passed with param type INT' => [null, \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_INT],
+            'string passed with param type INT' => ['1', \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_INT],
+            'bool passed with param type INT' => [true, \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_INT],
+            'NULL passed with param type BOOL' => [null, \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_BOOL],
+            'string passed with param type BOOL' => ['1', \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_BOOL],
+            'integer passed with param type BOOL' => [1, \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_BOOL]
         ];
     }
 
@@ -237,17 +174,14 @@ class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      * provided vor bindValue().
      *
      * @test
+     * @expectedException \InvalidArgumentException
      * @dataProvider invalidParameterTypesPassedToBindValueThrowsExceptionDataProvider
      * @param mixed $parameter Parameter to be replaced in the query
      * @param int $type Type of the parameter value
-     * @param int $exceptionCode Expected exception code
      * @return void
      */
-    public function invalidParameterTypesPassedToBindValueThrowsException($parameter, $type, $exceptionCode)
+    public function invalidParameterTypesPassedToBindValueThrowsException($parameter, $type)
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionCode($exceptionCode);
-
         $statement = $this->createPreparedStatement('');
         $statement->bindValue(1, $parameter, $type);
     }
@@ -261,31 +195,11 @@ class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function passingInvalidMarkersThrowsExceptionDataProvider()
     {
         return [
-            'using other prefix than colon' => [
-                /** @lang text */
-                'SELECT * FROM pages WHERE pid=#pid',
-                ['#pid' => 1]
-            ],
-            'using non alphanumerical character' => [
-                /** @lang text */
-                'SELECT * FROM pages WHERE title=:stra≠e',
-                [':stra≠e' => 1]
-            ],
-            'no colon used' => [
-                /** @lang text */
-                'SELECT * FROM pages WHERE pid=pid',
-                ['pid' => 1]
-            ],
-            'colon at the end' => [
-                /** @lang text */
-                'SELECT * FROM pages WHERE pid=pid:',
-                ['pid:' => 1]
-            ],
-            'colon without alphanumerical character' => [
-                /** @lang text */
-                'SELECT * FROM pages WHERE pid=:',
-                [':' => 1]
-            ]
+            'using other prefix than colon' => ['SELECT * FROM pages WHERE pid=#pid', ['#pid' => 1]],
+            'using non alphanumerical character' => ['SELECT * FROM pages WHERE title=:stra≠e', [':stra≠e' => 1]],
+            'no colon used' => ['SELECT * FROM pages WHERE pid=pid', ['pid' => 1]],
+            'colon at the end' => ['SELECT * FROM pages WHERE pid=pid:', ['pid:' => 1]],
+            'colon without alphanumerical character' => ['SELECT * FROM pages WHERE pid=:', [':' => 1]]
         ];
     }
 
@@ -293,6 +207,7 @@ class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      * Checks if an exception is thrown, if parameter have invalid marker named.
      *
      * @test
+     * @expectedException \InvalidArgumentException
      * @dataProvider passingInvalidMarkersThrowsExceptionDataProvider
      * @param string $query Query with unreplaced markers
      * @param array  $parameters Array of parameters to be replaced in the query
@@ -300,9 +215,6 @@ class PreparedStatementTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function passingInvalidMarkersThrowsException($query, $parameters)
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionCode(1395055513);
-
         $statement = $this->createPreparedStatement($query);
         $statement->bindValues($parameters);
     }

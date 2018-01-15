@@ -27,27 +27,27 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migrateReturnsGivenArrayUnchangedIfNoMigrationNeeded()
     {
-        $input = $expected = array(
-            'aTable' => array(
-                'ctrl' => array(
+        $input = $expected = [
+            'aTable' => [
+                'ctrl' => [
                     'aKey' => 'aValue',
-                ),
-                'columns' => array(
-                    'aField' => array(
+                ],
+                'columns' => [
+                    'aField' => [
                         'label' => 'foo',
-                        'config' => array(
+                        'config' => [
                             'type' => 'aType',
                             'lolli' => 'did this',
-                        )
-                    ),
-                ),
-                'types' => array(
-                    0 => array(
+                        ]
+                    ],
+                ],
+                'types' => [
+                    0 => [
                         'showitem' => 'this,should;stay,this,too',
-                    ),
-                ),
-            ),
-        );
+                    ],
+                ],
+            ],
+        ];
         $subject = new TcaMigration();
         $this->assertEquals($expected, $subject->migrate($input));
     }
@@ -57,51 +57,51 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migrateChangesT3editorWizardToT3editorRenderTypeIfNotEnabledByTypeConfig()
     {
-        $input = array(
-            'aTable' => array(
-                'columns' => array(
-                    'bodytext' => array(
+        $input = [
+            'aTable' => [
+                'columns' => [
+                    'bodytext' => [
                         'exclude' => 1,
                         'label' => 'aLabel',
-                        'config' => array(
+                        'config' => [
                             'type' => 'text',
                             'rows' => 42,
-                            'wizards' => array(
-                                't3editor' => array(
+                            'wizards' => [
+                                't3editor' => [
                                     'type' => 'userFunc',
                                     'userFunc' => 'TYPO3\CMS\T3editor\FormWizard->main',
                                     'title' => 't3editor',
                                     'icon' => 'EXT:backend/Resources/Public/Images/FormFieldWizard/wizard_table.gif',
-                                    'module' => array(
+                                    'module' => [
                                         'name' => 'wizard_table'
-                                    ),
-                                    'params' => array(
+                                    ],
+                                    'params' => [
                                         'format' => 'html',
                                         'style' => 'width:98%; height: 60%;'
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        );
-        $expected = array(
-            'aTable' => array(
-                'columns' => array(
-                    'bodytext' => array(
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+        $expected = [
+            'aTable' => [
+                'columns' => [
+                    'bodytext' => [
                         'exclude' => 1,
                         'label' => 'aLabel',
-                        'config' => array(
+                        'config' => [
                             'type' => 'text',
                             'renderType' => 't3editor',
                             'format' => 'html',
                             'rows' => 42,
-                        ),
-                    ),
-                ),
-            ),
-        );
+                        ],
+                    ],
+                ],
+            ],
+        ];
         $subject = new TcaMigration();
         $this->assertEquals($expected, $subject->migrate($input));
     }
@@ -111,30 +111,30 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migrateDropsStylePointerFromShowItem()
     {
-        $input = array(
-            'aTable' => array(
-                'types' => array(
-                    0 => array(
+        $input = [
+            'aTable' => [
+                'types' => [
+                    0 => [
                         'showitem' => 'aField,anotherField;with;;;style-pointer,thirdField',
-                    ),
-                    1 => array(
+                    ],
+                    1 => [
                         'showitem' => 'aField,;;;;only-a-style-pointer,anotherField',
-                    ),
-                ),
-            ),
-        );
-        $expected = array(
-            'aTable' => array(
-                'types' => array(
-                    0 => array(
+                    ],
+                ],
+            ],
+        ];
+        $expected = [
+            'aTable' => [
+                'types' => [
+                    0 => [
                         'showitem' => 'aField,anotherField;with,thirdField',
-                    ),
-                    1 => array(
+                    ],
+                    1 => [
                         'showitem' => 'aField,anotherField',
-                    ),
-                ),
-            ),
-        );
+                    ],
+                ],
+            ],
+        ];
         $subject = new TcaMigration();
         $this->assertEquals($expected, $subject->migrate($input));
     }
@@ -144,29 +144,29 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migrateMovesSpecialConfigurationToColumnsOverridesDefaultExtras()
     {
-        $input = array(
-            'aTable' => array(
-                'types' => array(
-                    0 => array(
+        $input = [
+            'aTable' => [
+                'types' => [
+                    0 => [
                         'showitem' => 'aField,anotherField;with;;special:configuration,thirdField',
-                    ),
-                ),
-            ),
-        );
-        $expected = array(
-            'aTable' => array(
-                'types' => array(
-                    0 => array(
+                    ],
+                ],
+            ],
+        ];
+        $expected = [
+            'aTable' => [
+                'types' => [
+                    0 => [
                         'showitem' => 'aField,anotherField;with,thirdField',
-                        'columnsOverrides' => array(
-                            'anotherField' => array(
+                        'columnsOverrides' => [
+                            'anotherField' => [
                                 'defaultExtras' => 'special:configuration',
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        );
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
         $subject = new TcaMigration();
         $this->assertEquals($expected, $subject->migrate($input));
     }
@@ -176,39 +176,39 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migrateMovesSpecialConfigurationToColumnsOverridesDefaultExtrasAndMergesExistingDefaultExtras()
     {
-        $input = array(
-            'aTable' => array(
-                'columns' => array(
-                    'anotherField' => array(
+        $input = [
+            'aTable' => [
+                'columns' => [
+                    'anotherField' => [
                         'defaultExtras' => 'some:values',
-                    ),
-                ),
-                'types' => array(
-                    0 => array(
+                    ],
+                ],
+                'types' => [
+                    0 => [
                         'showitem' => 'aField,anotherField;with;;special:configuration,thirdField',
-                    ),
-                ),
-            ),
-        );
-        $expected = array(
-            'aTable' => array(
-                'columns' => array(
-                    'anotherField' => array(
+                    ],
+                ],
+            ],
+        ];
+        $expected = [
+            'aTable' => [
+                'columns' => [
+                    'anotherField' => [
                         'defaultExtras' => 'some:values',
-                    ),
-                ),
-                'types' => array(
-                    0 => array(
+                    ],
+                ],
+                'types' => [
+                    0 => [
                         'showitem' => 'aField,anotherField;with,thirdField',
-                        'columnsOverrides' => array(
-                            'anotherField' => array(
+                        'columnsOverrides' => [
+                            'anotherField' => [
                                 'defaultExtras' => 'some:values:special:configuration',
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        );
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
         $subject = new TcaMigration();
         $this->assertEquals($expected, $subject->migrate($input));
     }
@@ -218,98 +218,98 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migrateChangesT3editorWizardThatIsEnabledByTypeConfigToRenderTypeInColmnnsOverrides()
     {
-        $input = array(
-            'aTable' => array(
-                'columns' => array(
-                    'bodytext' => array(
+        $input = [
+            'aTable' => [
+                'columns' => [
+                    'bodytext' => [
                         'exclude' => 1,
                         'label' => 'aLabel',
-                        'config' => array(
+                        'config' => [
                             'type' => 'text',
                             'rows' => 42,
-                            'wizards' => array(
-                                't3editorHtml' => array(
+                            'wizards' => [
+                                't3editorHtml' => [
                                     'type' => 'userFunc',
                                     'userFunc' => 'TYPO3\CMS\T3editor\FormWizard->main',
                                     'enableByTypeConfig' => 1,
                                     'title' => 't3editor',
                                     'icon' => 'EXT:backend/Resources/Public/Images/FormFieldWizard/wizard_table.gif',
-                                    'module' => array(
+                                    'module' => [
                                         'name' => 'wizard_table'
-                                    ),
-                                    'params' => array(
+                                    ],
+                                    'params' => [
                                         'format' => 'html',
                                         'style' => 'width:98%; height: 60%;'
-                                    ),
-                                ),
-                                't3editorTypoScript' => array(
+                                    ],
+                                ],
+                                't3editorTypoScript' => [
                                     'type' => 'userFunc',
                                     'userFunc' => 'TYPO3\CMS\T3editor\FormWizard->main',
                                     'enableByTypeConfig' => 1,
                                     'title' => 't3editor',
                                     'icon' => 'EXT:backend/Resources/Public/Images/FormFieldWizard/wizard_table.gif',
-                                    'module' => array(
+                                    'module' => [
                                         'name' => 'wizard_table'
-                                    ),
-                                    'params' => array(
+                                    ],
+                                    'params' => [
                                         'format' => 'typoscript',
                                         'style' => 'width:98%; height: 60%;'
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-                'types' => array(
-                    'firstType' => array(
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+                'types' => [
+                    'firstType' => [
                         'showitem' => 'foo,bodytext;;;wizards[t3editorTypoScript|someOtherWizard],bar',
-                    ),
-                    'secondType' => array(
+                    ],
+                    'secondType' => [
                         'showitem' => 'foo,bodytext;;;nowrap:wizards[t3editorHtml], bar',
-                    ),
-                ),
-            ),
-        );
-        $expected = array(
-            'aTable' => array(
-                'columns' => array(
-                    'bodytext' => array(
+                    ],
+                ],
+            ],
+        ];
+        $expected = [
+            'aTable' => [
+                'columns' => [
+                    'bodytext' => [
                         'exclude' => 1,
                         'label' => 'aLabel',
-                        'config' => array(
+                        'config' => [
                             'type' => 'text',
                             'rows' => 42,
-                        ),
-                    ),
-                ),
-                'types' => array(
-                    'firstType' => array(
+                        ],
+                    ],
+                ],
+                'types' => [
+                    'firstType' => [
                         'showitem' => 'foo,bodytext,bar',
-                        'columnsOverrides' => array(
-                            'bodytext' => array(
-                                'config' => array(
+                        'columnsOverrides' => [
+                            'bodytext' => [
+                                'config' => [
                                     'format' => 'typoscript',
                                     'renderType' => 't3editor',
-                                ),
+                                ],
                                 'defaultExtras' => 'wizards[someOtherWizard]',
-                            ),
-                        ),
-                    ),
-                    'secondType' => array(
+                            ],
+                        ],
+                    ],
+                    'secondType' => [
                         'showitem' => 'foo,bodytext,bar',
-                        'columnsOverrides' => array(
-                            'bodytext' => array(
-                                'config' => array(
+                        'columnsOverrides' => [
+                            'bodytext' => [
+                                'config' => [
                                     'format' => 'html',
                                     'renderType' => 't3editor',
-                                ),
+                                ],
                                 'defaultExtras' => 'nowrap',
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        );
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
         $subject = new TcaMigration();
         $this->assertEquals($expected, $subject->migrate($input));
     }
@@ -319,50 +319,50 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migrateRemovesAnUnusedT3edtiorDefinitionIfEnabledByTypeConfig()
     {
-        $input = array(
-            'aTable' => array(
-                'columns' => array(
-                    'bodytext' => array(
+        $input = [
+            'aTable' => [
+                'columns' => [
+                    'bodytext' => [
                         'exclude' => 1,
                         'label' => 'aLabel',
-                        'config' => array(
+                        'config' => [
                             'type' => 'text',
                             'rows' => 42,
-                            'wizards' => array(
-                                't3editorHtml' => array(
+                            'wizards' => [
+                                't3editorHtml' => [
                                     'type' => 'userFunc',
                                     'userFunc' => 'TYPO3\CMS\T3editor\FormWizard->main',
                                     'enableByTypeConfig' => 1,
                                     'title' => 't3editor',
                                     'icon' => 'EXT:backend/Resources/Public/Images/FormFieldWizard/wizard_table.gif',
-                                    'module' => array(
+                                    'module' => [
                                         'name' => 'wizard_table'
-                                    ),
-                                    'params' => array(
+                                    ],
+                                    'params' => [
                                         'format' => 'html',
                                         'style' => 'width:98%; height: 60%;'
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        );
-        $expected = array(
-            'aTable' => array(
-                'columns' => array(
-                    'bodytext' => array(
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+        $expected = [
+            'aTable' => [
+                'columns' => [
+                    'bodytext' => [
                         'exclude' => 1,
                         'label' => 'aLabel',
-                        'config' => array(
+                        'config' => [
                             'type' => 'text',
                             'rows' => 42,
-                        ),
-                    ),
-                ),
-            ),
-        );
+                        ],
+                    ],
+                ],
+            ],
+        ];
         $subject = new TcaMigration();
         $this->assertEquals($expected, $subject->migrate($input));
     }
@@ -372,20 +372,20 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migrateSpecialConfigurationAndRemoveShowItemStylePointerConfigDoesNotAddMessageIfOnlySyntaxChanged()
     {
-        $input = array(
-            'aTable' => array(
-                'columns' => array(
-                    'anotherField' => array(
-                    ),
-                ),
-                'types' => array(
-                    0 => array(
+        $input = [
+            'aTable' => [
+                'columns' => [
+                    'anotherField' => [
+                    ],
+                ],
+                'types' => [
+                    0 => [
                         'showitem' => 'aField;;;',
-                    ),
-                    1 => array()
-                ),
-            ),
-        );
+                    ],
+                    1 => []
+                ],
+            ],
+        ];
         $subject = new TcaMigration();
         $subject->migrate($input);
         $this->assertEmpty($subject->getMessages());
@@ -396,24 +396,24 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migrateShowItemMovesAdditionalPaletteToOwnPaletteDefinition()
     {
-        $input = array(
-            'aTable' => array(
-                'types' => array(
-                    'firstType' => array(
+        $input = [
+            'aTable' => [
+                'types' => [
+                    'firstType' => [
                         'showitem' => 'field1;field1Label,field2;fieldLabel2;palette1,field2;;palette2',
-                    ),
-                ),
-            ),
-        );
-        $expected = array(
-            'aTable' => array(
-                'types' => array(
-                    'firstType' => array(
+                    ],
+                ],
+            ],
+        ];
+        $expected = [
+            'aTable' => [
+                'types' => [
+                    'firstType' => [
                         'showitem' => 'field1;field1Label,field2;fieldLabel2,--palette--;;palette1,field2,--palette--;;palette2',
-                    ),
-                ),
-            ),
-        );
+                    ],
+                ],
+            ],
+        ];
         $subject = new TcaMigration();
         $this->assertEquals($expected, $subject->migrate($input));
     }
@@ -423,37 +423,37 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migrateIconsForFormFieldWizardsToNewLocation()
     {
-        $input = array(
-            'aTable' => array(
-                'columns' => array(
-                    'bodytext' => array(
-                        'config' => array(
-                            'wizards' => array(
-                                't3editorHtml' => array(
+        $input = [
+            'aTable' => [
+                'columns' => [
+                    'bodytext' => [
+                        'config' => [
+                            'wizards' => [
+                                't3editorHtml' => [
                                     'icon' => 'wizard_table.gif',
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        );
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
 
-        $expected = array(
-            'aTable' => array(
-                'columns' => array(
-                    'bodytext' => array(
-                        'config' => array(
-                            'wizards' => array(
-                                't3editorHtml' => array(
+        $expected = [
+            'aTable' => [
+                'columns' => [
+                    'bodytext' => [
+                        'config' => [
+                            'wizards' => [
+                                't3editorHtml' => [
                                     'icon' => 'EXT:backend/Resources/Public/Images/FormFieldWizard/wizard_table.gif',
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        );
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
 
         $subject = new TcaMigration();
         $this->assertEquals($expected, $subject->migrate($input));
@@ -464,38 +464,38 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migrateExtAndSysextPathToEXTPath()
     {
-        $input = array(
-            'aTable' => array(
-                'columns' => array(
-                    'foo' => array(
-                        'config' => array(
+        $input = [
+            'aTable' => [
+                'columns' => [
+                    'foo' => [
+                        'config' => [
                             'type' => 'select',
-                            'items' => array(
-                                array('foo', 0, 'ext/myext/foo/bar.gif'),
-                                array('bar', 1, 'sysext/myext/foo/bar.gif'),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        );
+                            'items' => [
+                                ['foo', 0, 'ext/myext/foo/bar.gif'],
+                                ['bar', 1, 'sysext/myext/foo/bar.gif'],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
 
-        $expected = array(
-            'aTable' => array(
-                'columns' => array(
-                    'foo' => array(
-                        'config' => array(
+        $expected = [
+            'aTable' => [
+                'columns' => [
+                    'foo' => [
+                        'config' => [
                             'type' => 'select',
                             'renderType' => 'selectSingle',
-                            'items' => array(
-                                array('foo', 0, 'EXT:myext/foo/bar.gif'),
-                                array('bar', 1, 'EXT:myext/foo/bar.gif'),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        );
+                            'items' => [
+                                ['foo', 0, 'EXT:myext/foo/bar.gif'],
+                                ['bar', 1, 'EXT:myext/foo/bar.gif'],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
 
         $subject = new TcaMigration();
         $this->assertEquals($expected, $subject->migrate($input));
@@ -506,36 +506,36 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migratePathWhichStartsWithIToEXTPath()
     {
-        $input = array(
-            'aTable' => array(
-                'columns' => array(
-                    'foo' => array(
-                        'config' => array(
+        $input = [
+            'aTable' => [
+                'columns' => [
+                    'foo' => [
+                        'config' => [
                             'type' => 'select',
-                            'items' => array(
-                                array('foo', 0, 'i/tt_content.gif'),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        );
+                            'items' => [
+                                ['foo', 0, 'i/tt_content.gif'],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
 
-        $expected = array(
-            'aTable' => array(
-                'columns' => array(
-                    'foo' => array(
-                        'config' => array(
+        $expected = [
+            'aTable' => [
+                'columns' => [
+                    'foo' => [
+                        'config' => [
                             'type' => 'select',
                             'renderType' => 'selectSingle',
-                            'items' => array(
-                                array('foo', 0, 'EXT:t3skin/icons/gfx/i/tt_content.gif'),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        );
+                            'items' => [
+                                ['foo', 0, 'EXT:t3skin/icons/gfx/i/tt_content.gif'],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ];
 
         $subject = new TcaMigration();
         $this->assertEquals($expected, $subject->migrate($input));
@@ -546,30 +546,30 @@ class TcaMigrationTest extends UnitTestCase
      */
     public function migrateRemovesIconsInOptionTags()
     {
-        $input = array(
-            'aTable' => array(
-                'columns' => array(
-                    'foo' => array(
-                        'config' => array(
+        $input = [
+            'aTable' => [
+                'columns' => [
+                    'foo' => [
+                        'config' => [
                             'type' => 'select',
                             'iconsInOptionTags' => 1,
-                        ),
-                    ),
-                ),
-            ),
-        );
-        $expected = array(
-            'aTable' => array(
-                'columns' => array(
-                    'foo' => array(
-                        'config' => array(
+                        ],
+                    ],
+                ],
+            ],
+        ];
+        $expected = [
+            'aTable' => [
+                'columns' => [
+                    'foo' => [
+                        'config' => [
                             'type' => 'select',
                             'renderType' => 'selectSingle',
-                        ),
-                    ),
-                ),
-            ),
-        );
+                        ],
+                    ],
+                ],
+            ],
+        ];
 
         $subject = new TcaMigration();
         $this->assertEquals($expected, $subject->migrate($input));
@@ -1017,406 +1017,6 @@ class TcaMigrationTest extends UnitTestCase
                                     ],
                                 ],
                             ],
-                        ],
-                    ],
-                ],
-            ],
-        ];
-
-        $subject = new TcaMigration();
-        $this->assertEquals($expected, $subject->migrate($input));
-    }
-
-    /**
-     * @return array
-     */
-    public function migrateRemovesRteTransformOptionsDataProvider()
-    {
-        return [
-            'remove empty options in columns' => [
-                [
-                    // Given config section
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext:rte_transform[]'
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    // Expected config section
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext:rte_transform'
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove nothing in columns' => [
-                [
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext:rte_transform'
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext:rte_transform'
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove mode in columns' => [
-                [
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext:rte_transform[mode=ts_css]'
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext:rte_transform'
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove flag and mode in columns' => [
-                [
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext:rte_transform[flag=rte_enabled|mode=ts_css]'
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext:rte_transform'
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove flag and mode in columns with array notation' => [
-                [
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext[]:rte_transform[flag=rte_enabled|mode=ts_css]'
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext[]:rte_transform'
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove flag and mode in columns with array notation and index' => [
-                [
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext[*]:rte_transform[flag=rte_enabled|mode=ts_css]'
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext[*]:rte_transform'
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove flag and mode in columns with array notation and index and option list' => [
-                [
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext[cut|copy|paste]:rte_transform[flag=rte_enabled|mode=ts_css]'
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'columns' => [
-                            'aField' => [
-                                'defaultExtras' => 'richtext[cut|copy|paste]:rte_transform'
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove empty options in columnsOverrides' => [
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext:rte_transform[]'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext:rte_transform'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove nothing in columnsOverrides' => [
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext:rte_transform'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext:rte_transform'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove mode in columnsOverrides' => [
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext:rte_transform[mode=ts_css]'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext:rte_transform'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove flag and mode in columnsOverrides' => [
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext:rte_transform[flag=rte_enabled|mode=ts_css]'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext:rte_transform'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove flag and mode in columnsOverrides with array notation' => [
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext[]:rte_transform[flag=rte_enabled|mode=ts_css]'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext[]:rte_transform'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove flag and mode in columnsOverrides with array notation and index' => [
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext[*]:rte_transform[flag=rte_enabled|mode=ts_css]'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext[*]:rte_transform'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-            'remove flag and mode in columnsOverrides with array notation and index and option list' => [
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext[copy|cut|paste]:rte_transform[flag=rte_enabled|mode=ts_css]'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-                [
-                    'aTable' => [
-                        'types' => [
-                            'aType' => [
-                                'columnsOverrides' => [
-                                    'aField' => [
-                                        'defaultExtras' => 'richtext[copy|cut|paste]:rte_transform'
-                                    ]
-                                ]
-                            ]
-                        ]
-                    ]
-                ],
-            ],
-        ];
-    }
-
-    /**
-     * @test
-     * @dataProvider migrateRemovesRteTransformOptionsDataProvider
-     * @param array $givenConfig
-     * @param array $expectedConfig
-     */
-    public function migrateRemovesRteTransformOptions(array $givenConfig, array $expectedConfig)
-    {
-        $subject = new TcaMigration();
-        $this->assertEquals($expectedConfig, $subject->migrate($givenConfig));
-    }
-
-    /**
-     * @test
-     */
-    public function migrateRewritesColorpickerWizard()
-    {
-        $input = [
-            'aTable' => [
-                'columns' => [
-                    'aCol' => [
-                        'config' => [
-                            'wizards' => [
-                                'colorpicker' => [
-                                    'type' => 'colorbox',
-                                    'title' => 'Color picker',
-                                    'module' => [
-                                        'name' => 'wizard_colorpicker',
-                                    ],
-                                    'JSopenParams' => 'height=300,width=500,status=0,menubar=0,scrollbars=1',
-                                ],
-                            ],
-                        ],
-                    ],
-                ],
-            ],
-        ];
-        $expected = [
-            'aTable' => [
-                'columns' => [
-                    'aCol' => [
-                        'config' => [
-                            'renderType' => 'colorpicker',
                         ],
                     ],
                 ],

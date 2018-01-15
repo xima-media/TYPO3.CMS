@@ -25,7 +25,7 @@ use TYPO3\CMS\Form\Domain\Model\Json\AbstractJsonElement;
  */
 class TypoScriptToJsonConverter
 {
-    protected $registeredElementNames = array(
+    protected $registeredElementNames = [
         'BUTTON',
         'CHECKBOX',
         'CHECKBOXGROUP',
@@ -45,15 +45,15 @@ class TypoScriptToJsonConverter
         'TEXTAREA',
         'TEXTBLOCK',
         'TEXTLINE'
-    );
+    ];
 
     /**
      * @var array
      */
-    protected $nameMapping = array(
+    protected $nameMapping = [
         'checkboxgroup' => 'CheckboxGroup',
         'radiogroup' => 'RadioGroup',
-    );
+    ];
 
     /**
      * @var array
@@ -82,7 +82,7 @@ class TypoScriptToJsonConverter
      * @return AbstractJsonElement
      * @throws \RuntimeException
      */
-    public function createElement($class, array $arguments = array())
+    public function createElement($class, array $arguments = [])
     {
         $class = strtolower((string)$class);
         if (!empty($this->nameMapping[$class])) {
@@ -122,7 +122,7 @@ class TypoScriptToJsonConverter
                     if (isset($typoscript[$key . '.'])) {
                         $elementArguments = $typoscript[$key . '.'];
                     } else {
-                        $elementArguments = array();
+                        $elementArguments = [];
                     }
                     $this->setElementType($parentElement, $class, $elementArguments);
                 }

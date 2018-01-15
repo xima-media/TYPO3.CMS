@@ -14,12 +14,13 @@ namespace TYPO3\CMS\Form\Domain\Builder;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Utility\ArrayUtility;
+use TYPO3\CMS\Core\TypoScript\TemplateService;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Form\Domain\Model\Configuration;
 use TYPO3\CMS\Form\Domain\Model\Element;
 use TYPO3\CMS\Form\Domain\Model\ValidationElement;
 use TYPO3\CMS\Form\Mvc\Controller\ControllerContext;
+use TYPO3\CMS\Form\Utility\CompatibilityLayerUtility;
 use TYPO3\CMS\Form\Utility\FormUtility;
 
 /**
@@ -31,13 +32,18 @@ use TYPO3\CMS\Form\Utility\FormUtility;
 class FormBuilder
 {
     /**
+     * @var string
+     */
+    const COMPATIBILITY_THEME_NAME = 'Compatibility';
+
+    /**
      * @param Configuration $configuration
      * @return FormBuilder
      */
     public static function create(Configuration $configuration)
     {
         /** @var FormBuilder $formBuilder */
-        $formBuilder = \TYPO3\CMS\Form\Utility\FormUtility::getObjectManager()->get(FormBuilder::class);
+        $formBuilder = \TYPO3\CMS\Form\Utility\FormUtility::getObjectManager()->get(self::class);
         $formBuilder->setConfiguration($configuration);
         return $formBuilder;
     }
@@ -51,6 +57,11 @@ class FormBuilder
      * @var \TYPO3\CMS\Extbase\Service\TypoScriptService
      */
     protected $typoScriptService;
+
+    /**
+     * @var \TYPO3\CMS\Form\Utility\CompatibilityLayerUtility
+     */
+    protected $compatibilityService;
 
     /**
      * @var ValidationBuilder
@@ -152,6 +163,14 @@ class FormBuilder
     }
 
     /**
+     * Creates this object.
+     */
+    public function __construct()
+    {
+        $this->compatibilityService = CompatibilityLayerUtility::create($this);
+    }
+
+    /**
      * @return Configuration
      */
     public function getConfiguration()
@@ -181,6 +200,22 @@ class FormBuilder
     public function setControllerContext(ControllerContext $controllerContext)
     {
         $this->controllerContext = $controllerContext;
+    }
+
+    /**
+     * @return CompatibilityLayerUtility
+     */
+    public function getCompatibilityService()
+    {
+        return $this->compatibilityService;
+    }
+
+    /**
+     * @param CompatibilityLayerUtility $compatibilityService
+     */
+    public function setCompatibilityService(CompatibilityLayerUtility $compatibilityService)
+    {
+        $this->compatibilityService = $compatibilityService;
     }
 
     /**
@@ -224,6 +259,42 @@ class FormBuilder
     public function buildModel()
     {
         $userConfiguredFormTypoScript = $this->configuration->getTypoScript();
+
+        if ($this->configuration->getCompatibility()) {
+            $layout = [];
+            if (isset($userConfiguredFormTypoScript['layout.'])) {
+                $layout = $userConfiguredFormTypoScript['layout.'];
+                /* use the compatibility theme whenever if a layout is defined */
+                $this->configuration->setThemeName(static::COMPATIBILITY_THEME_NAME);
+                unset($userConfiguredFormTypoScript['layout.']);
+            }
+
+            switch ($this->getControllerAction()) {
+                case 'show':
+                    $actionLayoutKey = 'form.';
+                    break;
+                case 'confirmation':
+                    $actionLayoutKey = 'confirmationView.';
+                    break;
+                case 'process':
+                    $actionLayoutKey = 'postProcessor.';
+                    break;
+                default:
+                    $actionLayoutKey = '';
+                    break;
+            }
+            if ($actionLayoutKey && isset($userConfiguredFormTypoScript[$actionLayoutKey]['layout.'])) {
+                $actionLayout = $userConfiguredFormTypoScript[$actionLayoutKey]['layout.'];
+                $this->configuration->setThemeName(static::COMPATIBILITY_THEME_NAME);
+                unset($userConfiguredFormTypoScript[$actionLayoutKey]['layout.']);
+                $layout = array_replace_recursive($layout, $actionLayout);
+            }
+
+            if (!empty($layout)) {
+                $this->compatibilityService->setGlobalLayoutConfiguration($layout);
+            }
+        }
+
         $form = $this->createElementObject();
         $this->reviveElement($form, $userConfiguredFormTypoScript, 'FORM');
         $form->setThemeName($this->configuration->getThemeName());
@@ -272,18 +343,33 @@ class FormBuilder
                     $userConfiguredElementTypoScript['cObj']
                 );
             }
-            $element->setAdditionalArguments(array(
+            $element->setAdditionalArguments([
                 'content' => $attributeValue,
-            ));
+            ]);
+            /* use the compatibility theme whenever if a layout is defined */
+            if ($this->configuration->getCompatibility()) {
+                $this->compatibilityService->setElementLayouts($element, $userConfiguredElementTypoScript);
+                if (isset($userConfiguredElementTypoScript['layout'])) {
+                    $this->configuration->setThemeName(static::COMPATIBILITY_THEME_NAME);
+                    unset($userConfiguredElementTypoScript['layout']);
+                }
+            }
         } else {
             $this->setAttributes($elementBuilder, $element, $userConfiguredElementTypoScript);
-            $userConfiguredElementTypoScript = $elementBuilder->getUserConfiguredElementTyposcript();
+            $userConfiguredElementTypoScript = $elementBuilder->getUserConfiguredElementTypoScript();
             $this->setValidationMessages($element);
-
+            /* use the compatibility theme whenever if a layout is defined */
+            if ($this->configuration->getCompatibility()) {
+                $this->compatibilityService->setElementLayouts($element, $userConfiguredElementTypoScript);
+                if (isset($userConfiguredElementTypoScript['layout'])) {
+                    $this->configuration->setThemeName(static::COMPATIBILITY_THEME_NAME);
+                    unset($userConfiguredElementTypoScript['layout']);
+                }
+            }
             $this->signalSlotDispatcher->dispatch(
                 __CLASS__,
                 'txFormAfterElementCreation',
-                array($element, $this)
+                [$element, $this]
             );
                 // create all child elements
             $this->setChildElementsByIntegerKey($element, $userConfiguredElementTypoScript);
@@ -302,7 +388,7 @@ class FormBuilder
     protected function setChildElementsByIntegerKey(Element $element, array $userConfiguredElementTypoScript)
     {
         if (is_array($userConfiguredElementTypoScript)) {
-            $keys = ArrayUtility::filterAndSortByNumericKeys($userConfiguredElementTypoScript);
+            $keys = TemplateService::sortedKeyList($userConfiguredElementTypoScript);
             foreach ($keys as $key) {
                 if (
                     (int)$key
@@ -312,7 +398,7 @@ class FormBuilder
                     if (isset($userConfiguredElementTypoScript[$key . '.'])) {
                         $concreteChildElementTypoScript = $userConfiguredElementTypoScript[$key . '.'];
                     } else {
-                        $concreteChildElementTypoScript = array();
+                        $concreteChildElementTypoScript = [];
                     }
                     $this->distinguishElementType($element, $concreteChildElementTypoScript, $elementType);
                 }
@@ -338,10 +424,10 @@ class FormBuilder
         if (in_array($elementType, $this->typoScriptRepository->getRegisteredElementTypes())) {
             $this->addChildElement($element, $userConfiguredElementTypoScript, $elementType);
         } elseif ($this->configuration->getContentElementRendering()) {
-            $contentObject = array(
+            $contentObject = [
                 'cObj' => $elementType,
                 'cObj.' => $userConfiguredElementTypoScript
-            );
+            ];
             $this->addChildElement($element, $contentObject, 'CONTENTELEMENT');
         }
     }
@@ -386,7 +472,7 @@ class FormBuilder
         $elementBuilder->setViewHelperDefaulArgumentsToAdditionalArguments();
         $elementBuilder->moveAllOtherUserdefinedPropertiesToAdditionalArguments();
         $htmlAttributes = $elementBuilder->getHtmlAttributes();
-        $userConfiguredElementTypoScript = $elementBuilder->getUserConfiguredElementTyposcript();
+        $userConfiguredElementTypoScript = $elementBuilder->getUserConfiguredElementTypoScript();
         $additionalArguments = $elementBuilder->getAdditionalArguments();
         $element->setHtmlAttributes($htmlAttributes);
         $additionalArguments = $this->typoScriptService->convertTypoScriptArrayToPlainArray($additionalArguments);
@@ -443,7 +529,9 @@ class FormBuilder
 
         if ($this->getIncomingData()->getIncomingField($elementName) !== null) {
             /* filter values and set it back to incoming fields */
-            $keys = ArrayUtility::filterAndSortByNumericKeys($userConfiguredElementTypoScript['filters.']);
+                /* remove xss every time */
+            $userConfiguredElementTypoScript['filters.'][-1] = 'removexss';
+            $keys = TemplateService::sortedKeyList($userConfiguredElementTypoScript['filters.']);
             foreach ($keys as $key) {
                 $class = $userConfiguredElementTypoScript['filters.'][$key];
                 if (
@@ -482,12 +570,12 @@ class FormBuilder
         $this->signalSlotDispatcher->dispatch(
             __CLASS__,
             'txFormHandleIncomingValues',
-            array(
+            [
                 $element,
                 $this->getIncomingData(),
                 $modelValue,
                 $this
-            )
+            ]
         );
     }
 
@@ -509,7 +597,7 @@ class FormBuilder
         ) {
             /** @var \TYPO3\CMS\Extbase\Error\Error[] $errors */
             $errors = $this->getValidationErrors()->forProperty($elementName)->getErrors();
-            $errorMessages = array();
+            $errorMessages = [];
             foreach ($errors as $error) {
                 $errorMessages[] = $error->getMessage();
             }
@@ -545,6 +633,16 @@ class FormBuilder
     public function getControllerAction()
     {
         return $this->controllerContext->getRequest()->getControllerActionName();
+    }
+
+    /**
+     * If TRUE form try to respect the layout settings
+     *
+     * @return bool
+     */
+    public function getCompatibilityMode()
+    {
+        return $this->configuration->getCompatibility();
     }
 
     /**

@@ -39,7 +39,7 @@ class SimpleLockStrategyTest extends UnitTestCase
     public function constructorSetsResourceToPathWithIdIfUsingSimpleLocking()
     {
         $lock = $this->getAccessibleMock(SimpleLockStrategy::class, ['dummy'], ['999999999']);
-        $this->assertSame(PATH_site . SimpleLockStrategy::FILE_LOCK_FOLDER  . 'simple_' . md5('999999999'), $lock->_get('filePath'));
+        $this->assertSame(PATH_site . SimpleLockStrategy::FILE_LOCK_FOLDER . 'simple_' . md5('999999999'), $lock->_get('filePath'));
     }
 
     /**
@@ -87,12 +87,12 @@ class SimpleLockStrategyTest extends UnitTestCase
      */
     public function invalidFileReferences()
     {
-        return array(
-            'not within PATH_site' => array(tempnam(sys_get_temp_dir(), 'foo')),
-            'directory traversal' => array(PATH_site . 'typo3temp/../typo3temp/var/locks/foo'),
-            'directory traversal 2' => array(PATH_site . 'typo3temp/var/locks/../../var/locks/foo'),
-            'within uploads' => array(PATH_site . 'uploads/TYPO3-Lock-Test')
-        );
+        return [
+            'not withing PATH_site' => ['/tmp/TYPO3-Lock-Test'],
+            'directory traversal' => [PATH_site . 'typo3temp/../typo3temp/locks/foo'],
+            'directory traversal 2' => [PATH_site . 'typo3temp/locks/../locks/foo'],
+            'within uploads' => [PATH_site . 'uploads/TYPO3-Lock-Test']
+        ];
     }
 
     /**
@@ -103,6 +103,9 @@ class SimpleLockStrategyTest extends UnitTestCase
      */
     public function releaseDoesNotRemoveFilesNotWithinTypo3TempLocksDirectory($file)
     {
+        if (TYPO3_OS === 'WIN') {
+            $this->markTestSkipped('releaseDoesNotRemoveFilesNotWithinTypo3TempLocksDirectory() test not available on Windows.');
+        }
         // Create test file
         touch($file);
         if (!is_file($file)) {

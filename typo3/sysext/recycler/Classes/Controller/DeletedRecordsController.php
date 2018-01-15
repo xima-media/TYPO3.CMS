@@ -52,12 +52,13 @@ class DeletedRecordsController
     public function transform($deletedRowsArray, $totalDeleted)
     {
         $total = 0;
-        $jsonArray = array(
-            'rows' => array()
-        );
+        $jsonArray = [
+            'rows' => []
+        ];
 
         if (is_array($deletedRowsArray)) {
             $lang = $this->getLanguageService();
+            $backendUser = $this->getBackendUser();
             $iconFactory = GeneralUtility::makeInstance(IconFactory::class);
 
             foreach ($deletedRowsArray as $table => $rows) {
@@ -65,21 +66,20 @@ class DeletedRecordsController
                 foreach ($rows as $row) {
                     $pageTitle = $this->getPageTitle((int)$row['pid']);
                     $backendUser = BackendUtility::getRecord('be_users', $row[$GLOBALS['TCA'][$table]['ctrl']['cruser_id']], 'username', '', false);
-                    $jsonArray['rows'][] = array(
+                    $jsonArray['rows'][] = [
                         'uid' => $row['uid'],
                         'pid' => $row['pid'],
                         'icon' => $iconFactory->getIconForRecord($table, $row, Icon::SIZE_SMALL)->render(),
-                        'pageTitle' => $pageTitle,
+                        'pageTitle' => RecyclerUtility::getUtf8String($pageTitle),
                         'table' => $table,
                         'crdate' => BackendUtility::datetime($row[$GLOBALS['TCA'][$table]['ctrl']['crdate']]),
                         'tstamp' => BackendUtility::datetime($row[$GLOBALS['TCA'][$table]['ctrl']['tstamp']]),
                         'owner' => htmlspecialchars($backendUser['username']),
                         'owner_uid' => $row[$GLOBALS['TCA'][$table]['ctrl']['cruser_id']],
-                        'tableTitle' => $lang->sL($GLOBALS['TCA'][$table]['ctrl']['title']),
-                        'title' => htmlspecialchars(BackendUtility::getRecordTitle($table, $row)),
-                        'path' => RecyclerUtility::getRecordPath($row['pid']),
-                        'isParentDeleted' => $table === 'pages' ? RecyclerUtility::isParentPageDeleted($row['pid']) : false
-                    );
+                        'tableTitle' => RecyclerUtility::getUtf8String($lang->sL($GLOBALS['TCA'][$table]['ctrl']['title'])),
+                        'title' => htmlspecialchars(RecyclerUtility::getUtf8String(BackendUtility::getRecordTitle($table, $row))),
+                        'path' => RecyclerUtility::getRecordPath($row['pid'])
+                    ];
                 }
             }
         }
@@ -118,6 +118,16 @@ class DeletedRecordsController
     protected function getLanguageService()
     {
         return $GLOBALS['LANG'];
+    }
+
+    /**
+     * Returns the current BE user.
+     *
+     * @return \TYPO3\CMS\Core\Authentication\BackendUserAuthentication
+     */
+    protected function getBackendUser()
+    {
+        return $GLOBALS['BE_USER'];
     }
 
     /**

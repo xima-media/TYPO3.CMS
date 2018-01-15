@@ -34,7 +34,7 @@ abstract class UnitTestCase extends BaseTestCase
      *
      * @var array
      */
-    protected $backupGlobalsBlacklist = array('TYPO3_LOADED_EXT');
+    protected $backupGlobalsBlacklist = ['TYPO3_LOADED_EXT'];
 
     /**
      * Absolute path to files that should be removed after a test.
@@ -43,14 +43,14 @@ abstract class UnitTestCase extends BaseTestCase
      *
      * @var array
      */
-    protected $testFilesToDelete = array();
+    protected $testFilesToDelete = [];
 
     /**
      * Unset all additional properties of test classes to help PHP
      * garbage collection. This reduces memory footprint with lots
      * of tests.
      *
-     * If overwriting tearDown() in test classes, please call
+     * If owerwriting tearDown() in test classes, please call
      * parent::tearDown() at the end. Unsetting of own properties
      * is not needed this way.
      *
@@ -81,9 +81,9 @@ abstract class UnitTestCase extends BaseTestCase
             if (!GeneralUtility::validPathStr($absoluteFileName)) {
                 throw new \RuntimeException('tearDown() cleanup: Filename contains illegal characters', 1410633087);
             }
-            if (!StringUtility::beginsWith($absoluteFileName, PATH_site . 'typo3temp/var/')) {
+            if (!StringUtility::beginsWith($absoluteFileName, PATH_site . 'typo3temp/')) {
                 throw new \RuntimeException(
-                    'tearDown() cleanup:  Files to delete must be within typo3temp/var/',
+                    'tearDown() cleanup:  Files to delete must be within typo3temp/',
                     1410633412
                 );
             }
@@ -96,6 +96,6 @@ abstract class UnitTestCase extends BaseTestCase
                 throw new \RuntimeException('tearDown() cleanup: File, link or directory does not exist', 1410633510);
             }
         }
-        $this->testFilesToDelete = array();
+        $this->testFilesToDelete = [];
     }
 }

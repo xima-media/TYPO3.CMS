@@ -28,7 +28,7 @@ class WorkspaceTitleViewHelper extends AbstractViewHelper
      *
      * @var array
      */
-    protected static $workspaceTitleRuntimeCache = array();
+    protected static $workspaceTitleRuntimeCache = [];
 
     /**
      * Resolve workspace title from UID.
@@ -39,9 +39,9 @@ class WorkspaceTitleViewHelper extends AbstractViewHelper
     public function render($uid)
     {
         return static::renderStatic(
-            array(
+            [
                 'uid' => $uid
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
@@ -59,7 +59,7 @@ class WorkspaceTitleViewHelper extends AbstractViewHelper
         $uid = $arguments['uid'];
 
         if (isset(static::$workspaceTitleRuntimeCache[$uid])) {
-            return static::$workspaceTitleRuntimeCache[$uid];
+            return htmlspecialchars(static::$workspaceTitleRuntimeCache[$uid]);
         }
 
         if ($uid === 0) {
@@ -75,6 +75,6 @@ class WorkspaceTitleViewHelper extends AbstractViewHelper
             static::$workspaceTitleRuntimeCache[$uid] = ($workspace === null) ? '' : $workspace->getTitle();
         }
 
-        return static::$workspaceTitleRuntimeCache[$uid];
+        return htmlspecialchars(static::$workspaceTitleRuntimeCache[$uid]);
     }
 }

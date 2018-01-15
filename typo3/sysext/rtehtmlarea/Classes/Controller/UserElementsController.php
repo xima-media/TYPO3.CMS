@@ -112,7 +112,7 @@ class UserElementsController
         // unset the default jumpToUrl() function
         unset($this->doc->JScodeArray['jumpToUrl']);
 
-        $this->doc->JScode = GeneralUtility::wrapJS($JScode);
+        $this->doc->JScode = $this->doc->wrapScriptTags($JScode);
         $this->modData = $GLOBALS['BE_USER']->getModuleData('user.php', 'ses');
         if (\TYPO3\CMS\Core\Utility\GeneralUtility::_GP('OC_key')) {
             $parts = explode('|', \TYPO3\CMS\Core\Utility\GeneralUtility::_GP('OC_key'));
@@ -134,6 +134,31 @@ class UserElementsController
         $content = $this->main_user($this->modData['openKeys']);
         $response->getBody()->write($content);
         return $response;
+    }
+
+    /**
+     * Main function
+     *
+     * @return void
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, use main_user() instead
+     */
+    public function main()
+    {
+        GeneralUtility::logDeprecatedFunction();
+        $this->content = '';
+        $this->content .= $this->main_user($this->modData['openKeys']);
+    }
+
+    /**
+     * Print content
+     *
+     * @return void
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, use mainAction() instead
+     */
+    public function printContent()
+    {
+        GeneralUtility::logDeprecatedFunction();
+        echo $this->content;
     }
 
     /********************************
@@ -172,22 +197,22 @@ class UserElementsController
     public function main_user($openKeys)
     {
         // Starting content:
-        $content = $this->doc->startPage(htmlspecialchars($GLOBALS['LANG']->getLL('Insert Custom Element')));
+        $content = $this->doc->startPage($GLOBALS['LANG']->getLL('Insert Custom Element', true));
         $RTEtsConfigParts = explode(':', \TYPO3\CMS\Core\Utility\GeneralUtility::_GP('RTEtsConfigParams'));
         $RTEsetup = $GLOBALS['BE_USER']->getTSConfig('RTE', \TYPO3\CMS\Backend\Utility\BackendUtility::getPagesTSconfig($RTEtsConfigParts[5]));
         $thisConfig = \TYPO3\CMS\Backend\Utility\BackendUtility::RTEsetup($RTEsetup['properties'], $RTEtsConfigParts[0], $RTEtsConfigParts[2], $RTEtsConfigParts[4]);
         if (is_array($thisConfig['userElements.'])) {
-            $categories = array();
+            $categories = [];
             foreach ($thisConfig['userElements.'] as $k => $value) {
                 $ki = (int)$k;
                 $v = $thisConfig['userElements.'][$ki . '.'];
                 if (substr($k, -1) == '.' && is_array($v)) {
-                    $subcats = array();
+                    $subcats = [];
                     $openK = $ki;
                     if ($openKeys[$openK]) {
                         $mArray = '';
                         if ($v['load'] === 'images_from_folder') {
-                            $mArray = array();
+                            $mArray = [];
                             if ($v['path'] && @is_dir((PATH_site . $v['path']))) {
                                 $files = \TYPO3\CMS\Core\Utility\GeneralUtility::getFilesInDir(PATH_site . $v['path'], 'gif,jpg,jpeg,png', 0, '');
                                 if (is_array($files)) {
@@ -197,11 +222,11 @@ class UserElementsController
                                         $iInfo = $this->calcWH($iInfo, 50, 100);
                                         $ks = (string)(100 + $c);
                                         $mArray[$ks] = $filename;
-                                        $mArray[$ks . '.'] = array(
+                                        $mArray[$ks . '.'] = [
                                             'content' => '<img src="' . $this->siteUrl . $v['path'] . $filename . '" />',
                                             '_icon' => '<img src="' . $this->siteUrl . $v['path'] . $filename . '" ' . $iInfo[3] . ' />',
-                                            'description' => $GLOBALS['LANG']->getLL('filesize') . ': ' . str_replace('&nbsp;', ' ', \TYPO3\CMS\Core\Utility\GeneralUtility::formatSize(@filesize((PATH_site . $v['path'] . $filename)))) . ', ' . htmlspecialchars($GLOBALS['LANG']->getLL('pixels')) . ': ' . $iInfo[0] . 'x' . $iInfo[1]
-                                        );
+                                            'description' => $GLOBALS['LANG']->getLL('filesize') . ': ' . str_replace('&nbsp;', ' ', \TYPO3\CMS\Core\Utility\GeneralUtility::formatSize(@filesize((PATH_site . $v['path'] . $filename)))) . ', ' . $GLOBALS['LANG']->getLL('pixels', 1) . ': ' . $iInfo[0] . 'x' . $iInfo[1]
+                                        ];
                                         $c++;
                                     }
                                 }
@@ -220,11 +245,11 @@ class UserElementsController
                             if (substr($k2, -1) == '.' && is_array($v[$k2i . '.'])) {
                                 $title = trim($v[$k2i]);
                                 if (!$title) {
-                                    $title = '[' . htmlspecialchars($GLOBALS['LANG']->getLL('noTitle')) . ']';
+                                    $title = '[' . $GLOBALS['LANG']->getLL('noTitle', true) . ']';
                                 } else {
-                                    $title = htmlspecialchars($GLOBALS['LANG']->sL($title));
+                                    $title = $GLOBALS['LANG']->sL($title, true);
                                 }
-                                $description = htmlspecialchars($GLOBALS['LANG']->sL($v[$k2i . '.']['description'])) . '<br />';
+                                $description = $GLOBALS['LANG']->sL($v[$k2i . '.']['description'], true) . '<br />';
                                 if (!$v[$k2i . '.']['dontInsertSiteUrl']) {
                                     $v[$k2i . '.']['content'] = str_replace('###_URL###', $this->siteUrl, $v[$k2i . '.']['content']);
                                 }
@@ -249,11 +274,11 @@ class UserElementsController
                                     default:
                                         $onClickEvent = 'insertHTML(' . GeneralUtility::quoteJSvalue($v[$k2i . '.']['content']) . ');';
                                 }
-                                $A = array('<a href="#" onClick="' . $onClickEvent . 'return false;">', '</a>');
+                                $A = ['<a href="#" onClick="' . $onClickEvent . 'return false;">', '</a>'];
                                 $subcats[$k2i] = '<tr>
 									<td></td>
-									<td>' . $A[0] . $logo . $A[1] . '</td>
-									<td>' . $A[0] . '<strong>' . $title . '</strong><br />' . $description . $A[1] . '</td>
+									<td class="bgColor4" valign="top">' . $A[0] . $logo . $A[1] . '</td>
+									<td class="bgColor4" valign="top">' . $A[0] . '<strong>' . $title . '</strong><br />' . $description . $A[1] . '</td>
 								</tr>';
                             }
                         }
@@ -264,23 +289,23 @@ class UserElementsController
             }
             ksort($categories);
             // Render menu of the items:
-            $lines = array();
+            $lines = [];
             foreach ($categories as $k => $v) {
                 $title = trim($thisConfig['userElements.'][$k]);
                 $openK = $k;
                 if (!$title) {
-                    $title = '[' . htmlspecialchars($GLOBALS['LANG']->getLL('noTitle')) . ']';
+                    $title = '[' . $GLOBALS['LANG']->getLL('noTitle', true) . ']';
                 } else {
-                    $title = htmlspecialchars($GLOBALS['LANG']->sL($title));
+                    $title = $GLOBALS['LANG']->sL($title, true);
                 }
 
                 $uriBuilder = GeneralUtility::makeInstance(\TYPO3\CMS\Backend\Routing\UriBuilder::class);
-                $url = (string)$uriBuilder->buildUriFromRoute('rtehtmlarea_wizard_user_elements', array('OC_key' => ($openKeys[$openK] ? 'C|' : 'O|') . $openK));
+                $url = (string)$uriBuilder->buildUriFromRoute('rtehtmlarea_wizard_user_elements', ['OC_key' => ($openKeys[$openK] ? 'C|' : 'O|') . $openK]);
 
-                $lines[] = '<tr><td colspan="3"><a href="#" title="' . htmlspecialchars($GLOBALS['LANG']->getLL('expand')) . '" onClick="jumpToUrl(' . GeneralUtility::quoteJSvalue($url) . ');return false;"><i class="fa fa-caret-square-o-' . ($openKeys[$openK] ? 'left' : 'right') . '" title="' . htmlspecialchars($GLOBALS['LANG']->getLL('expand')) . '"></i><strong>' . $title . '</strong></a></td></tr>';
+                $lines[] = '<tr><td colspan="3" class="bgColor5"><a href="#" title="' . $GLOBALS['LANG']->getLL('expand', true) . '" onClick="jumpToUrl(' . GeneralUtility::quoteJSvalue($url) . ');return false;"><i class="fa fa-caret-square-o-' . ($openKeys[$openK] ? 'left' : 'right') . '" title="' . $GLOBALS['LANG']->getLL('expand', true) . '"></i><strong>' . $title . '</strong></a></td></tr>';
                 $lines[] = $v;
             }
-            $content .= '<table class="table table-striped table-hover">' . implode('', $lines) . '</table>';
+            $content .= '<table border="0" cellpadding="1" cellspacing="1">' . implode('', $lines) . '</table>';
         }
         $content .= $this->doc->endPage();
         return $content;

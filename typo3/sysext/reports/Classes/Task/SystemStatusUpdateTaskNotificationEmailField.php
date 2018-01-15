@@ -13,25 +13,19 @@ namespace TYPO3\CMS\Reports\Task;
  *
  * The TYPO3 project - inspiring people to share!
  */
-use TYPO3\CMS\Core\Messaging\FlashMessage;
-use TYPO3\CMS\Core\Utility\GeneralUtility;
-use TYPO3\CMS\Lang\LanguageService;
-use TYPO3\CMS\Scheduler\AdditionalFieldProviderInterface;
-use TYPO3\CMS\Scheduler\Controller\SchedulerModuleController;
-use TYPO3\CMS\Scheduler\Task\AbstractTask;
 
 /**
  * Additional field to set the notification email address(es) for system health
  * issue notifications.
  */
-class SystemStatusUpdateTaskNotificationEmailField implements AdditionalFieldProviderInterface
+class SystemStatusUpdateTaskNotificationEmailField implements \TYPO3\CMS\Scheduler\AdditionalFieldProviderInterface
 {
     /**
      * Additional fields
      *
      * @var array
      */
-    protected $fields = array('notificationEmail');
+    protected $fields = ['notificationEmail'];
 
     /**
      * Field prefix.
@@ -48,8 +42,9 @@ class SystemStatusUpdateTaskNotificationEmailField implements AdditionalFieldPro
      * @param \TYPO3\CMS\Scheduler\Controller\SchedulerModuleController $schedulerModule Reference to the scheduler backend module
      * @return array A two dimensional array, array('Identifier' => array('fieldId' => array('code' => '', 'label' => '', 'cshKey' => '', 'cshLabel' => ''))
      */
-    public function getAdditionalFields(array &$taskInfo, $task, SchedulerModuleController $schedulerModule)
+    public function getAdditionalFields(array &$taskInfo, $task, \TYPO3\CMS\Scheduler\Controller\SchedulerModuleController $schedulerModule)
     {
+        $fields = ['notificationEmail' => 'textarea'];
         if ($schedulerModule->CMD == 'edit') {
             $taskInfo[$this->fieldPrefix . 'NotificationEmail'] = $task->getNotificationEmail();
         }
@@ -58,13 +53,13 @@ class SystemStatusUpdateTaskNotificationEmailField implements AdditionalFieldPro
         $fieldId = 'task_' . $fieldName;
         $fieldHtml = '<textarea class="form-control" ' . 'rows="5" cols="50" name="tx_scheduler[' . $fieldName . ']" ' . 'id="' . $fieldId . '" ' . '>' . htmlspecialchars($taskInfo[$fieldName]) . '</textarea>';
 
-        $additionalFields = array();
-        $additionalFields[$fieldId] = array(
+        $additionalFields = [];
+        $additionalFields[$fieldId] = [
             'code' => $fieldHtml,
             'label' => 'LLL:EXT:reports/Resources/Private/Language/locallang_reports.xlf:status_updateTaskField_notificationEmails',
             'cshKey' => '',
             'cshLabel' => $fieldId
-        );
+        ];
 
         return $additionalFields;
     }
@@ -76,18 +71,18 @@ class SystemStatusUpdateTaskNotificationEmailField implements AdditionalFieldPro
      * @param \TYPO3\CMS\Scheduler\Controller\SchedulerModuleController $schedulerModule Reference to the scheduler backend module
      * @return bool TRUE if validation was ok (or selected class is not relevant), FALSE otherwise
      */
-    public function validateAdditionalFields(array &$submittedData, SchedulerModuleController $schedulerModule)
+    public function validateAdditionalFields(array &$submittedData, \TYPO3\CMS\Scheduler\Controller\SchedulerModuleController $schedulerModule)
     {
         $validInput = true;
-        $notificationEmails = GeneralUtility::trimExplode(LF, $submittedData[$this->fieldPrefix . 'NotificationEmail'], true);
+        $notificationEmails = \TYPO3\CMS\Core\Utility\GeneralUtility::trimExplode(LF, $submittedData[$this->fieldPrefix . 'NotificationEmail'], true);
         foreach ($notificationEmails as $notificationEmail) {
-            if (!GeneralUtility::validEmail($notificationEmail)) {
+            if (!\TYPO3\CMS\Core\Utility\GeneralUtility::validEmail($notificationEmail)) {
                 $validInput = false;
                 break;
             }
         }
         if (empty($submittedData[$this->fieldPrefix . 'NotificationEmail']) || !$validInput) {
-            $schedulerModule->addMessage($this->getLanguageService()->sL('LLL:EXT:reports/Resources/Private/Language/locallang_reports.xlf:status_updateTaskField_notificationEmails_invalid'), FlashMessage::ERROR);
+            $schedulerModule->addMessage($GLOBALS['LANG']->sL('LLL:EXT:reports/Resources/Private/Language/locallang_reports.xlf:status_updateTaskField_notificationEmails_invalid'), \TYPO3\CMS\Core\Messaging\FlashMessage::ERROR);
             $validInput = false;
         }
         return $validInput;
@@ -100,10 +95,10 @@ class SystemStatusUpdateTaskNotificationEmailField implements AdditionalFieldPro
      * @param \TYPO3\CMS\Scheduler\Task\AbstractTask $task Reference to the scheduler backend module
      * @return void
      */
-    public function saveAdditionalFields(array $submittedData, AbstractTask $task)
+    public function saveAdditionalFields(array $submittedData, \TYPO3\CMS\Scheduler\Task\AbstractTask $task)
     {
-        if (!$task instanceof SystemStatusUpdateTask) {
-            throw new \InvalidArgumentException('Expected a task of type ' . SystemStatusUpdateTask::class . ', but got ' . get_class($task), 1295012802);
+        if (!$task instanceof \TYPO3\CMS\Reports\Task\SystemStatusUpdateTask) {
+            throw new \InvalidArgumentException('Expected a task of type ' . \TYPO3\CMS\Reports\Task\SystemStatusUpdateTask::class . ', but got ' . get_class($task), 1295012802);
         }
         $task->setNotificationEmail($submittedData[$this->fieldPrefix . 'NotificationEmail']);
     }
@@ -117,13 +112,5 @@ class SystemStatusUpdateTaskNotificationEmailField implements AdditionalFieldPro
     protected function getFullFieldName($fieldName)
     {
         return $this->fieldPrefix . ucfirst($fieldName);
-    }
-
-    /**
-     * @return LanguageService
-     */
-    protected function getLanguageService()
-    {
-        return $GLOBALS['LANG'];
     }
 }

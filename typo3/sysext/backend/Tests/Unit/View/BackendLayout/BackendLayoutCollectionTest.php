@@ -51,7 +51,7 @@ class BackendLayoutCollectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
         $identifier = $this->getUniqueId('identifier');
         $backendLayoutCollection = new \TYPO3\CMS\Backend\View\BackendLayout\BackendLayoutCollection($identifier);
         $backendLayoutIdentifier = $this->getUniqueId('identifier__');
-        $backendLayoutMock = $this->getMock(\TYPO3\CMS\Backend\View\BackendLayout\BackendLayout::class, array('getIdentifier'), array(), '', false);
+        $backendLayoutMock = $this->getMock(\TYPO3\CMS\Backend\View\BackendLayout\BackendLayout::class, ['getIdentifier'], [], '', false);
         $backendLayoutMock->expects($this->once())->method('getIdentifier')->will($this->returnValue($backendLayoutIdentifier));
 
         $backendLayoutCollection->add($backendLayoutMock);
@@ -67,9 +67,9 @@ class BackendLayoutCollectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
         $identifier = $this->getUniqueId('identifier');
         $backendLayoutCollection = new \TYPO3\CMS\Backend\View\BackendLayout\BackendLayoutCollection($identifier);
         $backendLayoutIdentifier = $this->getUniqueId('identifier');
-        $firstBackendLayoutMock = $this->getMock(\TYPO3\CMS\Backend\View\BackendLayout\BackendLayout::class, array('getIdentifier'), array(), '', false);
+        $firstBackendLayoutMock = $this->getMock(\TYPO3\CMS\Backend\View\BackendLayout\BackendLayout::class, ['getIdentifier'], [], '', false);
         $firstBackendLayoutMock->expects($this->once())->method('getIdentifier')->will($this->returnValue($backendLayoutIdentifier));
-        $secondBackendLayoutMock = $this->getMock(\TYPO3\CMS\Backend\View\BackendLayout\BackendLayout::class, array('getIdentifier'), array(), '', false);
+        $secondBackendLayoutMock = $this->getMock(\TYPO3\CMS\Backend\View\BackendLayout\BackendLayout::class, ['getIdentifier'], [], '', false);
         $secondBackendLayoutMock->expects($this->once())->method('getIdentifier')->will($this->returnValue($backendLayoutIdentifier));
 
         $backendLayoutCollection->add($firstBackendLayoutMock);
@@ -84,7 +84,7 @@ class BackendLayoutCollectionTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
         $identifier = $this->getUniqueId('identifier');
         $backendLayoutCollection = new \TYPO3\CMS\Backend\View\BackendLayout\BackendLayoutCollection($identifier);
         $backendLayoutIdentifier = $this->getUniqueId('identifier');
-        $backendLayoutMock = $this->getMock(\TYPO3\CMS\Backend\View\BackendLayout\BackendLayout::class, array('getIdentifier'), array(), '', false);
+        $backendLayoutMock = $this->getMock(\TYPO3\CMS\Backend\View\BackendLayout\BackendLayout::class, ['getIdentifier'], [], '', false);
         $backendLayoutMock->expects($this->once())->method('getIdentifier')->will($this->returnValue($backendLayoutIdentifier));
 
         $backendLayoutCollection->add($backendLayoutMock);

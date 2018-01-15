@@ -56,11 +56,11 @@ class ReportController extends ActionController
         if (!isset($vars['redirect']) && $vars['action'] !== 'index' && !isset($vars['extension']) && is_array($GLOBALS['BE_USER']->uc['reports']['selection'])) {
             $previousSelection = $GLOBALS['BE_USER']->uc['reports']['selection'];
             if (!empty($previousSelection['extension']) && !empty($previousSelection['report'])) {
-                $this->redirect('detail', 'Report', null, array(
+                $this->redirect('detail', 'Report', null, [
                     'extension' => $previousSelection['extension'],
                     'report' => $previousSelection['report'],
                     'redirect' => 1,
-                ));
+                ]);
             } else {
                 $this->redirect('index');
             }
@@ -90,7 +90,9 @@ class ReportController extends ActionController
      */
     public function indexAction()
     {
-        $this->view->assign('reports', $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['reports']);
+        $this->view->assign(
+            'reports', $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['reports']
+        );
         $this->saveState();
     }
 
@@ -106,7 +108,8 @@ class ReportController extends ActionController
     {
         $content = ($error = '');
         $reportClass = null;
-        if (isset($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['reports'][$extension])
+        if (
+            isset($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['reports'][$extension])
             && is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['reports'][$extension])
             && isset($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['reports'][$extension][$report])
             && is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['reports'][$extension][$report])
@@ -127,17 +130,15 @@ class ReportController extends ActionController
         } else {
             $error = $reportClass . ' does not implement the Report Interface which is necessary to be displayed here.';
         }
-        $this->view->assignMultiple(array(
+        $this->view->assignMultiple([
             'content' => $content,
             'error' => $error,
             'report' => $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['reports'][$extension][$report],
-        ));
+        ]);
     }
 
     /**
      * Generates the menu
-     *
-     * @return void
      */
     protected function generateMenu()
     {
@@ -157,7 +158,8 @@ class ReportController extends ActionController
             foreach ($reports as $reportName => $report) {
                 $menuItem = $menu
                     ->makeMenuItem()
-                    ->setHref($this->uriBuilder->reset()->uriFor('detail', array('extension' => $extKey, 'report' => $reportName), 'Report'))
+                    ->setHref($this->uriBuilder->reset()->uriFor('detail',
+                        ['extension' => $extKey, 'report' => $reportName], 'Report'))
                     ->setTitle($this->getLanguageService()->sL($report['title']));
                 if ($this->arguments->hasArgument('extension') && $this->arguments->hasArgument('report')) {
                     if ($this->arguments->getArgument('extension')->getValue() === $extKey && $this->arguments->getArgument('report')->getValue() === $reportName) {
@@ -173,8 +175,6 @@ class ReportController extends ActionController
 
     /**
      * Gets all buttons for the docheader
-     *
-     * @return void
      */
     protected function generateButtons()
     {
@@ -184,7 +184,7 @@ class ReportController extends ActionController
         $setVars = $this->request->hasArgument('setVars') ? $this->request->getArgument('setVars') : [];
         if (count($getVars) === 0) {
             $modulePrefix = strtolower('tx_' . $this->request->getControllerExtensionName() . '_' . $moduleName);
-            $getVars = array('id', 'M', $modulePrefix);
+            $getVars = ['id', 'M', $modulePrefix];
         }
         $shortcutButton = $buttonBar->makeShortcutButton()
             ->setModuleName($moduleName)
@@ -204,11 +204,11 @@ class ReportController extends ActionController
      */
     protected function saveState($extension = '', $report = '')
     {
-        $this->getBackendUser()->uc['reports']['selection'] = array(
+        $GLOBALS['BE_USER']->uc['reports']['selection'] = [
             'extension' => $extension,
             'report' => $report,
-        );
-        $this->getBackendUser()->writeUC();
+        ];
+        $GLOBALS['BE_USER']->writeUC();
     }
 
     /**

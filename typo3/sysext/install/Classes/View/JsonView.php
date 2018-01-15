@@ -33,10 +33,10 @@ class JsonView extends AbstractView
             try {
                 $renderedData['status'] = $this->transformStatusMessagesToArray($renderedData['status']);
             } catch (StatusException $e) {
-                $renderedData['status'] = array(array(
+                $renderedData['status'] = [[
                     'severity' => 'error',
                     'title' => htmlspecialchars($e->getMessage())
-                ));
+                ]];
             }
         }
 
@@ -50,9 +50,9 @@ class JsonView extends AbstractView
      * @return array
      * @throws StatusException
      */
-    protected function transformStatusMessagesToArray(array $statusArray = array())
+    protected function transformStatusMessagesToArray(array $statusArray = [])
     {
-        $result = array();
+        $result = [];
         foreach ($statusArray as $status) {
             if (!$status instanceof StatusInterface) {
                 throw new StatusException(
@@ -74,10 +74,46 @@ class JsonView extends AbstractView
      */
     public function transformStatusToArray(StatusInterface $status)
     {
-        $arrayStatus = array();
-        $arrayStatus['severity'] = htmlspecialchars($status->getSeverity());
+        $arrayStatus = [];
+        $arrayStatus['severity'] = $this->getSeverityAsNumber($status->getSeverity());
         $arrayStatus['title'] = htmlspecialchars($status->getTitle());
         $arrayStatus['message'] = htmlspecialchars($status->getMessage());
         return $arrayStatus;
+    }
+
+    /**
+     * Return the corresponding integer value for given severity string
+     *
+     * @param string $severity
+     *
+     * @return int
+     */
+    protected function getSeverityAsNumber($severity)
+    {
+        $number = -2;
+        switch (strtolower($severity)) {
+            case 'loading':
+                $number = -3;
+                break;
+            case 'notice':
+                $number = -2;
+                break;
+            case 'info':
+                $number = -1;
+                break;
+            case 'ok':
+            case 'success':
+                $number = 0;
+                break;
+            case 'warning':
+                $number = 1;
+                break;
+            case 'error':
+            case 'danger':
+            case 'fatal':
+                $number = 2;
+                break;
+        }
+        return $number;
     }
 }

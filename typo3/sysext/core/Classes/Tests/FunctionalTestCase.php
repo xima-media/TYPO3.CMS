@@ -14,9 +14,7 @@ namespace TYPO3\CMS\Core\Tests;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
-use TYPO3\CMS\Core\Core\Bootstrap;
-use TYPO3\CMS\Core\Database\ConnectionPool;
+use TYPO3\CMS\Core\Tests\Functional\DataHandling\Framework\DataSet;
 use TYPO3\CMS\Core\Tests\Functional\Framework\Frontend\Response;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
@@ -52,22 +50,6 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
  */
 abstract class FunctionalTestCase extends BaseTestCase
 {
-    /**
-     * An unique identifier for this test case. Location of the test
-     * instance and database name depend on this. Calculated early in setUp()
-     *
-     * @var string
-     */
-    protected $identifier;
-
-    /**
-     * Absolute path to test instance document root. Depends on $identifier.
-     * Calculated early in setUp()
-     *
-     * @var string
-     */
-    protected $instancePath;
-
     /**
      * Core extensions to load.
      *
@@ -181,6 +163,34 @@ abstract class FunctionalTestCase extends BaseTestCase
     protected $backendUserFixture = 'typo3/sysext/core/Tests/Functional/Fixtures/be_users.xml';
 
     /**
+     * Private utility class used in setUp() and tearDown(). Do NOT use in test cases!
+     *
+     * @var \TYPO3\CMS\Core\Tests\FunctionalTestCaseBootstrapUtility
+     */
+    private $bootstrapUtility = null;
+
+    /**
+     * Calculate a "unique" identifier for the test database and the
+     * instance patch based on the given test case class name.
+     *
+     * @return string
+     */
+    protected function getInstanceIdentifier()
+    {
+        return FunctionalTestCaseBootstrapUtility::getInstanceIdentifier(get_class($this));
+    }
+
+    /**
+     * Calculates path to TYPO3 CMS test installation for this test case.
+     *
+     * @return string
+     */
+    protected function getInstancePath()
+    {
+        return FunctionalTestCaseBootstrapUtility::getInstancePath(get_class($this));
+    }
+
+    /**
      * Set up creates a test instance and database.
      *
      * This method should be called with parent::setUp() in your test cases!
@@ -192,64 +202,15 @@ abstract class FunctionalTestCase extends BaseTestCase
         if (!defined('ORIGINAL_ROOT')) {
             $this->markTestSkipped('Functional tests must be called through phpunit on CLI');
         }
-
-        // Use a 7 char long hash of class name as identifier
-        $this->identifier = substr(sha1(get_class($this)), 0, 7);
-        $this->instancePath = ORIGINAL_ROOT . 'typo3temp/var/tests/functional-' . $this->identifier;
-
-        $testbase = new Testbase();
-        $testbase->defineTypo3ModeBe();
-        $testbase->setTypo3TestingContext();
-        if ($testbase->recentTestInstanceExists($this->instancePath)) {
-            // Reusing an existing instance. This typically happens for the second, third, ... test
-            // in a test case, so environment is set up only once per test case.
-            $testbase->setUpBasicTypo3Bootstrap($this->instancePath);
-            $testbase->initializeTestDatabaseAndTruncateTables();
-            $testbase->loadExtensionTables();
-        } else {
-            $testbase->removeOldInstanceIfExists($this->instancePath);
-            // Basic instance directory structure
-            $testbase->createDirectory($this->instancePath . '/fileadmin');
-            $testbase->createDirectory($this->instancePath . '/typo3temp/var/transient');
-            $testbase->createDirectory($this->instancePath . '/typo3temp/assets');
-            $testbase->createDirectory($this->instancePath . '/typo3conf/ext');
-            $testbase->createDirectory($this->instancePath . '/uploads');
-            // Additionally requested directories
-            foreach ($this->additionalFoldersToCreate as $directory) {
-                $testbase->createDirectory($this->instancePath . '/' . $directory);
-            }
-            $testbase->createLastRunTextfile($this->instancePath);
-            $testbase->setUpInstanceCoreLinks($this->instancePath);
-            $testbase->linkTestExtensionsToInstance($this->instancePath, $this->testExtensionsToLoad);
-            $testbase->linkPathsInTestInstance($this->instancePath, $this->pathsToLinkInTestInstance);
-            $localConfiguration = $testbase->getOriginalDatabaseSettingsFromEnvironmentOrLocalConfiguration();
-            $originalDatabaseName = $localConfiguration['DB']['Connections']['Default']['dbname'];
-            // Append the unique identifier to the base database name to end up with a single database per test case
-            $localConfiguration['DB']['Connections']['Default']['dbname'] = $originalDatabaseName . '_ft' . $this->identifier;
-            $testbase->testDatabaseNameIsNotTooLong($originalDatabaseName, $localConfiguration);
-            // Set some hard coded base settings for the instance. Those could be overruled by
-            // $this->configurationToUseInTestInstance if needed again.
-            $localConfiguration['SYS']['isInitialInstallationInProgress'] = false;
-            $localConfiguration['SYS']['isInitialDatabaseImportDone'] = true;
-            $localConfiguration['SYS']['displayErrors'] = '1';
-            $localConfiguration['SYS']['debugExceptionHandler'] = '';
-            $localConfiguration['SYS']['trustedHostsPattern'] = '.*';
-            $localConfiguration['SYS']['setDBinit'] = 'SET SESSION sql_mode = \'STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_AUTO_VALUE_ON_ZERO,NO_ENGINE_SUBSTITUTION,NO_ZERO_DATE,NO_ZERO_IN_DATE,ONLY_FULL_GROUP_BY\';';
-            $testbase->setUpLocalConfiguration($this->instancePath, $localConfiguration, $this->configurationToUseInTestInstance);
-            $defaultCoreExtensionsToLoad = [
-                'core',
-                'backend',
-                'frontend',
-                'lang',
-                'extbase',
-                'install',
-            ];
-            $testbase->setUpPackageStates($this->instancePath, $defaultCoreExtensionsToLoad, $this->coreExtensionsToLoad, $this->testExtensionsToLoad);
-            $testbase->setUpBasicTypo3Bootstrap($this->instancePath);
-            $testbase->setUpTestDatabase($localConfiguration['DB']['Connections']['Default']['dbname'], $originalDatabaseName);
-            $testbase->loadExtensionTables();
-            $testbase->createDatabaseStructure();
-        }
+        $this->bootstrapUtility = new FunctionalTestCaseBootstrapUtility();
+        $this->bootstrapUtility->setUp(
+            get_class($this),
+            $this->coreExtensionsToLoad,
+            $this->testExtensionsToLoad,
+            $this->pathsToLinkInTestInstance,
+            $this->configurationToUseInTestInstance,
+            $this->additionalFoldersToCreate
+        );
     }
 
     /**
@@ -259,11 +220,9 @@ abstract class FunctionalTestCase extends BaseTestCase
      * $GLOBALS['TYPO3_DB'] for easy IDE auto completion.
      *
      * @return \TYPO3\CMS\Core\Database\DatabaseConnection
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
      */
     protected function getDatabaseConnection()
     {
-        GeneralUtility::logDeprecatedFunction();
         return $GLOBALS['TYPO3_DB'];
     }
 
@@ -271,24 +230,17 @@ abstract class FunctionalTestCase extends BaseTestCase
      * Initialize backend user
      *
      * @param int $userUid uid of the user we want to initialize. This user must exist in the fixture file
-     * @return BackendUserAuthentication
+     * @return \TYPO3\CMS\Core\Authentication\BackendUserAuthentication
      * @throws Exception
      */
     protected function setUpBackendUserFromFixture($userUid)
     {
         $this->importDataSet(ORIGINAL_ROOT . $this->backendUserFixture);
+        $database = $this->getDatabaseConnection();
+        $userRow = $database->exec_SELECTgetSingleRow('*', 'be_users', 'uid = ' . (int)$userUid);
 
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('be_users');
-        $queryBuilder->getRestrictions()->removeAll();
-
-        $userRow = $queryBuilder->select('*')
-            ->from('be_users')
-            ->where($queryBuilder->expr()->eq('uid', (int) $userUid))
-            ->execute()
-            ->fetch();
-
-        /** @var $backendUser BackendUserAuthentication */
-        $backendUser = GeneralUtility::makeInstance(BackendUserAuthentication::class);
+        /** @var $backendUser \TYPO3\CMS\Core\Authentication\BackendUserAuthentication */
+        $backendUser = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Authentication\BackendUserAuthentication::class);
         $sessionId = $backendUser->createSessionId();
         $_COOKIE['be_typo_user'] = $sessionId;
         $backendUser->id = $sessionId;
@@ -318,30 +270,312 @@ abstract class FunctionalTestCase extends BaseTestCase
      */
     protected function importDataSet($path)
     {
-        $testbase = new Testbase();
-        $testbase->importXmlDatabaseFixture($path);
+        if (!is_file($path)) {
+            throw new Exception(
+                'Fixture file ' . $path . ' not found',
+                1376746261
+            );
+        }
+
+        $database = $this->getDatabaseConnection();
+
+        $fileContent = file_get_contents($path);
+        // Disables the functionality to allow external entities to be loaded when parsing the XML, must be kept
+        $previousValueOfEntityLoader = libxml_disable_entity_loader(true);
+        $xml = simplexml_load_string($fileContent);
+        libxml_disable_entity_loader($previousValueOfEntityLoader);
+        $foreignKeys = [];
+
+        /** @var $table \SimpleXMLElement */
+        foreach ($xml->children() as $table) {
+            $insertArray = [];
+
+            /** @var $column \SimpleXMLElement */
+            foreach ($table->children() as $column) {
+                $columnName = $column->getName();
+                $columnValue = null;
+
+                if (isset($column['ref'])) {
+                    list($tableName, $elementId) = explode('#', $column['ref']);
+                    $columnValue = $foreignKeys[$tableName][$elementId];
+                } elseif (isset($column['is-NULL']) && ($column['is-NULL'] === 'yes')) {
+                    $columnValue = null;
+                } else {
+                    $columnValue = (string)$table->$columnName;
+                }
+
+                $insertArray[$columnName] = $columnValue;
+            }
+
+            $tableName = $table->getName();
+            $result = $database->exec_INSERTquery($tableName, $insertArray);
+            if ($result === false) {
+                throw new Exception(
+                    'Error when processing fixture file: ' . $path . ' Can not insert data to table ' . $tableName . ': ' . $database->sql_error(),
+                    1376746262
+                );
+            }
+            if (isset($table['id'])) {
+                $elementId = (string)$table['id'];
+                $foreignKeys[$tableName][$elementId] = $database->sql_insert_id();
+            }
+        }
+    }
+
+    /**
+     * Import data from a CSV file to database
+     * Single file can contain data from multiple tables
+     *
+     * @param string $path absolute path to the CSV file containing the data set to load
+     */
+    public function importCSVDataSet($path)
+    {
+        $dataSet = DataSet::read($path, true);
+
+        foreach ($dataSet->getTableNames() as $tableName) {
+            foreach ($dataSet->getElements($tableName) as $element) {
+                $this->getDatabaseConnection()->exec_INSERTquery(
+                    $tableName,
+                    $element
+                );
+                $sqlError = $this->getDatabaseConnection()->sql_error();
+                if (!empty($sqlError)) {
+                    $this->fail('SQL Error for table "' . $tableName . '": ' . LF . $sqlError);
+                }
+            }
+        }
+    }
+
+    /**
+     * Compare data in database with CSV file
+     *
+     * @param string $path absolute path to the CSV file
+     */
+    protected function assertCSVDataSet($path)
+    {
+        $dataSet = DataSet::read($path);
+        $failMessages = [];
+
+        foreach ($dataSet->getTableNames() as $tableName) {
+            $hasUidField = ($dataSet->getIdIndex($tableName) !== null);
+            $records = $this->getAllRecords($tableName, $hasUidField);
+            foreach ($dataSet->getElements($tableName) as $assertion) {
+                $result = $this->assertInRecords($assertion, $records);
+                if ($result === false) {
+                    if ($hasUidField && empty($records[$assertion['uid']])) {
+                        $failMessages[] = 'Record "' . $tableName . ':' . $assertion['uid'] . '" not found in database';
+                        continue;
+                    }
+                    $recordIdentifier = $tableName . ($hasUidField ? ':' . $assertion['uid'] : '');
+                    $additionalInformation = ($hasUidField ? $this->renderRecords($assertion, $records[$assertion['uid']]) : $this->arrayToString($assertion));
+                    $failMessages[] = 'Assertion in data-set failed for "' . $recordIdentifier . '":' . LF . $additionalInformation;
+                    // Unset failed asserted record
+                    if ($hasUidField) {
+                        unset($records[$assertion['uid']]);
+                    }
+                } else {
+                    // Unset asserted record
+                    unset($records[$result]);
+                    // Increase assertion counter
+                    $this->assertTrue($result !== false);
+                }
+            }
+            if (!empty($records)) {
+                foreach ($records as $record) {
+                    $recordIdentifier = $tableName . ':' . $record['uid'];
+                    $emptyAssertion = array_fill_keys($dataSet->getFields($tableName), '[none]');
+                    $reducedRecord = array_intersect_key($record, $emptyAssertion);
+                    $additionalInformation = ($hasUidField ? $this->renderRecords($emptyAssertion, $reducedRecord) : $this->arrayToString($reducedRecord));
+                    $failMessages[] = 'Not asserted record found for "' . $recordIdentifier . '":' . LF . $additionalInformation;
+                }
+            }
+        }
+
+        if (!empty($failMessages)) {
+            $this->fail(implode(LF, $failMessages));
+        }
+    }
+
+    /**
+     * Check if $expectedRecord is present in $actualRecords array
+     * and compares if all column values from matches
+     *
+     * @param array $expectedRecord
+     * @param array $actualRecords
+     * @return bool|int|string false if record is not found or some column value doesn't match
+     */
+    protected function assertInRecords(array $expectedRecord, array $actualRecords)
+    {
+        foreach ($actualRecords as $index => $record) {
+            $differentFields = $this->getDifferentFields($expectedRecord, $record);
+
+            if (empty($differentFields)) {
+                return $index;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Fetches all records from a database table
+     * Helper method for assertCSVDataSet
+     *
+     * @param string $tableName
+     * @param bool $hasUidField
+     * @return array
+     */
+    protected function getAllRecords($tableName, $hasUidField = false)
+    {
+       $allRecords = [];
+
+        $records = $this->getDatabaseConnection()->exec_SELECTgetRows(
+            '*',
+            $tableName,
+            '1=1',
+            '',
+            '',
+            '',
+            ($hasUidField ? 'uid' : '')
+        );
+
+        if (!empty($records)) {
+            $allRecords = $records;
+        }
+
+        return $allRecords;
+    }
+
+    /**
+     * Format array as human readable string. Used to format verbose error messages in assertCSVDataSet
+     *
+     * @param array $array
+     * @return string
+     */
+    protected function arrayToString(array $array)
+    {
+        $elements = [];
+        foreach ($array as $key => $value) {
+            if (is_array($value)) {
+                $value = $this->arrayToString($value);
+            }
+            $elements[] = "'" . $key . "' => '" . $value . "'";
+        }
+        return 'array(' . PHP_EOL . '   ' . implode(', ' . PHP_EOL . '   ', $elements) . PHP_EOL . ')' . PHP_EOL;
+    }
+
+    /**
+     * Format output showing difference between expected and actual db row in a human readable way
+     * Used to format verbose error messages in assertCSVDataSet
+     *
+     * @param array $assertion
+     * @param array $record
+     * @return string
+     */
+    protected function renderRecords(array $assertion, array $record)
+    {
+        $differentFields = $this->getDifferentFields($assertion, $record);
+        $columns = [
+            'fields' => ['Fields'],
+            'assertion' => ['Assertion'],
+            'record' => ['Record'],
+        ];
+        $lines = [];
+        $linesFromXmlValues = [];
+        $result = '';
+
+        foreach ($differentFields as $differentField) {
+            $columns['fields'][] = $differentField;
+            $columns['assertion'][] = ($assertion[$differentField] === null ? 'NULL' : $assertion[$differentField]);
+            $columns['record'][] = ($record[$differentField] === null ? 'NULL' : $record[$differentField]);
+        }
+
+        foreach ($columns as $columnIndex => $column) {
+            $columnLength = null;
+            foreach ($column as $value) {
+                if (strpos($value, '<?xml') === 0) {
+                    $value = '[see diff]';
+                }
+                $valueLength = strlen($value);
+                if (empty($columnLength) || $valueLength > $columnLength) {
+                    $columnLength = $valueLength;
+                }
+            }
+            foreach ($column as $valueIndex => $value) {
+                if (strpos($value, '<?xml') === 0) {
+                    if ($columnIndex === 'assertion') {
+                        try {
+                            $this->assertXmlStringEqualsXmlString((string)$value, (string)$record[$columns['fields'][$valueIndex]]);
+                        } catch (\PHPUnit_Framework_ExpectationFailedException $e) {
+                            $linesFromXmlValues[] = 'Diff for field "' . $columns['fields'][$valueIndex] . '":' . PHP_EOL . $e->getComparisonFailure()->getDiff();
+                        }
+                    }
+                    $value = '[see diff]';
+                }
+                $lines[$valueIndex][$columnIndex] = str_pad($value, $columnLength, ' ');
+            }
+        }
+
+        foreach ($lines as $line) {
+            $result .= implode('|', $line) . PHP_EOL;
+        }
+
+        foreach ($linesFromXmlValues as $lineFromXmlValues) {
+            $result .= PHP_EOL . $lineFromXmlValues . PHP_EOL;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Compares two arrays containing db rows and returns array containing column names which don't match
+     * It's a helper method used in assertCSVDataSet
+     *
+     * @param array $assertion
+     * @param array $record
+     * @return array
+     */
+    protected function getDifferentFields(array $assertion, array $record)
+    {
+        $differentFields = [];
+
+        foreach ($assertion as $field => $value) {
+            if (strpos($value, '\\*') === 0) {
+                continue;
+            } elseif (strpos($value, '<?xml') === 0) {
+                try {
+                    $this->assertXmlStringEqualsXmlString((string)$value, (string)$record[$field]);
+                } catch (\PHPUnit_Framework_ExpectationFailedException $e) {
+                    $differentFields[] = $field;
+                }
+            } elseif ($value === null && $record[$field] !== $value) {
+                $differentFields[] = $field;
+            } elseif ((string)$record[$field] !== (string)$value) {
+                $differentFields[] = $field;
+            }
+        }
+
+        return $differentFields;
     }
 
     /**
      * @param int $pageId
      * @param array $typoScriptFiles
      */
-    protected function setUpFrontendRootPage($pageId, array $typoScriptFiles = array())
+    protected function setUpFrontendRootPage($pageId, array $typoScriptFiles = [])
     {
         $pageId = (int)$pageId;
-
-        $connection = GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable('pages');
-        $page = $connection->select(['*'], 'pages', ['uid' => $pageId])->fetch();
+        $page = $this->getDatabaseConnection()->exec_SELECTgetSingleRow('*', 'pages', 'uid=' . $pageId);
 
         if (empty($page)) {
             $this->fail('Cannot set up frontend root page "' . $pageId . '"');
         }
 
-        $connection->update(
-            'pages',
-            ['is_siteroot' => 1],
-            ['uid' => $pageId]
-        );
+        $pagesFields = [
+            'is_siteroot' => 1
+        ];
+
+        $this->getDatabaseConnection()->exec_UPDATEquery('pages', 'uid=' . $pageId, $pagesFields);
 
         $templateFields = [
             'pid' => $pageId,
@@ -355,9 +589,29 @@ abstract class FunctionalTestCase extends BaseTestCase
             $templateFields['config'] .= '<INCLUDE_TYPOSCRIPT: source="FILE:' . $typoScriptFile . '">' . LF;
         }
 
-        GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable('sys_template')->insert(
+        $this->getDatabaseConnection()->exec_DELETEquery('sys_template', 'pid = ' . $pageId);
+        $this->getDatabaseConnection()->exec_INSERTquery('sys_template', $templateFields);
+    }
+
+    /**
+     * Adds TypoScript setup snippet to the existing template record
+     *
+     * @param int $pageId
+     * @param string $typoScript
+     */
+    protected function addTypoScriptToTemplateRecord($pageId, $typoScript)
+    {
+        $connection = $this->getDatabaseConnection();
+
+        $template = $connection->exec_SELECTgetSingleRow('*', 'sys_template', 'pid = '. $pageId . ' AND root = 1');
+        if (empty($template)) {
+            $this->fail('Cannot find root template on page with id: "' . $pageId . '"');
+        }
+        $updateFields['config'] = $template['config'] . LF . $typoScript;
+        $connection->exec_UPDATEquery(
             'sys_template',
-            $templateFields
+            'uid = ' . $template['uid'],
+            $updateFields
         );
     }
 
@@ -387,17 +641,17 @@ abstract class FunctionalTestCase extends BaseTestCase
             $additionalParameter .= '&workspaceId=' . (int)$workspaceId;
         }
 
-        $arguments = array(
-            'documentRoot' => $this->instancePath,
+        $arguments = [
+            'documentRoot' => $this->getInstancePath(),
             'requestUrl' => 'http://localhost/?id=' . $pageId . '&L=' . $languageId . $additionalParameter,
-        );
+        ];
 
         $template = new \Text_Template(ORIGINAL_ROOT . 'typo3/sysext/core/Tests/Functional/Fixtures/Frontend/request.tpl');
         $template->setVar(
-            array(
+            [
                 'arguments' => var_export($arguments, true),
                 'originalRoot' => ORIGINAL_ROOT,
-            )
+            ]
         );
 
         $php = \PHPUnit_Util_PHP::factory();

@@ -133,20 +133,18 @@ class DebugUtility
     /**
      * Displays the "path" of the function call stack in a string, using debug_backtrace
      *
-     * @param bool $prependFileNames If set to true file names are added to the output
      * @return string plain, not HTML encoded string
      */
-    public static function debugTrail($prependFileNames = false)
+    public static function debugTrail()
     {
         $trail = debug_backtrace(0);
         $trail = array_reverse($trail);
         array_pop($trail);
-        $path = array();
+        $path = [];
         foreach ($trail as $dat) {
-            $fileInformation = $prependFileNames && !empty($dat['file']) ? $dat['file'] . ':' : '';
-            $pathFragment = $fileInformation . $dat['class'] . $dat['type'] . $dat['function'];
+            $pathFragment = $dat['class'] . $dat['type'] . $dat['function'];
             // add the path of the included file
-            if (in_array($dat['function'], array('require', 'include', 'require_once', 'include_once'))) {
+            if (in_array($dat['function'], ['require', 'include', 'require_once', 'include_once'])) {
                 $pathFragment .= '(' . PathUtility::stripPathSitePrefix($dat['args'][0]) . '),' . PathUtility::stripPathSitePrefix($dat['file']);
             }
             $path[] = $pathFragment . '#' . $dat['line'];
@@ -159,9 +157,13 @@ class DebugUtility
      *
      * @param mixed $rows Array of arrays with similar keys
      * @param string $header Table header
+     * @param bool $returnHTML If TRUE, will return content instead of echo'ing out. Deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
      */
-    public static function debugRows($rows, $header = '')
+    public static function debugRows($rows, $header = '', $returnHTML = false)
     {
+        if ($returnHTML !== false) {
+            GeneralUtility::deprecationLog('Setting the parameter $returnHTML is deprecated since TYPO3 CMS 7 and will be removed in TYPO3 CMS 8.');
+        }
         self::debug($rows, $header);
     }
 

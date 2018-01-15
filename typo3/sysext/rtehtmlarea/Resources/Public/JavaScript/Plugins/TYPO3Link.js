@@ -162,8 +162,8 @@ define(['TYPO3/CMS/Rtehtmlarea/HTMLArea/Plugin/Plugin',
 					this.getButton(buttonId).tooltip,
 					this.getWindowDimensions(
 						{
-							width:	TYPO3.settings.Textarea.RTEPopupWindow.width,
-							height:	TYPO3.settings.Textarea.RTEPopupWindow.height
+							width:	(top.TYPO3.configuration.RTEPopupWindow || top.TYPO3.configuration.PopupWindow).width,
+							height:	(top.TYPO3.configuration.RTEPopupWindow || top.TYPO3.configuration.PopupWindow).height
 						},
 						buttonId
 					),
@@ -317,7 +317,7 @@ define(['TYPO3/CMS/Rtehtmlarea/HTMLArea/Plugin/Plugin',
 						}
 					}
 					if (UserAgent.isGecko) {
-						node.href = decodeURI(node.getAttributeNode('href').value);
+						node.href = decodeURI(node.getAttribute('href'));
 					}
 					if (cur_target.trim()) node.target = cur_target.trim();
 						else node.removeAttribute('target');

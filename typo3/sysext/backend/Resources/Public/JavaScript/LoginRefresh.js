@@ -17,9 +17,11 @@
  * displays a proper dialog to the user.
  */
 define(['jquery', 'TYPO3/CMS/Backend/Notification', 'bootstrap'], function($, Typo3Notification) {
+	'use strict';
+
 	/**
 	 *
-	 * @type {{identifier: {loginrefresh: string, lockedModal: string, loginFormModal: string}, options: {modalConfig: {backdrop: string}}, webNotification: null, intervalId: null, backendIsLocked: boolean, isTimingOut: boolean, $timeoutModal: string, $backendLockedModal: string, $loginForm: string, loginFramesetUrl: string, logoutUrl: string}}
+	 * @type {{identifier: {loginrefresh: string, lockedModal: string, loginFormModal: string}, options: {modalConfig: {backdrop: string}}, webNotification: null, intervalTime: integer, intervalId: null, backendIsLocked: boolean, isTimingOut: boolean, $timeoutModal: string, $backendLockedModal: string, $loginForm: string, loginFramesetUrl: string, logoutUrl: string}}
 	 * @exports TYPO3/CMS/Backend/LoginRefresh
 	 */
 	var LoginRefresh = {
@@ -34,6 +36,7 @@ define(['jquery', 'TYPO3/CMS/Backend/Notification', 'bootstrap'], function($, Ty
 			}
 		},
 		webNotification: null,
+		intervalTime: 60,
 		intervalId: null,
 		backendIsLocked: false,
 		isTimingOut: false,
@@ -53,7 +56,7 @@ define(['jquery', 'TYPO3/CMS/Backend/Notification', 'bootstrap'], function($, Ty
 		}
 
 		// set interval to 60 seconds
-		var interval = 1000 * 60;
+		var interval = 1000 * LoginRefresh.intervalTime;
 		LoginRefresh.intervalId = setInterval(LoginRefresh.checkActiveSession, interval);
 	};
 
@@ -83,6 +86,16 @@ define(['jquery', 'TYPO3/CMS/Backend/Notification', 'bootstrap'], function($, Ty
 				)
 			)
 		);
+	};
+
+	/**
+	 * Set interval time
+	 *
+	 * @param {integer} intervalTime
+	 */
+	LoginRefresh.setIntervalTime = function(intervalTime) {
+		// To avoid the integer overflow in setInterval, we limit the interval time to be one request per day
+		LoginRefresh.intervalTime = Math.min(intervalTime, 86400);
 	};
 
 	/**
@@ -204,7 +217,8 @@ define(['jquery', 'TYPO3/CMS/Backend/Notification', 'bootstrap'], function($, Ty
 
 		LoginRefresh.$loginForm = LoginRefresh.generateModal(LoginRefresh.identifier.loginFormModal);
 		LoginRefresh.$loginForm.addClass('t3-modal-notice');
-		LoginRefresh.$loginForm.find('.modal-header h4').text(TYPO3.LLL.core.refresh_login_title);
+		var refresh_login_title = String(TYPO3.LLL.core.refresh_login_title).replace('%s', TYPO3.configuration.username);
+		LoginRefresh.$loginForm.find('.modal-header h4').text(refresh_login_title);
 		LoginRefresh.$loginForm.find('.modal-body').append(
 			$('<p />').text(TYPO3.LLL.core.login_expired),
 			$('<form />', {id: 'beLoginRefresh', method: 'POST', action: TYPO3.settings.ajaxUrls['login']}).append(
@@ -217,12 +231,19 @@ define(['jquery', 'TYPO3/CMS/Backend/Notification', 'bootstrap'], function($, Ty
 		);
 		LoginRefresh.$loginForm.find('.modal-footer').append(
 			$('<a />', {href: LoginRefresh.logoutUrl, class: 'btn btn-default'}).text(TYPO3.LLL.core.refresh_exit_button),
-			$('<button />', {type: 'submit', form: 'beLoginRefresh', class: 'btn btn-primary', 'data-action': 'refreshSession'}).text(TYPO3.LLL.core.refresh_login_button)
+			$('<button />', {type: 'button', class: 'btn btn-primary', 'data-action': 'refreshSession'})
+				.text(TYPO3.LLL.core.refresh_login_button)
+				.on('click', function(e) {
+					LoginRefresh.$loginForm.find('form').submit();
+				})
 		);
-
 		LoginRefresh.registerDefaultModalEvents(LoginRefresh.$loginForm).on('submit', LoginRefresh.submitForm);
-
 		$('body').append(LoginRefresh.$loginForm);
+		if (require.specified('TYPO3/CMS/Rsaauth/RsaEncryptionModule')) {
+			require(['TYPO3/CMS/Rsaauth/RsaEncryptionModule'], function(RsaEncryption) {
+				RsaEncryption.registerForm($('#beLoginRefresh').get(0));
+			});
+		}
 	};
 
 	/**
@@ -444,8 +465,7 @@ define(['jquery', 'TYPO3/CMS/Backend/Notification', 'bootstrap'], function($, Ty
 		});
 	};
 
-	// initialize and return the LoginRefresh object
-	$(function() {
+	LoginRefresh.initialize = function() {
 		LoginRefresh.initializeTimeoutModal();
 		LoginRefresh.initializeBackendLockedModal();
 		LoginRefresh.initializeLoginForm();
@@ -455,7 +475,7 @@ define(['jquery', 'TYPO3/CMS/Backend/Notification', 'bootstrap'], function($, Ty
 		if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
 			Notification.requestPermission();
 		}
-	});
+	};
 
 	// expose to global
 	TYPO3.LoginRefresh = LoginRefresh;

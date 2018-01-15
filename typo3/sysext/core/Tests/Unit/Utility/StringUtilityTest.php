@@ -22,20 +22,104 @@ use TYPO3\CMS\Core\Utility\StringUtility;
 class StringUtilityTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
 {
     /**
+     * Data provider for isLastPartOfStrReturnsTrueForMatchingLastParts
+     *
+     * @return array
+     */
+    public function isLastPartOfStringReturnsTrueForMatchingFirstPartDataProvider()
+    {
+        return [
+            'match last part of string' => ['hello world', 'world'],
+            'match last char of string' => ['hellod world', 'd'],
+            'match whole string' => ['hello', 'hello'],
+            'integer is part of string with same number' => ['24', 24],
+            'string is part of integer with same number' => [24, '24'],
+            'integer is part of string starting with same number' => ['please gimme beer, 24', 24]
+        ];
+    }
+
+    /**
+     * @test
+     * @dataProvider isLastPartOfStringReturnsTrueForMatchingFirstPartDataProvider
+     */
+    public function isLastPartOfStringReturnsTrueForMatchingFirstPart($string, $part)
+    {
+        $this->assertTrue(\TYPO3\CMS\Core\Utility\StringUtility::isLastPartOfString($string, $part));
+    }
+
+    /**
+     * Data provider for checkisLastPartOfStringReturnsFalseForNotMatchingFirstParts
+     *
+     * @return array
+     */
+    public function isLastPartOfStringReturnsFalseForNotMatchingFirstPartDataProvider()
+    {
+        return [
+            'no string match' => ['hello', 'bye'],
+            'no case sensitive string match' => ['hello world', 'World'],
+        ];
+    }
+
+    /**
+     * @test
+     * @dataProvider isLastPartOfStringReturnsFalseForNotMatchingFirstPartDataProvider
+     */
+    public function isLastPartOfStringReturnsFalseForNotMatchingFirstPart($string, $part)
+    {
+        $this->assertFalse(\TYPO3\CMS\Core\Utility\StringUtility::isLastPartOfString($string, $part));
+    }
+
+    /**
+     * Data provider for isLastPartOfStringReturnsThrowsExceptionWithInvalidArguments
+     *
+     * @return array
+     */
+    public function isLastPartOfStringReturnsInvalidArgumentDataProvider()
+    {
+        return [
+            'array is not part of string' => ['string', []],
+            'string is not part of array' => [[], 'string'],
+            'NULL is not part of string' => ['string', null],
+            'null is not part of array' => [null, 'string'],
+            'NULL is not part of array' => [[], null],
+            'array is not part of null' => [null, []],
+            'NULL is not part of empty string' => ['', null],
+            'false is not part of empty string' => ['', false],
+            'empty string is not part of NULL' => [null, ''],
+            'empty string is not part of false' => [false, ''],
+            'empty string is not part of zero integer' => [0, ''],
+            'zero integer is not part of NULL' => [null, 0],
+            'zero integer is not part of empty string' => ['', 0],
+            'string is not part of object' => [new \stdClass(), 'foo'],
+            'object is not part of string' => ['foo', new \stdClass()],
+        ];
+    }
+
+    /**
+     * @test
+     * @dataProvider isLastPartOfStringReturnsInvalidArgumentDataProvider
+     * @expectedException \InvalidArgumentException
+     */
+    public function isLastPartOfStringReturnsThrowsExceptionWithInvalidArguments($string, $part)
+    {
+        $this->assertFalse(\TYPO3\CMS\Core\Utility\StringUtility::isLastPartOfString($string, $part));
+    }
+
+    /**
      * Data provider for endsWithReturnsTrueForMatchingFirstPart
      *
      * @return array
      */
     public function endsWithReturnsTrueForMatchingLastPartDataProvider()
     {
-        return array(
-            'match last part of string' => array('hello world', 'world'),
-            'match last char of string' => array('hellod world', 'd'),
-            'match whole string' => array('hello', 'hello'),
-            'integer is part of string with same number' => array('24', 24),
-            'string is part of integer with same number' => array(24, '24'),
-            'integer is part of string ending with same number' => array('please gimme beer, 24', 24)
-        );
+        return [
+            'match last part of string' => ['hello world', 'world'],
+            'match last char of string' => ['hellod world', 'd'],
+            'match whole string' => ['hello', 'hello'],
+            'integer is part of string with same number' => ['24', 24],
+            'string is part of integer with same number' => [24, '24'],
+            'integer is part of string ending with same number' => ['please gimme beer, 24', 24]
+        ];
     }
 
     /**
@@ -54,13 +138,13 @@ class StringUtilityTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function endsWithReturnsFalseForNotMatchingLastPartDataProvider()
     {
-        return array(
-            'no string match' => array('hello', 'bye'),
-            'no case sensitive string match' => array('hello world', 'World'),
-            'string is part but not last part' => array('hello world', 'worl'),
-            'integer is not part of empty string' => array('', 0),
-            'longer string is not part of shorter string' => array('a', 'aa'),
-        );
+        return [
+            'no string match' => ['hello', 'bye'],
+            'no case sensitive string match' => ['hello world', 'World'],
+            'string is part but not last part' => ['hello world', 'worl'],
+            'integer is not part of empty string' => ['', 0],
+            'longer string is not part of shorter string' => ['a', 'aa'],
+        ];
     }
 
     /**
@@ -80,33 +164,31 @@ class StringUtilityTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function endsWithReturnsThrowsExceptionWithInvalidArgumentsDataProvider()
     {
         return [
-            'array is not part of string' => ['string', [], 1347135545],
-            'NULL is not part of string' => ['string', null, 1347135545],
-            'empty string is not part of string' => ['string', '', 1347135545],
-            'string is not part of array' => [[], 'string', 1347135544],
-            'NULL is not part of array' => [[], null, 1347135544],
-            'string is not part of NULL' => [null, 'string', 1347135544],
-            'array is not part of NULL' => [null, [], 1347135544],
-            'integer is not part of NULL' => [null, 0, 1347135544],
-            'empty string is not part of NULL' => [null, '', 1347135544],
-            'NULL is not part of empty string' => ['', null, 1347135545],
-            'FALSE is not part of empty string' => ['', false, 1347135545],
-            'empty string is not part of FALSE' => [false, '', 1347135545],
-            'empty string is not part of integer' => [0, '', 1347135545],
-            'string is not part of object' => [new \stdClass(), 'foo', 1347135544],
-            'object is not part of string' => ['foo', new \stdClass(), 1347135545],
+            'array is not part of string' => ['string', []],
+            'NULL is not part of string' => ['string', null],
+            'empty string is not part of string' => ['string', ''],
+            'string is not part of array' => [[], 'string'],
+            'NULL is not part of array' => [[], null],
+            'string is not part of NULL' => [null, 'string'],
+            'array is not part of NULL' => [null, []],
+            'integer is not part of NULL' => [null, 0],
+            'empty string is not part of NULL' => [null, ''],
+            'NULL is not part of empty string' => ['', null],
+            'FALSE is not part of empty string' => ['', false],
+            'empty string is not part of FALSE' => [false, ''],
+            'empty string is not part of integer' => [0, ''],
+            'string is not part of object' => [new \stdClass(), 'foo'],
+            'object is not part of string' => ['foo', new \stdClass()],
         ];
     }
 
     /**
      * @test
      * @dataProvider endsWithReturnsThrowsExceptionWithInvalidArgumentsDataProvider
+     * @expectedException \InvalidArgumentException
      */
-    public function endsWithReturnsThrowsExceptionWithInvalidArguments($string, $part, $expectedException)
+    public function endsWithReturnsThrowsExceptionWithInvalidArguments($string, $part)
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionCode($expectedException);
-
         StringUtility::endsWith($string, $part);
     }
 
@@ -117,14 +199,14 @@ class StringUtilityTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function beginsWithReturnsTrueForMatchingFirstPartDataProvider()
     {
-        return array(
-            'match first part of string' => array('hello world', 'hello'),
-            'match first char of string' => array('hello world', 'h'),
-            'match whole string' => array('hello', 'hello'),
-            'integer is part of string with same number' => array('24', 24),
-            'string is part of integer with same number' => array(24, '24'),
-            'integer is part of string starting with same number' => array('24, please gimme beer', 24),
-        );
+        return [
+            'match first part of string' => ['hello world', 'hello'],
+            'match first char of string' => ['hello world', 'h'],
+            'match whole string' => ['hello', 'hello'],
+            'integer is part of string with same number' => ['24', 24],
+            'string is part of integer with same number' => [24, '24'],
+            'integer is part of string starting with same number' => ['24, please gimme beer', 24],
+        ];
     }
 
     /**
@@ -143,11 +225,11 @@ class StringUtilityTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function beginsWithReturnsFalseForNotMatchingFirstPartDataProvider()
     {
-        return array(
-            'no string match' => array('hello', 'bye'),
-            'no case sensitive string match' => array('hello world', 'Hello'),
-            'string in empty string' => array('', 'foo')
-        );
+        return [
+            'no string match' => ['hello', 'bye'],
+            'no case sensitive string match' => ['hello world', 'Hello'],
+            'string in empty string' => ['', 'foo']
+        ];
     }
 
     /**
@@ -167,37 +249,31 @@ class StringUtilityTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function beginsWithReturnsInvalidArgumentDataProvider()
     {
         return [
-            'array is not part of string' => ['string', [], 1347135547],
-            'NULL is not part of string' => ['string', null, 1347135547],
-            'empty string is not part of string' => ['string', '', 1347135547],
-            'string is not part of array' => [[], 'string', 1347135546],
-            'NULL is not part of array' => [[], null, 1347135546],
-            'string is not part of NULL' => [null, 'string', 1347135546],
-            'array is not part of NULL' => [null, [], 1347135546],
-            'integer is not part of NULL' => [null, 0, 1347135546],
-            'empty string is not part of NULL' => [null, '', 1347135546],
-            'NULL is not part of empty string' => ['', null, 1347135547],
-            'FALSE is not part of empty string' => ['', false, 1347135547],
-            'empty string is not part of FALSE' => [false, '', 1347135547],
-            'empty string is not part of integer' => [0, '', 1347135547],
-            'string is not part of object' => [new \stdClass(), 'foo', 1347135546],
-            'object is not part of string' => ['foo', new \stdClass(), 1347135547],
+            'array is not part of string' => ['string', []],
+            'NULL is not part of string' => ['string', null],
+            'empty string is not part of string' => ['string', ''],
+            'string is not part of array' => [[], 'string'],
+            'NULL is not part of array' => [[], null],
+            'string is not part of NULL' => [null, 'string'],
+            'array is not part of NULL' => [null, []],
+            'integer is not part of NULL' => [null, 0],
+            'empty string is not part of NULL' => [null, ''],
+            'NULL is not part of empty string' => ['', null],
+            'FALSE is not part of empty string' => ['', false],
+            'empty string is not part of FALSE' => [false, ''],
+            'empty string is not part of integer' => [0, ''],
+            'string is not part of object' => [new \stdClass(), 'foo'],
+            'object is not part of string' => ['foo', new \stdClass()],
         ];
     }
 
     /**
      * @test
      * @dataProvider beginsWithReturnsInvalidArgumentDataProvider
-     *
-     * @param mixed $string
-     * @param mixed $part
-     * @param int $expectedException
+     * @expectedException \InvalidArgumentException
      */
-    public function beginsWithReturnsThrowsExceptionWithInvalidArguments($string, $part, $expectedException)
+    public function beginsWithReturnsThrowsExceptionWithInvalidArguments($string, $part)
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionCode($expectedException);
-
         StringUtility::beginsWith($string, $part);
     }
 

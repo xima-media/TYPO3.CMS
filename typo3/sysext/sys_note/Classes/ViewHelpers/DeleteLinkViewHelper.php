@@ -35,9 +35,9 @@ class DeleteLinkViewHelper extends AbstractViewHelper
     public function render($id)
     {
         return static::renderStatic(
-            array(
+            [
                 'id' => $id
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

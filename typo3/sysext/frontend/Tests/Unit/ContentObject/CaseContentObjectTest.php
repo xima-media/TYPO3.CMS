@@ -13,6 +13,7 @@ namespace TYPO3\CMS\Frontend\Tests\Unit\ContentObject;
  *
  * The TYPO3 project - inspiring people to share!
  */
+use TYPO3\CMS\Core\Charset\CharsetConverter;
 use TYPO3\CMS\Core\Tests\UnitTestCase;
 use TYPO3\CMS\Core\TypoScript\TemplateService;
 use TYPO3\CMS\Frontend\ContentObject\CaseContentObject;
@@ -37,18 +38,20 @@ class CaseContentObjectTest extends UnitTestCase
     protected function setUp()
     {
         /** @var TypoScriptFrontendController $tsfe */
-        $tsfe = $this->getMock(TypoScriptFrontendController::class, array('dummy'), array(), '', false);
-        $tsfe->tmpl = $this->getMock(TemplateService::class, array('dummy'));
-        $tsfe->config = array();
-        $tsfe->page = array();
-        $tsfe->sys_page = $this->getMock(PageRepository::class, array('getRawRecord'));
+        $tsfe = $this->getMock(TypoScriptFrontendController::class, ['dummy'], [], '', false);
+        $tsfe->tmpl = $this->getMock(TemplateService::class, ['dummy']);
+        $tsfe->config = [];
+        $tsfe->page = [];
+        $tsfe->sys_page = $this->getMock(PageRepository::class, ['getRawRecord']);
+        $tsfe->csConvObj = new CharsetConverter();
+        $tsfe->renderCharset = 'utf-8';
         $GLOBALS['TSFE'] = $tsfe;
 
         $contentObjectRenderer = new ContentObjectRenderer();
-        $contentObjectRenderer->setContentObjectClassMap(array(
+        $contentObjectRenderer->setContentObjectClassMap([
             'CASE' => CaseContentObject::class,
             'TEXT' => TextContentObject::class,
-        ));
+        ]);
         $this->subject = new CaseContentObject($contentObjectRenderer);
     }
 
@@ -57,9 +60,9 @@ class CaseContentObjectTest extends UnitTestCase
      */
     public function renderReturnsEmptyStringIfNoKeyMatchesAndIfNoDefaultObjectIsSet()
     {
-        $conf = array(
+        $conf = [
             'key' => 'not existing'
-        );
+        ];
         $this->assertSame('', $this->subject->render($conf));
     }
 
@@ -68,13 +71,13 @@ class CaseContentObjectTest extends UnitTestCase
      */
     public function renderReturnsContentFromDefaultObjectIfKeyDoesNotExist()
     {
-        $conf = array(
+        $conf = [
             'key' => 'not existing',
             'default' => 'TEXT',
-            'default.' => array(
+            'default.' => [
                 'value' => 'expected value'
-            ),
-        );
+            ],
+        ];
         $this->assertSame('expected value', $this->subject->render($conf));
     }
 }

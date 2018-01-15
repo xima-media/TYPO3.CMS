@@ -14,7 +14,6 @@ namespace TYPO3\CMS\Core\Database;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\TimeTracker\TimeTracker;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\StringUtility;
 
@@ -140,7 +139,7 @@ class DatabaseConnection
     /**
      * @var array List of commands executed after connection was established
      */
-    protected $initializeCommandsAfterConnect = array();
+    protected $initializeCommandsAfterConnect = [];
 
     /**
      * @var bool TRUE if database connection is established
@@ -162,28 +161,28 @@ class DatabaseConnection
     /**
      * @var array<PostProcessQueryHookInterface>
      */
-    protected $preProcessHookObjects = array();
+    protected $preProcessHookObjects = [];
 
     /**
      * @var array<PreProcessQueryHookInterface>
      */
-    protected $postProcessHookObjects = array();
+    protected $postProcessHookObjects = [];
 
     /**
      * the date and time formats compatible with the database in general
      *
      * @var array
      */
-    protected static $dateTimeFormats = array(
-        'date' => array(
+    protected static $dateTimeFormats = [
+        'date' => [
             'empty' => '0000-00-00',
             'format' => 'Y-m-d'
-        ),
-        'datetime' => array(
+        ],
+        'datetime' => [
             'empty' => '0000-00-00 00:00:00',
             'format' => 'Y-m-d H:i:s'
-        )
-    );
+        ]
+    ];
 
     /**
      * Initialize the database connection
@@ -350,12 +349,27 @@ class DatabaseConnection
     /**
      * Executes a select based on input query parts array
      *
-     * @param array $queryParts Query parts array
+     *     $queryArray = [
+     *         'SELECT' => 'uid',
+     *         'FROM' => 'tt_content',
+     *         'WHERE' => 'uid = ' . (int)$uid,
+     *         'LIMIT' => 1
+     *     ];
+     *     exec_SELECT_queryArray($queryArray);
+     *
+     * @param array $queryParts Query parts array, where the keys »SELECT« & »FROM« are required
      * @return bool|\mysqli_result|object MySQLi result object / DBAL object
      * @see exec_SELECTquery()
      */
     public function exec_SELECT_queryArray($queryParts)
     {
+        $queryPartsFallback = [
+            'WHERE' => '',
+            'GROUPBY' => '',
+            'ORDERBY' => '',
+            'LIMIT' => ''
+        ];
+        $queryParts = array_merge($queryPartsFallback, $queryParts);
         return $this->exec_SELECTquery($queryParts['SELECT'], $queryParts['FROM'], $queryParts['WHERE'], $queryParts['GROUPBY'], $queryParts['ORDERBY'], $queryParts['LIMIT']);
     }
 
@@ -380,7 +394,7 @@ class DatabaseConnection
             $this->sql_free_result($res);
             return null;
         }
-        $output = array();
+        $output = [];
         $firstRecord = true;
         while ($record = $this->sql_fetch_assoc($res)) {
             if ($uidIndexField) {
@@ -537,7 +551,7 @@ class DatabaseConnection
         }
         // Build query
         $query = 'INSERT INTO ' . $table . ' (' . implode(', ', $fields) . ') VALUES ';
-        $rowSQL = array();
+        $rowSQL = [];
         foreach ($rows as $row) {
             // Quote and escape values
             $row = $this->fullQuoteArray($row, $table, $no_quote_fields);
@@ -571,7 +585,7 @@ class DatabaseConnection
                 /** @var $hookObject PreProcessQueryHookInterface */
                 $hookObject->UPDATEquery_preProcessAction($table, $where, $fields_values, $no_quote_fields, $this);
             }
-            $fields = array();
+            $fields = [];
             if (is_array($fields_values) && !empty($fields_values)) {
                 // Quote and escape values
                 $nArr = $this->fullQuoteArray($fields_values, $table, $no_quote_fields, true);
@@ -760,7 +774,7 @@ class DatabaseConnection
                 $constraint = 'AND';
         }
 
-        $queryParts = array();
+        $queryParts = [];
         foreach ($searchWords as $sw) {
             $like = ' LIKE \'%' . $this->quoteStr($this->escapeStrForLike($sw, $table), $table) . '%\'';
             $queryParts[] = $table . '.' . implode(($like . ' OR ' . $table . '.'), $fields) . $like;
@@ -787,11 +801,11 @@ class DatabaseConnection
      * @param array $input_parameters An array of values with as many elements as there are bound parameters in the SQL statement being executed. All values are treated as \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_AUTOTYPE.
      * @return \TYPO3\CMS\Core\Database\PreparedStatement Prepared statement
      */
-    public function prepare_SELECTquery($select_fields, $from_table, $where_clause, $groupBy = '', $orderBy = '', $limit = '', array $input_parameters = array())
+    public function prepare_SELECTquery($select_fields, $from_table, $where_clause, $groupBy = '', $orderBy = '', $limit = '', array $input_parameters = [])
     {
         $query = $this->SELECTquery($select_fields, $from_table, $where_clause, $groupBy, $orderBy, $limit);
         /** @var $preparedStatement \TYPO3\CMS\Core\Database\PreparedStatement */
-        $preparedStatement = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Database\PreparedStatement::class, $query, $from_table, array());
+        $preparedStatement = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Database\PreparedStatement::class, $query, $from_table, []);
         // Bind values to parameters
         foreach ($input_parameters as $key => $value) {
             $preparedStatement->bindValue($key, $value, PreparedStatement::PARAM_AUTOTYPE);
@@ -807,7 +821,7 @@ class DatabaseConnection
      * @param array $input_parameters An array of values with as many elements as there are bound parameters in the SQL statement being executed. All values are treated as \TYPO3\CMS\Core\Database\PreparedStatement::PARAM_AUTOTYPE.
      * @return \TYPO3\CMS\Core\Database\PreparedStatement Prepared statement
      */
-    public function prepare_SELECTqueryArray(array $queryParts, array $input_parameters = array())
+    public function prepare_SELECTqueryArray(array $queryParts, array $input_parameters = [])
     {
         return $this->prepare_SELECTquery($queryParts['SELECT'], $queryParts['FROM'], $queryParts['WHERE'], $queryParts['GROUPBY'], $queryParts['ORDERBY'], $queryParts['LIMIT'], $input_parameters);
     }
@@ -872,7 +886,7 @@ class DatabaseConnection
      *
      * @param array $arr Array with values (either associative or non-associative array)
      * @param string $table Table name for which to quote
-     * @param bool|array|string $noQuote List/array of keys NOT to quote (eg. SQL functions) - ONLY for associative arrays
+     * @param bool|array $noQuote List/array of keys NOT to quote (eg. SQL functions) - ONLY for associative arrays
      * @param bool $allowNull Whether to allow NULL values
      * @return array The input array with the values quoted
      * @see cleanIntArray()
@@ -882,10 +896,7 @@ class DatabaseConnection
         if (is_string($noQuote)) {
             $noQuote = explode(',', $noQuote);
         } elseif (!is_array($noQuote)) {
-            $noQuote = (bool)$noQuote;
-        }
-        if ($noQuote === true) {
-            return $arr;
+            $noQuote = false;
         }
         foreach ($arr as $k => $v) {
             if ($noQuote === false || !in_array($k, $noQuote)) {
@@ -981,6 +992,50 @@ class DatabaseConnection
     }
 
     /**
+     * Takes the last part of a query, eg. "... uid=123 GROUP BY title ORDER BY title LIMIT 5,2" and splits each part into a table (WHERE, GROUPBY, ORDERBY, LIMIT)
+     * Work-around function for use where you know some userdefined end to an SQL clause is supplied and you need to separate these factors.
+     *
+     * @param string $str Input string
+     * @return array
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function splitGroupOrderLimit($str)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        // Prepending a space to make sure "[[:space:]]+" will find a space there
+        // for the first element.
+        $str = ' ' . $str;
+        // Init output array:
+        $wgolParts = [
+            'WHERE' => '',
+            'GROUPBY' => '',
+            'ORDERBY' => '',
+            'LIMIT' => ''
+        ];
+        // Find LIMIT
+        $reg = [];
+        if (preg_match('/^(.*)[[:space:]]+LIMIT[[:space:]]+([[:alnum:][:space:],._]+)$/i', $str, $reg)) {
+            $wgolParts['LIMIT'] = trim($reg[2]);
+            $str = $reg[1];
+        }
+        // Find ORDER BY
+        $reg = [];
+        if (preg_match('/^(.*)[[:space:]]+ORDER[[:space:]]+BY[[:space:]]+([[:alnum:][:space:],._]+)$/i', $str, $reg)) {
+            $wgolParts['ORDERBY'] = trim($reg[2]);
+            $str = $reg[1];
+        }
+        // Find GROUP BY
+        $reg = [];
+        if (preg_match('/^(.*)[[:space:]]+GROUP[[:space:]]+BY[[:space:]]+([[:alnum:][:space:],._]+)$/i', $str, $reg)) {
+            $wgolParts['GROUPBY'] = trim($reg[2]);
+            $str = $reg[1];
+        }
+        // Rest is assumed to be "WHERE" clause
+        $wgolParts['WHERE'] = $str;
+        return $wgolParts;
+    }
+
+    /**
      * Returns the date and time formats compatible with the given database table.
      *
      * @param string $table Table name for which to return an empty date. Just enter the table that the field-value is selected from (and any DBAL will look up which handler to use and then how date and time should be formatted).
@@ -1017,14 +1072,14 @@ class DatabaseConnection
             $mmWhere .= ($foreign_table_as ?: $foreign_table) . '.uid=' . $mm_table . '.uid_foreign';
             $tables .= ',' . $foreign_table . ($foreign_table_as ? ' AS ' . $foreign_table_as : '');
         }
-        return array(
+        return [
             'SELECT' => $select,
             'FROM' => $tables,
             'WHERE' => $mmWhere . ' ' . $whereClause,
             'GROUPBY' => $groupBy,
             'ORDERBY' => $orderBy,
             'LIMIT' => $limit
-        );
+        ];
     }
 
     /**************************************
@@ -1195,7 +1250,7 @@ class DatabaseConnection
         // mysql_field_type compatibility map
         // taken from: http://www.php.net/manual/en/mysqli-result.fetch-field-direct.php#89117
         // Constant numbers see http://php.net/manual/en/mysqli.constants.php
-        $mysql_data_type_hash = array(
+        $mysql_data_type_hash = [
             1=>'tinyint',
             2=>'smallint',
             3=>'int',
@@ -1213,7 +1268,7 @@ class DatabaseConnection
             253=>'varchar',
             254=>'char',
             246=>'decimal'
-        );
+        ];
         if ($this->debug_check_recordset($res)) {
             $metaInfo = $res->fetch_field_direct($pointer);
             if ($metaInfo === false) {
@@ -1248,31 +1303,27 @@ class DatabaseConnection
             ? 'p:' . $this->databaseHost
             : $this->databaseHost;
 
-        // We are not using the TYPO3 CMS shim here as the database parameters in this class
-        // are settable externally. This requires building the connection parameter array
-        // just in time when establishing the connection.
-        $connection = \Doctrine\DBAL\DriverManager::getConnection([
-            'driver' => 'mysqli',
-            'wrapperClass' => Connection::class,
-            'host' => $host,
-            'port' => (int)$this->databasePort,
-            'unix_socket' => $this->databaseSocket,
-            'user' => $this->databaseUsername,
-            'password' => $this->databaseUserPassword,
-            'charset' => $this->connectionCharset,
-        ]);
+        $this->link = mysqli_init();
+        $connected = $this->link->real_connect(
+            $host,
+            $this->databaseUsername,
+            $this->databaseUserPassword,
+            null,
+            (int)$this->databasePort,
+            $this->databaseSocket,
+            $this->connectionCompression ? MYSQLI_CLIENT_COMPRESS : 0
+        );
 
-        // Mimic the previous behavior of returning false on connection errors
-        try {
-            /** @var \Doctrine\DBAL\Driver\Mysqli\MysqliConnection $mysqliConnection */
-            $mysqliConnection = $connection->getWrappedConnection();
-            $this->link = $mysqliConnection->getWrappedResourceHandle();
-        } catch (\Doctrine\DBAL\Exception\ConnectionException $exception) {
-            return false;
-        }
-
-        if ($connection->isConnected()) {
+        if ($connected) {
             $this->isConnected = true;
+
+            if ($this->link->set_charset($this->connectionCharset) === false) {
+                GeneralUtility::sysLog(
+                    'Error setting connection charset to "' . $this->connectionCharset . '"',
+                    'core',
+                    GeneralUtility::SYSLOG_SEVERITY_ERROR
+                );
+            }
 
             foreach ($this->initializeCommandsAfterConnect as $command) {
                 if ($this->query($command) === false) {
@@ -1289,13 +1340,11 @@ class DatabaseConnection
             $error_msg = $this->link->connect_error;
             $this->link = null;
             GeneralUtility::sysLog(
-                'Could not connect to MySQL server ' . $host . ' with user ' . $this->databaseUsername . ': '
-                . $error_msg,
+                'Could not connect to MySQL server ' . $host . ' with user ' . $this->databaseUsername . ': ' . $error_msg,
                 'core',
                 GeneralUtility::SYSLOG_SEVERITY_FATAL
             );
         }
-
         return $this->link;
     }
 
@@ -1338,7 +1387,7 @@ class DatabaseConnection
      */
     public function admin_get_dbs()
     {
-        $dbArr = array();
+        $dbArr = [];
         $db_list = $this->query('SELECT SCHEMA_NAME FROM information_schema.SCHEMATA');
         if ($db_list === false) {
             throw new \RuntimeException(
@@ -1371,7 +1420,7 @@ class DatabaseConnection
      */
     public function admin_get_tables()
     {
-        $whichTables = array();
+        $whichTables = [];
         $tables_result = $this->query('SHOW TABLE STATUS FROM `' . $this->databaseName . '`');
         if ($tables_result !== false) {
             while ($theTable = $tables_result->fetch_assoc()) {
@@ -1395,7 +1444,7 @@ class DatabaseConnection
      */
     public function admin_get_fields($tableName)
     {
-        $output = array();
+        $output = [];
         $columns_res = $this->query('SHOW FULL COLUMNS FROM `' . $tableName . '`');
         if ($columns_res !== false) {
             while ($fieldRow = $columns_res->fetch_assoc()) {
@@ -1415,7 +1464,7 @@ class DatabaseConnection
      */
     public function admin_get_keys($tableName)
     {
-        $output = array();
+        $output = [];
         $keyRes = $this->query('SHOW KEYS FROM `' . $tableName . '`');
         if ($keyRes !== false) {
             while ($keyRow = $keyRes->fetch_assoc()) {
@@ -1440,7 +1489,7 @@ class DatabaseConnection
      */
     public function admin_get_charsets()
     {
-        $output = array();
+        $output = [];
         $columns_res = $this->query('SHOW CHARACTER SET');
         if ($columns_res !== false) {
             while ($row = $columns_res->fetch_assoc()) {
@@ -1623,8 +1672,8 @@ class DatabaseConnection
         }
 
         // Prepare user defined objects (if any) for hooks which extend query methods
-        $this->preProcessHookObjects = array();
-        $this->postProcessHookObjects = array();
+        $this->preProcessHookObjects = [];
+        $this->postProcessHookObjects = [];
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_db.php']['queryProcessors'])) {
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_db.php']['queryProcessors'] as $classRef) {
                 $hookObject = GeneralUtility::getUserObj($classRef);
@@ -1693,7 +1742,7 @@ class DatabaseConnection
             );
         }
 
-        $charsetVariables = array();
+        $charsetVariables = [];
         while (($row = $this->sql_fetch_row($sessionResult)) !== false) {
             $variableName = $row[0];
             $variableValue = $row[1];
@@ -1703,11 +1752,11 @@ class DatabaseConnection
 
         // These variables are set with the "Set names" command which was
         // used in the past. This is why we check them.
-        $charsetRequiredVariables = array(
+        $charsetRequiredVariables = [
             'character_set_client',
             'character_set_results',
             'character_set_connection',
-        );
+        ];
 
         $hasValidCharset = true;
         foreach ($charsetRequiredVariables as $variableName) {
@@ -1800,14 +1849,14 @@ class DatabaseConnection
         $error = $this->sql_error();
         if ($error || (int)$this->debugOutput === 2) {
             \TYPO3\CMS\Core\Utility\DebugUtility::debug(
-                array(
+                [
                     'caller' => \TYPO3\CMS\Core\Database\DatabaseConnection::class . '::' . $func,
                     'ERROR' => $error,
                     'lastBuiltQuery' => $query ? $query : $this->debug_lastBuiltQuery,
                     'debug_backtrace' => \TYPO3\CMS\Core\Utility\DebugUtility::debugTrail()
-                ),
+                ],
                 $func,
-                is_object($GLOBALS['error']) && @is_callable(array($GLOBALS['error'], 'debug'))
+                is_object($GLOBALS['error']) && @is_callable([$GLOBALS['error'], 'debug'])
                     ? ''
                     : 'DB Error'
             );
@@ -1822,7 +1871,7 @@ class DatabaseConnection
      */
     public function debug_check_recordset($res)
     {
-        if ($res !== false) {
+        if ($res !== false && $res !== null) {
             return true;
         }
         $trace = debug_backtrace(0);
@@ -1837,12 +1886,12 @@ class DatabaseConnection
         );
         // Send to devLog if enabled
         if (TYPO3_DLOG) {
-            $debugLogData = array(
+            $debugLogData = [
                 'SQL Error' => $this->sql_error(),
                 'Backtrace' => $trace
-            );
+            ];
             if ($this->debug_lastBuiltQuery) {
-                $debugLogData = array('SQL Query' => $this->debug_lastBuiltQuery) + $debugLogData;
+                $debugLogData = ['SQL Query' => $this->debug_lastBuiltQuery] + $debugLogData;
             }
             GeneralUtility::devLog($msg, 'Core/t3lib_db', 3, $debugLogData);
         }
@@ -1873,7 +1922,7 @@ class DatabaseConnection
         ) {
             // Raw HTML output
             $explainMode = 1;
-        } elseif ((int)$this->explainOutput == 3) {
+        } elseif ((int)$this->explainOutput == 3 && is_object($GLOBALS['TT'])) {
             // Embed the output into the TS admin panel
             $explainMode = 2;
         } else {
@@ -1881,8 +1930,8 @@ class DatabaseConnection
         }
         $error = $this->sql_error();
         $trail = \TYPO3\CMS\Core\Utility\DebugUtility::debugTrail();
-        $explain_tables = array();
-        $explain_output = array();
+        $explain_tables = [];
+        $explain_output = [];
         $res = $this->sql_query('EXPLAIN ' . $query, $this->link);
         if (is_a($res, '\\mysqli_result')) {
             while ($tempRow = $this->sql_fetch_assoc($res)) {
@@ -1891,7 +1940,7 @@ class DatabaseConnection
             }
             $this->sql_free_result($res);
         }
-        $indices_output = array();
+        $indices_output = [];
         // Notice: Rows are skipped if there is only one result, or if no conditions are set
         if ($explain_output[0]['rows'] > 1 || $explain_output[0]['type'] === 'ALL') {
             // Only enable output if it's really useful
@@ -1915,7 +1964,7 @@ class DatabaseConnection
         }
         if ($debug) {
             if ($explainMode) {
-                $data = array();
+                $data = [];
                 $data['query'] = $query;
                 $data['trail'] = $trail;
                 $data['row_count'] = $row_count;
@@ -1931,9 +1980,7 @@ class DatabaseConnection
                 if ($explainMode == 1) {
                     \TYPO3\CMS\Core\Utility\DebugUtility::debug($data, 'Tables: ' . $from_table, 'DB SQL EXPLAIN');
                 } elseif ($explainMode == 2) {
-                    /** @var TimeTracker $timeTracker */
-                    $timeTracker = GeneralUtility::makeInstance(TimeTracker::class);
-                    $timeTracker->setTSselectQuery($data);
+                    $GLOBALS['TT']->setTSselectQuery($data);
                 }
             }
             return true;
@@ -1949,7 +1996,7 @@ class DatabaseConnection
     public function __sleep()
     {
         $this->disconnectIfConnected();
-        return array(
+        return [
             'debugOutput',
             'explainOutput',
             'databaseHost',
@@ -1962,6 +2009,6 @@ class DatabaseConnection
             'connectionCompression',
             'initializeCommandsAfterConnect',
             'default_charset',
-        );
+        ];
     }
 }

@@ -16,9 +16,8 @@ namespace TYPO3\CMS\Backend\Http;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
+use TYPO3\CMS\Backend\Routing\Exception\InvalidRequestTokenException;
 use TYPO3\CMS\Backend\Routing\Exception\ResourceNotFoundException;
-use TYPO3\CMS\Backend\Routing\Exception\RouteNotFoundException;
-use TYPO3\CMS\Backend\Routing\Route;
 use TYPO3\CMS\Core\Core\Bootstrap;
 use TYPO3\CMS\Core\FormProtection\FormProtectionFactory;
 use TYPO3\CMS\Core\Http\RequestHandlerInterface;
@@ -48,13 +47,13 @@ class AjaxRequestHandler implements RequestHandlerInterface
      * List of requests that don't need a valid BE user
      * @var array
      */
-    protected $publicAjaxIds = array(
+    protected $publicAjaxIds = [
         '/ajax/login',
         '/ajax/logout',
         '/ajax/login/refresh',
         '/ajax/login/timedout',
         '/ajax/rsa/publickey'
-    );
+    ];
 
     /**
      * Constructor handing over the bootstrap and the original request
@@ -151,7 +150,7 @@ class AjaxRequestHandler implements RequestHandlerInterface
      * @param ServerRequestInterface $request
      * @return ResponseInterface $response
      * @throws ResourceNotFoundException if no valid route was found
-     * @throws RouteNotFoundException if the request could not be verified
+     * @throws InvalidRequestTokenException if the request could not be verified
      */
     protected function dispatch(ServerRequestInterface $request)
     {
@@ -189,7 +188,7 @@ class AjaxRequestHandler implements RequestHandlerInterface
         // Instantiating the AJAX object
         /** @var \TYPO3\CMS\Core\Http\AjaxRequestHandler $ajaxObj */
         $ajaxObj = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Http\AjaxRequestHandler::class, $ajaxID);
-        $ajaxParams = array('request' => $request);
+        $ajaxParams = ['request' => $request];
 
         // Evaluating the arguments and calling the AJAX method/function
         if (empty($ajaxID)) {

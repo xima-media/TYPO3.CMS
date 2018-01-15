@@ -15,6 +15,7 @@ namespace TYPO3\CMS\Core\Resource;
  */
 
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Utility\MathUtility;
 
 /**
  * File representation in the file abstraction layer.
@@ -30,7 +31,7 @@ class File extends AbstractFile
     /**
      * @var array
      */
-    protected $metaDataProperties = array();
+    protected $metaDataProperties = [];
 
     /**
      * Set to TRUE while this file is being indexed - used to prevent some endless loops
@@ -45,7 +46,7 @@ class File extends AbstractFile
      *
      * @var array
      */
-    protected $updatedProperties = array();
+    protected $updatedProperties = [];
 
     /**
      * Constructor for a file object. Should normally not be used directly, use
@@ -55,7 +56,7 @@ class File extends AbstractFile
      * @param ResourceStorage $storage
      * @param array $metaData
      */
-    public function __construct(array $fileData, ResourceStorage $storage, array $metaData = array())
+    public function __construct(array $fileData, ResourceStorage $storage, array $metaData = [])
     {
         $this->identifier = $fileData['identifier'];
         $this->name = $fileData['name'];
@@ -301,6 +302,11 @@ class File extends AbstractFile
      */
     public function process($taskType, array $configuration)
     {
+        if ($taskType === ProcessedFile::CONTEXT_IMAGEPREVIEW) {
+            $configuration = array_merge(['width' => 64, 'height' => 64], $configuration);
+            $configuration['width'] = MathUtility::forceIntegerInRange($configuration['width'], 1, 1000);
+            $configuration['height'] = MathUtility::forceIntegerInRange($configuration['height'], 1, 1000);
+        }
         return $this->getStorage()->processFile($this, $taskType, $configuration);
     }
 
@@ -312,7 +318,7 @@ class File extends AbstractFile
      */
     public function toArray()
     {
-        $array = array(
+        $array = [
             'id' => $this->getCombinedIdentifier(),
             'name' => $this->getName(),
             'extension' => $this->getExtension(),
@@ -322,13 +328,13 @@ class File extends AbstractFile
             'url' => $this->getPublicUrl(),
             'indexed' => true,
             'uid' => $this->getUid(),
-            'permissions' => array(
+            'permissions' => [
                 'read' => $this->checkActionPermission('read'),
                 'write' => $this->checkActionPermission('write'),
                 'delete' => $this->checkActionPermission('delete')
-            ),
+            ],
             'checksum' => $this->calculateChecksum()
-        );
+        ];
         foreach ($this->properties as $key => $value) {
             $array[$key] = $value;
         }
@@ -352,7 +358,7 @@ class File extends AbstractFile
      */
     public function setMissing($missing)
     {
-        $this->updateProperties(array('missing' => $missing ? 1 : 0));
+        $this->updateProperties(['missing' => $missing ? 1 : 0]);
     }
 
     /**

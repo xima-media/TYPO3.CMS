@@ -14,25 +14,18 @@ namespace TYPO3\CMS\Belog\ViewHelpers;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Imaging\Icon;
-use TYPO3\CMS\Core\Imaging\IconFactory;
+use TYPO3\CMS\Backend\Template\DocumentTemplate;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Fluid\Core\Rendering\RenderingContextInterface;
+use TYPO3\CMS\Fluid\Core\ViewHelper\Facets\CompilableInterface;
 use TYPO3\CMS\Fluid\ViewHelpers\Be\AbstractBackendViewHelper;
-use TYPO3Fluid\Fluid\Core\Rendering\RenderingContextInterface;
 
 /**
  * Display error icon from error integer value
  * @internal
  */
-class ErrorIconViewHelper extends AbstractBackendViewHelper
+class ErrorIconViewHelper extends AbstractBackendViewHelper implements CompilableInterface
 {
-    /**
-     * As this ViewHelper renders HTML, the output must not be escaped.
-     *
-     * @var bool
-     */
-    protected $escapeOutput = false;
-
     /**
      * Renders an error icon link as known from the TYPO3 backend.
      * Error codes 2 and three are mapped to "error" and 1 is mapped to "warning".
@@ -43,9 +36,9 @@ class ErrorIconViewHelper extends AbstractBackendViewHelper
     public function render($errorNumber = 0)
     {
         return static::renderStatic(
-            array(
+            [
                 'errorNumber' => $errorNumber
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
@@ -53,24 +46,20 @@ class ErrorIconViewHelper extends AbstractBackendViewHelper
 
     /**
      * @param array $arguments
-     * @param \Closure $renderChildrenClosure
+     * @param callable $renderChildrenClosure
      * @param RenderingContextInterface $renderingContext
      *
      * @return string
      */
     public static function renderStatic(array $arguments, \Closure $renderChildrenClosure, RenderingContextInterface $renderingContext)
     {
-        $errorSymbols = array(
+        $errorSymbols = [
             '0' => '',
-            '1' => 'status-dialog-warning',
-            '2' => 'status-dialog-error',
-            '3' => 'status-dialog-error'
-        );
-        if ($errorSymbols[$arguments['errorNumber']]) {
-            $iconFactory = GeneralUtility::makeInstance(IconFactory::class);
-            return $iconFactory->getIcon($errorSymbols[$arguments['errorNumber']], Icon::SIZE_SMALL)->render();
-        } else {
-            return '';
-        }
+            '1' => DocumentTemplate::STATUS_ICON_WARNING,
+            '2' => DocumentTemplate::STATUS_ICON_ERROR,
+            '3' => DocumentTemplate::STATUS_ICON_ERROR
+        ];
+        $doc = GeneralUtility::makeInstance(DocumentTemplate::class);
+        return $doc->icons($errorSymbols[$arguments['errorNumber']]);
     }
 }

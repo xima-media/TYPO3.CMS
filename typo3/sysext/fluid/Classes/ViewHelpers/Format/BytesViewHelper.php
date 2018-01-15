@@ -54,7 +54,7 @@ class BytesViewHelper extends AbstractViewHelper
     /**
      * @var array
      */
-    protected static $units = array();
+    protected static $units = [];
 
     /**
      * Render the supplied byte count as a human readable string.
@@ -69,12 +69,12 @@ class BytesViewHelper extends AbstractViewHelper
     public function render($value = null, $decimals = 0, $decimalSeparator = '.', $thousandsSeparator = ',')
     {
         return static::renderStatic(
-            array(
+            [
                 'value' => $value,
                 'decimals' => $decimals,
                 'decimalSeparator' => $decimalSeparator,
                 'thousandsSeparator' => $thousandsSeparator
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
@@ -98,7 +98,7 @@ class BytesViewHelper extends AbstractViewHelper
         if (empty(self::$units)) {
             self::$units = GeneralUtility::trimExplode(',', LocalizationUtility::translate('viewhelper.format.bytes.units', 'fluid'));
         }
-        if (!is_integer($value) && !is_float($value)) {
+        if (!is_int($value) && !is_float($value)) {
             if (is_numeric($value)) {
                 $value = (float)$value;
             } else {

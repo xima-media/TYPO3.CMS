@@ -23,6 +23,7 @@ use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Type\Bitmask\JsConfirmation;
 use TYPO3\CMS\Core\Utility\DiffUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
+use TYPO3\CMS\Core\Utility\MathUtility;
 use TYPO3\CMS\Lang\LanguageService;
 
 /**
@@ -56,7 +57,7 @@ class SingleFieldContainer extends AbstractContainer
             return $resultArray;
         }
 
-        $parameterArray = array();
+        $parameterArray = [];
         $parameterArray['fieldConf'] = $this->data['processedTca']['columns'][$fieldName];
 
         $isOverlay = false;
@@ -65,10 +66,25 @@ class SingleFieldContainer extends AbstractContainer
         // Based on this decision we need to trigger field exclusion or special rendering (like readOnly)
         if (isset($this->data['processedTca']['ctrl']['transOrigPointerField'])
             && is_array($this->data['processedTca']['columns'][$this->data['processedTca']['ctrl']['transOrigPointerField']])
-            && is_array($row[$this->data['processedTca']['ctrl']['transOrigPointerField']])
-            && $row[$this->data['processedTca']['ctrl']['transOrigPointerField']][0] > 0
         ) {
-            $isOverlay = true;
+            $parentValue = $row[$this->data['processedTca']['ctrl']['transOrigPointerField']];
+            if (MathUtility::canBeInterpretedAsInteger($parentValue)) {
+                $isOverlay = (bool)$parentValue;
+            } elseif (is_array($parentValue)) {
+                // This case may apply if the value has been converted to an array by the select data provider
+                $isOverlay = !empty($parentValue) ? (bool)$parentValue[0] : false;
+            } elseif (is_string($parentValue) && $parentValue !== '') {
+                // This case may apply if a group definition is used in TCA and the group provider builds a weird string
+                $recordsReferencedInField = GeneralUtility::trimExplode(',', $parentValue);
+                // Pick the first record because if you set multiple records you're in trouble anyways
+                $recordIdentifierParts = GeneralUtility::trimExplode('|', $recordsReferencedInField[0]);
+                list(, $refUid) = BackendUtility::splitTable_Uid($recordIdentifierParts[0]);
+                $isOverlay = MathUtility::canBeInterpretedAsInteger($refUid) ? (bool)$refUid : false;
+            } else {
+                throw new \InvalidArgumentException('The given value for the original language field '
+                                                    . $this->data['processedTca']['ctrl']['transOrigPointerField']
+                                                    . ' of table ' . $table . ' contains an invalid value.', 1470742770);
+            }
         }
 
         // A couple of early returns in case the field should not be rendered
@@ -79,7 +95,7 @@ class SingleFieldContainer extends AbstractContainer
             // @todo: Drop option "showIfRTE" ?
             || !$backendUser->isRTE() && $parameterArray['fieldConf']['config']['showIfRTE']
             // Return if field should not be rendered in translated records
-            || $isOverlay && !$parameterArray['fieldConf']['l10n_display'] && $parameterArray['fieldConf']['l10n_mode'] === 'exclude'
+            || $isOverlay && empty($parameterArray['fieldConf']['l10n_display']) && $parameterArray['fieldConf']['l10n_mode'] === 'exclude'
             // @todo: localizationMode still needs handling!
             || $isOverlay && $this->data['localizationMode'] && $this->data['localizationMode'] !== $parameterArray['fieldConf']['l10n_cat']
             || $this->inlineFieldShouldBeSkipped()
@@ -136,9 +152,11 @@ class SingleFieldContainer extends AbstractContainer
         }
 
         // JavaScript code for event handlers:
-        $parameterArray['fieldChangeFunc'] = array();
+        $parameterArray['fieldChangeFunc'] = [];
         $parameterArray['fieldChangeFunc']['TBE_EDITOR_fieldChanged'] = 'TBE_EDITOR.fieldChanged(' . GeneralUtility::quoteJSvalue($table) . ',' . GeneralUtility::quoteJSvalue($row['uid']) . ',' . GeneralUtility::quoteJSvalue($fieldName) . ',' . GeneralUtility::quoteJSvalue($parameterArray['itemFormElName']) . ');';
-        $parameterArray['fieldChangeFunc']['alert'] = $alertMsgOnChange;
+        if ($alertMsgOnChange) {
+            $parameterArray['fieldChangeFunc']['alert'] = $alertMsgOnChange;
+        }
 
         // If this is the child of an inline type and it is the field creating the label
         if ($this->isInlineChildAndLabelField($table, $fieldName)) {
@@ -148,11 +166,11 @@ class SingleFieldContainer extends AbstractContainer
             $inlineDomObjectId = $inlineStackProcessor->getCurrentStructureDomObjectIdPrefix($this->data['inlineFirstPid']);
             $inlineObjectId = implode(
                 '-',
-                array(
+                [
                     $inlineDomObjectId,
                     $table,
                     $row['uid']
-                )
+                ]
             );
             $parameterArray['fieldChangeFunc']['inline'] = 'inline.handleChangedField(' . GeneralUtility::quoteJSvalue($parameterArray['itemFormElName']) . ',' . GeneralUtility::quoteJSvalue($inlineObjectId) . ');';
         }
@@ -193,12 +211,12 @@ class SingleFieldContainer extends AbstractContainer
             $html = $this->renderDefaultLanguageDiff($table, $fieldName, $row, $html);
         }
 
-        $fieldItemClasses = array(
+        $fieldItemClasses = [
             't3js-formengine-field-item'
-        );
+        ];
 
         // NULL value and placeholder handling
-        $nullControlNameAttribute = ' name="' . htmlspecialchars('control[active][' . $table . '][' . $row['uid'] . '][' . $fieldName . ']') . '"';
+        $nullControlNameEscaped = htmlspecialchars('control[active][' . $table . '][' . $row['uid'] . '][' . $fieldName . ']');
         if (!empty($parameterArray['fieldConf']['config']['eval']) && GeneralUtility::inList($parameterArray['fieldConf']['config']['eval'], 'null')
             && (empty($parameterArray['fieldConf']['config']['mode']) || $parameterArray['fieldConf']['config']['mode'] !== 'useOrOverridePlaceholder')
         ) {
@@ -223,16 +241,16 @@ class SingleFieldContainer extends AbstractContainer
                 'typo3form.fieldSetNull(' . GeneralUtility::quoteJSvalue($formElementName) . ', !this.checked)'
             );
 
-            $nullValueWrap = array();
+            $nullValueWrap = [];
             $nullValueWrap[] = '<div class="' . implode(' ', $fieldItemClasses) . '">';
             $nullValueWrap[] =    '<div class="t3-form-field-disable"></div>';
-            $nullValueWrap[] =    '<div class="checkbox">';
-            $nullValueWrap[] =        '<label>';
-            $nullValueWrap[] =            '<input type="hidden"' . $nullControlNameAttribute . ' value="0" />';
-            $nullValueWrap[] =            '<input type="checkbox"' . $nullControlNameAttribute . ' value="1" onchange="' . $onChange . '"' . $checked . ' /> &nbsp;';
+            $nullValueWrap[] =    '<div class="checkbox t3-form-field-eval-null-checkbox">';
+            $nullValueWrap[] =        '<label for="' . $nullControlNameEscaped . '">';
+            $nullValueWrap[] =            '<input type="hidden" name="' . $nullControlNameEscaped . '" value="0" />';
+            $nullValueWrap[] =            '<input type="checkbox" name="' . $nullControlNameEscaped . '" id="' . $nullControlNameEscaped . '" value="1" onchange="' . $onChange . '"' . $checked . ' /> &nbsp;';
             $nullValueWrap[] =        '</label>';
-            $nullValueWrap[] =        $html;
             $nullValueWrap[] =    '</div>';
+            $nullValueWrap[] =    $html;
             $nullValueWrap[] = '</div>';
 
             $html = implode(LF, $nullValueWrap);
@@ -253,23 +271,13 @@ class SingleFieldContainer extends AbstractContainer
             $placeholder = empty($parameterArray['fieldConf']['config']['placeholder']) ? '' : $parameterArray['fieldConf']['config']['placeholder'];
             $onChange = 'typo3form.fieldTogglePlaceholder(' . GeneralUtility::quoteJSvalue($parameterArray['itemFormElName']) . ', !this.checked)';
             $checked = $parameterArray['itemFormElValue'] === null ? '' : ' checked="checked"';
-            $disabled = '';
-            $fallbackValue = 0;
-            if (strlen(BackendUtility::getRecordTitlePrep($placeholder, 20)) > 0) {
-                $overrideLabel = sprintf($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.placeholder.override'), BackendUtility::getRecordTitlePrep($placeholder, 20));
-            } else {
-                $fallbackValue = 1;
-                $checked = ' checked="checked"';
-                $disabled = ' disabled="disabled"';
-                $overrideLabel = sprintf($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.placeholder.override_not_available'), BackendUtility::getRecordTitlePrep($placeholder, 20));
-            }
 
             $resultArray['additionalJavaScriptPost'][] = 'typo3form.fieldTogglePlaceholder('
                 . GeneralUtility::quoteJSvalue($parameterArray['itemFormElName']) . ', ' . ($checked ? 'false' : 'true') . ');';
 
             // Renders an input or textarea field depending on type of "parent"
-            $options = array();
-            $options['databaseRow'] = array();
+            $options = [];
+            $options['databaseRow'] = [];
             $options['table'] = '';
             $options['parameterArray'] = $parameterArray;
             $options['parameterArray']['itemFormElValue'] = GeneralUtility::fixed_lgd_cs($placeholder, 30);
@@ -277,14 +285,14 @@ class SingleFieldContainer extends AbstractContainer
             $noneElementResult = $this->nodeFactory->create($options)->render();
             $noneElementHtml = $noneElementResult['html'];
 
-            $placeholderWrap = array();
+            $placeholderWrap = [];
             $placeholderWrap[] = '<div class="' . implode(' ', $fieldItemClasses) . '">';
             $placeholderWrap[] =    '<div class="t3-form-field-disable"></div>';
             $placeholderWrap[] =    '<div class="checkbox">';
-            $placeholderWrap[] =        '<label>';
-            $placeholderWrap[] =            '<input type="hidden"' . $nullControlNameAttribute . ' value="' . $fallbackValue . '" />';
-            $placeholderWrap[] =            '<input type="checkbox"' . $nullControlNameAttribute . ' value="1" id="tce-forms-textfield-use-override-' . $fieldName . '-' . $row['uid'] . '" onchange="' . htmlspecialchars($onChange) . '"' . $checked . $disabled . ' />';
-            $placeholderWrap[] =            $overrideLabel;
+            $placeholderWrap[] =        '<label for="' . $nullControlNameEscaped . '">';
+            $placeholderWrap[] =            '<input type="hidden" name="' . $nullControlNameEscaped . '" value="0" />';
+            $placeholderWrap[] =            '<input type="checkbox" name="' . $nullControlNameEscaped . '" id="' . $nullControlNameEscaped . '" value="1" id="tce-forms-textfield-use-override-' . $fieldName . '-' . $row['uid'] . '" onchange="' . htmlspecialchars($onChange) . '"' . $checked . ' />';
+            $placeholderWrap[] =            sprintf($languageService->sL('LLL:EXT:lang/locallang_core.xlf:labels.placeholder.override'), BackendUtility::getRecordTitlePrep($placeholder, 20));
             $placeholderWrap[] =        '</label>';
             $placeholderWrap[] =    '</div>';
             $placeholderWrap[] =    '<div class="t3js-formengine-placeholder-placeholder">';
@@ -298,7 +306,7 @@ class SingleFieldContainer extends AbstractContainer
             $html = implode(LF, $placeholderWrap);
         } elseif ($parameterArray['fieldConf']['config']['type'] !== 'user' || empty($parameterArray['fieldConf']['config']['noTableWrapping'])) {
             // Add a casual wrap if the field is not of type user with no wrap requested.
-            $standardWrap = array();
+            $standardWrap = [];
             $standardWrap[] = '<div class="' . implode(' ', $fieldItemClasses) . '">';
             $standardWrap[] =    '<div class="t3-form-field-disable"></div>';
             $standardWrap[] =    $html;
@@ -337,11 +345,11 @@ class SingleFieldContainer extends AbstractContainer
             );
             $fieldConfig = $this->data['processedTca']['columns'][$field];
             // Don't show content if it's for IRRE child records:
-            if ($fieldConfig['config']['type'] !== 'inline' && $fieldConfig['config']['type'] !== 'flex') {
+            if ($fieldConfig['config']['type'] !== 'inline') {
                 /** @var IconFactory $iconFactory */
                 $iconFactory = GeneralUtility::makeInstance(IconFactory::class);
                 if ($defaultLanguageValue !== '') {
-                    $item .= '<div class="t3-form-original-language" title="' . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_misc.xlf:localizeMergeIfNotBlank')) . '">'
+                    $item .= '<div class="t3-form-original-language" title="' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_misc.xlf:localizeMergeIfNotBlank', true) . '">'
                         . $iconFactory->getIcon($this->data['systemLanguageRows'][0]['flagIconIdentifier'], Icon::SIZE_SMALL)->render()
                         . $this->getMergeBehaviourIcon($fieldConfig['l10n_mode'])
                         . $this->previewFieldValue($defaultLanguageValue, $fieldConfig, $field) . '</div>';
@@ -356,7 +364,7 @@ class SingleFieldContainer extends AbstractContainer
                         true
                     );
                     if ($defaultLanguageValue !== '') {
-                        $item .= '<div class="t3-form-original-language" title="' . htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_misc.xlf:localizeMergeIfNotBlank')) . '">'
+                        $item .= '<div class="t3-form-original-language" title="' . $this->getLanguageService()->sL('LLL:EXT:lang/locallang_misc.xlf:localizeMergeIfNotBlank', true) . '">'
                             . $iconFactory->getIcon($this->data['systemLanguageRows'][$previewLanguage['sys_language_uid']]['flagIconIdentifier'], Icon::SIZE_SMALL)->render()
                             . $this->getMergeBehaviourIcon($fieldConfig['l10n_mode'])
                             . $this->previewFieldValue($defaultLanguageValue, $fieldConfig, $field) . '</div>';
@@ -401,16 +409,17 @@ class SingleFieldContainer extends AbstractContainer
     {
         if (is_array($this->data['defaultLanguageDiffRow'][$table . ':' . $row['uid']])) {
             // Initialize:
-            $dLVal = array(
+            $dLVal = [
                 'old' => $this->data['defaultLanguageDiffRow'][$table . ':' . $row['uid']],
                 'new' => $this->data['defaultLanguageRow']
-            );
+            ];
             // There must be diff-data:
             if (isset($dLVal['old'][$field])) {
                 if ((string)$dLVal['old'][$field] !== (string)$dLVal['new'][$field]) {
                     // Create diff-result:
                     /** @var DiffUtility $diffUtility */
                     $diffUtility = GeneralUtility::makeInstance(DiffUtility::class);
+                    $diffUtility->stripTags = false;
                     $diffres = $diffUtility->makeDiffDisplay(
                         BackendUtility::getProcessedValue($table, $field, $dLVal['old'][$field], 0, 1),
                         BackendUtility::getProcessedValue($table, $field, $dLVal['new'][$field], 0, 1)
@@ -477,30 +486,30 @@ class SingleFieldContainer extends AbstractContainer
 
         $skipThisField = false;
         if ($structureDepth > 0) {
-            $searchArray = array(
-                '%OR' => array(
-                    'config' => array(
-                        0 => array(
-                            '%AND' => array(
+            $searchArray = [
+                '%OR' => [
+                    'config' => [
+                        0 => [
+                            '%AND' => [
                                 'foreign_table' => $table,
-                                '%OR' => array(
-                                    '%AND' => array(
-                                        'appearance' => array('useCombination' => true),
+                                '%OR' => [
+                                    '%AND' => [
+                                        'appearance' => ['useCombination' => true],
                                         'foreign_selector' => $fieldName
-                                    ),
+                                    ],
                                     'MM' => $fieldConfig['MM']
-                                )
-                            )
-                        ),
-                        1 => array(
-                            '%AND' => array(
+                                ]
+                            ]
+                        ],
+                        1 => [
+                            '%AND' => [
                                 'foreign_table' => $fieldConfig['foreign_table'],
                                 'foreign_selector' => $fieldConfig['foreign_field']
-                            )
-                        )
-                    )
-                )
-            );
+                            ]
+                        ]
+                    ]
+                ]
+            ];
             // Get the parent record from structure stack
             $level = $inlineStackProcessor->getStructureLevel(-1);
             // If we have symmetric fields, check on which side we are and hide fields, that are set automatically:
@@ -607,7 +616,7 @@ class SingleFieldContainer extends AbstractContainer
      */
     protected function isAssociativeArray($object)
     {
-        return is_array($object) && !empty($object) && array_keys($object) !== range(0, sizeof($object) - 1);
+        return is_array($object) && !empty($object) && array_keys($object) !== range(0, count($object) - 1);
     }
 
     /**

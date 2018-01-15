@@ -68,14 +68,14 @@ class BasicFileUtility
     /**
      * @var array
      */
-    public $f_ext = array();
+    public $f_ext = [];
 
     /**
      * See comment in header
      *
      * @var array
      */
-    public $mounts = array();
+    public $mounts = [];
 
     /**
      * See comment in header
@@ -132,7 +132,7 @@ class BasicFileUtility
         $this->f_ext['ftpspace']['allow'] = GeneralUtility::uniqueList(strtolower($f_ext['ftpspace']['allow']));
         $this->f_ext['ftpspace']['deny'] = GeneralUtility::uniqueList(strtolower($f_ext['ftpspace']['deny']));
 
-        $this->mounts = (!empty($mounts) ? $mounts : array());
+        $this->mounts = (!empty($mounts) ? $mounts : []);
         $this->webPath = GeneralUtility::getIndpEnv('TYPO3_DOCUMENT_ROOT');
         $this->isInit = 1;
     }

@@ -63,6 +63,13 @@ class ClickMenu
     public $isDBmenu = false;
 
     /**
+     * If TRUE, the "content" frame is always used for reference (when condensed mode is enabled)
+     *
+     * @var bool
+     */
+    public $alwaysContentFrame = false;
+
+    /**
      * Stores the parts of the input $item string, splitted by "|":
      * [0] = table/file, [1] = uid/blank, [2] = flag: If set, listFrame,
      * If "2" then "content frame" is forced  [3] = ("+" prefix = disable
@@ -70,14 +77,14 @@ class ClickMenu
      *
      * @var array
      */
-    public $iParts = array();
+    public $iParts = [];
 
     /**
      * Contains list of keywords of items to disable in the menu
      *
      * @var array
      */
-    public $disabledItems = array();
+    public $disabledItems = [];
 
     /**
      * If TRUE, Show icons on the left.
@@ -92,7 +99,7 @@ class ClickMenu
      *
      * @var array
      */
-    public $extClassArray = array();
+    public $extClassArray = [];
 
     /**
      * Set, when edit icon is drawn.
@@ -113,7 +120,7 @@ class ClickMenu
      *
      * @var array
      */
-    public $rec = array();
+    public $rec = [];
 
     /**
      * Clipboard set from the outside
@@ -160,7 +167,7 @@ class ClickMenu
     /**
      * Initialize click menu
      *
-     * @return array the array to be returned as JSON including all click menu items
+     * @return string The clickmenu HTML content
      */
     public function init()
     {
@@ -181,6 +188,9 @@ class ClickMenu
         // Setting flags:
         if ($this->iParts[2]) {
             $this->listFrame = true;
+        }
+        if ($this->iParts[2] == 2) {
+            $this->alwaysContentFrame = true;
         }
         if (isset($this->iParts[1]) && $this->iParts[1] !== '') {
             $this->isDBmenu = true;
@@ -216,14 +226,14 @@ class ClickMenu
      *
      * @param string $table Table name
      * @param int $uid UID for the current record.
-     * @return array the array to be returned as JSON
+     * @return string HTML content
      */
     public function printDBClickMenu($table, $uid)
     {
         $uid = (int)$uid;
         // Get record:
         $this->rec = BackendUtility::getRecordWSOL($table, $uid);
-        $menuItems = array();
+        $menuItems = [];
         $root = 0;
         $DBmount = false;
         // Rootlevel
@@ -282,11 +292,11 @@ class ClickMenu
             $elFromAllTables = count($this->clipObj->elFromTable(''));
             if (!in_array('paste', $this->disabledItems, true) && $elFromAllTables) {
                 $selItem = $this->clipObj->getSelectedRecord();
-                $elInfo = array(
+                $elInfo = [
                     GeneralUtility::fixed_lgd_cs($selItem['_RECORD_TITLE'], $this->backendUser->uc['titleLen']),
                     $root ? $GLOBALS['TYPO3_CONF_VARS']['SYS']['sitename'] : GeneralUtility::fixed_lgd_cs(BackendUtility::getRecordTitle($table, $this->rec), $this->backendUser->uc['titleLen']),
                     $this->clipObj->currentMode()
-                );
+                ];
                 if ($table === 'pages' && $lCP & Permission::PAGE_NEW) {
                     if ($elFromAllTables) {
                         $menuItems['pasteinto'] = $this->DB_paste('', $uid, 'into', $elInfo);
@@ -299,8 +309,10 @@ class ClickMenu
             }
 
             // Delete:
-            $elInfo = array(GeneralUtility::fixed_lgd_cs(BackendUtility::getRecordTitle($table, $this->rec), $this->backendUser->uc['titleLen']));
-            if (!in_array('delete', $this->disabledItems, true) && !$root && !$DBmount && $this->backendUser->isPSet($lCP, $table, 'delete')) {
+            $elInfo = [GeneralUtility::fixed_lgd_cs(BackendUtility::getRecordTitle($table, $this->rec), $this->backendUser->uc['titleLen'])];
+            $disableDeleteTS = $this->backendUser->getTSConfig('options.disableDelete');
+            $disableDelete = (bool) trim(isset($disableDeleteTS['properties'][$table]) ? $disableDeleteTS['properties'][$table] : $disableDeleteTS['value']);
+            if (!in_array('delete', $this->disabledItems, true) && !$root && !$DBmount && $this->backendUser->isPSet($lCP, $table, 'delete') && !$disableDelete) {
                 $menuItems['spacer2'] = 'spacer';
                 $menuItems['delete'] = $this->DB_delete($table, $uid, $elInfo);
             }
@@ -308,14 +320,14 @@ class ClickMenu
                 $menuItems['history'] = $this->DB_history($table, $uid);
             }
 
-            $localItems = array();
+            $localItems = [];
             if (!$this->cmLevel && !in_array('moreoptions', $this->disabledItems, true)) {
                 // Creating menu items here:
                 if ($this->editOK) {
                     $localItems['spacer3'] = 'spacer';
                     $localItems['moreoptions'] = $this->linkItem(
-                        $this->label('more') . '&nbsp;&nbsp;<span class="fa fa-caret-right"></span>',
-                        '<span class="fa fa-fw"></span>',
+                        $this->label('more'),
+                        '',
                         'TYPO3.ClickMenu.fetch(' . GeneralUtility::quoteJSvalue(GeneralUtility::linkThisScript() . '&cmLevel=1&subname=moreoptions') . ');return false;',
                         false,
                         true
@@ -383,7 +395,7 @@ class ClickMenu
         // Processing by external functions?
         $menuItems = $this->externalProcessingOfDBMenuItems($menuItems);
         if (!is_array($this->rec)) {
-            $this->rec = array();
+            $this->rec = [];
         }
 
         // Return the printed elements:
@@ -395,7 +407,7 @@ class ClickMenu
      *
      * @param string $table Table name
      * @param int $uid UID for the current record.
-     * @return array the array to be returned as JSON
+     * @return string HTML content
      */
     public function printNewDBLevel($table, $uid)
     {
@@ -403,7 +415,7 @@ class ClickMenu
         $uid = (int)$uid;
         // Setting internal record to the table/uid :
         $this->rec = BackendUtility::getRecordWSOL($table, $uid);
-        $menuItems = array();
+        $menuItems = [];
         $root = 0;
         // Rootlevel
         if ($table === 'pages' && $uid === 0) {
@@ -446,7 +458,7 @@ class ClickMenu
 
         // Return the printed elements:
         if (!is_array($menuItems)) {
-            $menuItems = array();
+            $menuItems = [];
         }
         return $this->printItems($menuItems);
     }
@@ -514,9 +526,9 @@ class ClickMenu
         if ($this->clipObj->current === 'normal') {
             $isSel = $this->clipObj->isSelected($table, $uid);
         }
-        $addParam = array();
+        $addParam = [];
         if ($this->listFrame) {
-            $addParam['reloadListFrame'] = 1;
+            $addParam['reloadListFrame'] = $this->alwaysContentFrame ? 2 : 1;
         }
         $icon = $this->iconFactory->getIcon('actions-edit-' . $type . ($isSel === $type ? '-release' : ''), Icon::SIZE_SMALL)->render();
         return $this->linkItem(
@@ -595,9 +607,9 @@ class ClickMenu
      */
     public function DB_history($table, $uid)
     {
-        $url = BackendUtility::getModuleUrl('record_history', array('element' => $table . ':' . $uid));
+        $url = BackendUtility::getModuleUrl('record_history', ['element' => $table . ':' . $uid]);
         return $this->linkItem(
-            htmlspecialchars($this->languageService->getLL('CM_history')),
+            $this->languageService->makeEntities($this->languageService->getLL('CM_history')),
             $this->iconFactory->getIcon('actions-document-history-open', Icon::SIZE_SMALL)->render(),
             $this->urlRefForCM($url, 'returnUrl')
         );
@@ -618,18 +630,18 @@ class ClickMenu
             return '';
         }
 
-        $parameters = array(
+        $parameters = [
             'id' => $uid,
-        );
+        ];
 
         if ($rec['perms_userid'] == $this->backendUser->user['uid'] || $this->backendUser->isAdmin()) {
-            $parameters['return_id'] = $uid;
-            $parameters['edit'] = '1';
+            $parameters['returnId'] = $uid;
+            $parameters['tx_beuser_system_beusertxpermission'] = ['action' => 'edit'];
         }
 
         $url = BackendUtility::getModuleUrl('system_BeuserTxPermission', $parameters);
         return $this->linkItem(
-            htmlspecialchars($this->languageService->getLL('CM_perms')),
+            $this->languageService->makeEntities($this->languageService->getLL('CM_perms')),
             $this->iconFactory->getIcon('status-status-locked', Icon::SIZE_SMALL)->render(),
             $this->urlRefForCM($url)
         );
@@ -646,12 +658,12 @@ class ClickMenu
      */
     public function DB_db_list($table, $uid, $rec)
     {
-        $urlParams = array();
+        $urlParams = [];
         $urlParams['id'] = $table === 'pages' ? $uid : $rec['pid'];
         $urlParams['table'] = $table === 'pages' ? '' : $table;
         $url = BackendUtility::getModuleUrl('web_list', $urlParams, '', true);
         return $this->linkItem(
-            htmlspecialchars($this->languageService->getLL('CM_db_list')),
+            $this->languageService->makeEntities($this->languageService->getLL('CM_db_list')),
             $this->iconFactory->getIcon('actions-system-list-open', Icon::SIZE_SMALL)->render(),
             'top.nextLoadModuleUrl=' . GeneralUtility::quoteJSvalue($url) . ';top.goToModule(\'web_list\', 1);'
         );
@@ -672,7 +684,7 @@ class ClickMenu
         $url = BackendUtility::getModuleUrl('move_element') . '&table=' . $table . '&uid=' . $uid;
         $url .= ($table === 'tt_content' ? '&sys_language_uid=' . (int)$rec['sys_language_uid'] : '');
         return $this->linkItem(
-            htmlspecialchars($this->languageService->getLL('CM_moveWizard' . ($table === 'pages' ? '_page' : ''))),
+            $this->languageService->makeEntities($this->languageService->getLL('CM_moveWizard' . ($table === 'pages' ? '_page' : ''))),
             $this->iconFactory->getIcon('actions-' . ($table === 'pages' ? 'page' : 'document') . '-move', Icon::SIZE_SMALL)->render(),
             $this->urlRefForCM($url, 'returnUrl')
         );
@@ -700,7 +712,7 @@ class ClickMenu
             $url = BackendUtility::getModuleUrl($newContentWizardModuleName, ['id' => $rec['pid'], 'sys_language_uid' => (int)$rec['sys_language_uid']]);
         }
         return $this->linkItem(
-            htmlspecialchars($this->languageService->getLL('CM_newWizard')),
+            $this->languageService->makeEntities($this->languageService->getLL('CM_newWizard')),
             $this->iconFactory->getIcon(($table === 'pages' ? 'actions-page-new' : 'actions-document-new'), Icon::SIZE_SMALL)->render(),
             $this->urlRefForCM($url, 'returnUrl')
         );
@@ -716,12 +728,12 @@ class ClickMenu
      */
     public function DB_editAccess($table, $uid)
     {
-        $url = BackendUtility::getModuleUrl('record_edit', array(
+        $url = BackendUtility::getModuleUrl('record_edit', [
             'columnsOnly' => (implode(',', $GLOBALS['TCA'][$table]['ctrl']['enablecolumns']) . ($table === 'pages' ? ',extendToSubpages' : '')),
             'edit[' . $table . '][' . $uid . ']' => 'edit'
-        ));
+        ]);
         return $this->linkItem(
-            htmlspecialchars($this->languageService->getLL('CM_editAccess')),
+            $this->languageService->makeEntities($this->languageService->getLL('CM_editAccess')),
             $this->iconFactory->getIcon('actions-document-edit-access', Icon::SIZE_SMALL)->render(),
             $this->urlRefForCM($url, 'returnUrl'),
             1
@@ -737,11 +749,11 @@ class ClickMenu
      */
     public function DB_editPageProperties($uid)
     {
-        $url = BackendUtility::getModuleUrl('record_edit', array(
+        $url = BackendUtility::getModuleUrl('record_edit', [
             'edit[pages][' . $uid . ']' => 'edit'
-        ));
+        ]);
         return $this->linkItem(
-            htmlspecialchars($this->languageService->getLL('CM_editPageProperties')),
+            $this->languageService->makeEntities($this->languageService->getLL('CM_editPageProperties')),
             $this->iconFactory->getIcon('actions-page-open', Icon::SIZE_SMALL)->render(),
             $this->urlRefForCM($url, 'returnUrl'),
             1
@@ -764,9 +776,9 @@ class ClickMenu
         $loc = 'top.content.list_frame';
         $theIcon = $this->iconFactory->getIcon('actions-document-open', Icon::SIZE_SMALL)->render();
 
-        $link = BackendUtility::getModuleUrl('record_edit', array(
+        $link = BackendUtility::getModuleUrl('record_edit', [
             'edit[' . $table . '][' . $uid . ']' => 'edit'
-        ));
+        ]);
 
         if ($this->iParts[0] === 'pages' && $this->iParts[1] && $this->backendUser->check('modules', $pageModule)) {
             $this->editPageIconSet = true;
@@ -788,8 +800,8 @@ class ClickMenu
         $frame = 'top.content.list_frame';
         $location = $this->frameLocation($frame . '.document');
         $module = $this->listFrame
-            ? GeneralUtility::quoteJSvalue(BackendUtility::getModuleUrl('record_edit', array('edit[' . $table . '][-' . $uid . ']' => 'new')) . '&returnUrl=') . '+top.rawurlencode(' . $location . '.pathname+' . $location . '.search)'
-            : GeneralUtility::quoteJSvalue(BackendUtility::getModuleUrl('db_new', array('id' => (int)$uid)));
+            ? GeneralUtility::quoteJSvalue(BackendUtility::getModuleUrl('record_edit', ['edit[' . $table . '][-' . $uid . ']' => 'new']) . '&returnUrl=') . '+top.rawurlencode(' . $location . '.pathname+' . $location . '.search)'
+            : GeneralUtility::quoteJSvalue(BackendUtility::getModuleUrl('db_new', ['id' => (int)$uid]));
         $editOnClick = 'if(' . $frame . '){' . $frame . '.location.href=' . $module . ';}';
         $icon = $this->iconFactory->getIcon('actions-' . ($table === 'pages' ? 'page' : 'document') . '-new', Icon::SIZE_SMALL)->render();
         return $this->linkItem($this->label('new'), $icon, $editOnClick);
@@ -813,7 +825,8 @@ class ClickMenu
             . $this->frameLocation($loc . '.document') . '.search)+'
             . GeneralUtility::quoteJSvalue(
                 '&cmd[' . $table . '][' . $uid . '][delete]=1&prErr=1&vC=' . $this->backendUser->veriCode()
-            );
+            )
+            . ';';
 
         if ($table === 'pages') {
             $jsCode .= 'top.nav.refresh.defer(500, top.nav);';
@@ -874,7 +887,7 @@ class ClickMenu
     {
         return $this->linkItem(
             $this->label('tempMountPoint'),
-            $this->iconFactory->getIcon('apps-pagetree-page-mountpoint', Icon::SIZE_SMALL)->render(),
+            $this->iconFactory->getIcon('actions-pagetree-mountroot', Icon::SIZE_SMALL)->render(),
             'if (top.content.nav_frame) {
 				var node = top.TYPO3.Backend.NavigationContainer.PageTree.getSelected();
 				if (node === null) {
@@ -953,7 +966,7 @@ class ClickMenu
     public function printFileClickMenu($combinedIdentifier)
     {
         $identifier = '';
-        $menuItems = array();
+        $menuItems = [];
         $combinedIdentifier = rawurldecode($combinedIdentifier);
         $fileObject = ResourceFactory::getInstance()
                 ->retrieveFileOrFolderObject($combinedIdentifier);
@@ -1037,11 +1050,11 @@ class ClickMenu
                 $selItem = reset($elArr);
                 $clickedFileOrFolder = ResourceFactory::getInstance()->retrieveFileOrFolderObject($combinedIdentifier);
                 $fileOrFolderInClipBoard = ResourceFactory::getInstance()->retrieveFileOrFolderObject($selItem);
-                $elInfo = array(
+                $elInfo = [
                     $fileOrFolderInClipBoard->getName(),
                     $clickedFileOrFolder->getName(),
                     $this->clipObj->currentMode()
-                );
+                ];
                 if (!$fileOrFolderInClipBoard instanceof Folder || !$fileOrFolderInClipBoard->getStorage()->isWithinFolder($fileOrFolderInClipBoard, $clickedFileOrFolder)) {
                     $menuItems['pasteinto'] = $this->FILE_paste($identifier, $selItem, $elInfo);
                 }
@@ -1050,7 +1063,7 @@ class ClickMenu
             // Delete:
             if (!in_array('delete', $this->disabledItems, true) && $fileObject->checkActionPermission('delete')) {
                 if ($isStorageRoot && $userMayEditStorage) {
-                    $elInfo = array(GeneralUtility::fixed_lgd_cs($fileObject->getStorage()->getName(), $this->backendUser->uc['titleLen']));
+                    $elInfo = [GeneralUtility::fixed_lgd_cs($fileObject->getStorage()->getName(), $this->backendUser->uc['titleLen'])];
                     $menuItems['delete'] = $this->DB_delete('sys_file_storage', $fileObject->getStorage()->getUid(), $elInfo);
                 } elseif (!$isStorageRoot) {
                     $menuItems['delete'] = $this->FILE_delete($identifier);
@@ -1090,13 +1103,23 @@ class ClickMenu
     public function FILE_launch($path, $moduleName, $type, $iconName, $noReturnUrl = false)
     {
         $loc = 'top.content.list_frame';
-        $scriptUrl = BackendUtility::getModuleUrl($moduleName);
+
+        if (strpos($moduleName, '.php') !== false) {
+            GeneralUtility::deprecationLog(
+                'Using a php file directly in ClickMenu is deprecated since TYPO3 CMS 7, and will be removed in CMS 8.'
+                . ' Register the class as module and use BackendUtility::getModuleUrl() to get the right link.'
+                . ' For examples how to do this see ext_tables.php of EXT:backend.'
+            );
+            $scriptUrl = $moduleName;
+        } else {
+            $scriptUrl = BackendUtility::getModuleUrl($moduleName);
+        }
 
         $editOnClick = 'if(' . $loc . '){' . $loc . '.location.href=' . GeneralUtility::quoteJSvalue($scriptUrl . '&target=' . rawurlencode($path)) . ($noReturnUrl ? '' : '+\'&returnUrl=\'+top.rawurlencode(' . $this->frameLocation($loc . '.document') . '.pathname+' . $this->frameLocation($loc . '.document') . '.search)') . ';}';
         return $this->linkItem(
             $this->label($type),
             $this->iconFactory->getIcon($iconName, Icon::SIZE_SMALL)->render(),
-            $editOnClick . 'top.nav.refresh();'
+            $editOnClick
         );
     }
 
@@ -1113,13 +1136,13 @@ class ClickMenu
         $isSel = '';
         // Pseudo table name for use in the clipboard.
         $table = '_FILE';
-        $uid = GeneralUtility::shortMD5($path);
+        $uid = GeneralUtility::shortmd5($path);
         if ($this->clipObj->current === 'normal') {
             $isSel = $this->clipObj->isSelected($table, $uid);
         }
-        $addParam = array();
+        $addParam = [];
         if ($this->listFrame) {
-            $addParam['reloadListFrame'] = 1;
+            $addParam['reloadListFrame'] = $this->alwaysContentFrame ? 2 : 1;
         }
         return $this->linkItem(
             $this->label($type),
@@ -1187,7 +1210,7 @@ class ClickMenu
         $jsCode = $loc . '.location.href='
             . GeneralUtility::quoteJSvalue($this->clipObj->pasteUrl('_FILE', $path, 0) . '&redirect=')
             . '+top.rawurlencode(' . $this->frameLocation($loc . '.document')
-            . '.pathname+' . $this->frameLocation($loc . '.document') . '.search); top.nav.refresh();';
+            . '.pathname+' . $this->frameLocation($loc . '.document') . '.search);';
 
         if ($this->backendUser->jsConfirmation(JsConfirmation::COPY_MOVE_PASTE)) {
             $title = $this->languageService->sL('LLL:EXT:lang/locallang_mod_web_list.xlf:clip_paste');
@@ -1235,11 +1258,11 @@ class ClickMenu
      * @param string $table The absolute path
      * @param int $srcId UID for the current record.
      * @param int $dstId Destination ID
-     * @return array the array to be returned as JSON
+     * @return string HTML content
      */
     public function printDragDropClickMenu($table, $srcId, $dstId)
     {
-        $menuItems = array();
+        $menuItems = [];
         // If the drag and drop menu should apply to PAGES use this set of menu items
         if ($table === 'pages') {
             // Move Into:
@@ -1298,7 +1321,7 @@ class ClickMenu
             GeneralUtility::quoteJSvalue(
                 '&cmd[pages][' . $srcUid . '][' . $action . ']=' . $negativeSign . $dstUid . '&prErr=1&vC=' .
                 $this->backendUser->veriCode()
-            ) . ';};top.nav.refresh();';
+            ) . ';};';
         return $this->linkItem(
             $this->label($action . 'Page_' . $into),
             $this->iconFactory->getIcon('actions-document-paste-' . $into, Icon::SIZE_SMALL)->render(),
@@ -1324,7 +1347,7 @@ class ClickMenu
             GeneralUtility::quoteJSvalue(
                 '&file[' . $action . '][0][data]=' . $srcPath . '&file[' . $action . '][0][target]=' . $dstPath . '&prErr=1&vC=' .
                 $this->backendUser->veriCode()
-            ) . ';};top.nav.refresh();';
+            ) . ';};';
         return $this->linkItem(
             $this->label($action . 'Folder_into'),
             $this->iconFactory->getIcon('apps-pagetree-drag-move-into', Icon::SIZE_SMALL)->render(),
@@ -1341,7 +1364,7 @@ class ClickMenu
      * Prints the items from input $menuItems array - as JS section for writing to the div-layers.
      *
      * @param array $menuItems Array
-     * @return array the array to be returned via JSON
+     * @return string HTML code
      */
     public function printItems($menuItems)
     {
@@ -1357,7 +1380,7 @@ class ClickMenu
      * Create the JavaScript section
      *
      * @param array $menuItems The $menuItems array to print
-     * @return array|null the items to print, and The JavaScript section which will print the content of the CM to the div-layer in the target frame.
+     * @return string The JavaScript section which will print the content of the CM to the div-layer in the target frame.
      */
     public function printLayerJScode($menuItems)
     {
@@ -1365,11 +1388,29 @@ class ClickMenu
         if ($this->isCMlayers()) {
             // Create the table displayed in the clickmenu layer:
             // Wrap the inner table in another table to create outer border:
-            return [
-                'items' => $this->menuItemsForClickMenu($menuItems),
-                'level' => $this->cmLevel
-            ];
+            $CMtable = '
+				<div class="typo3-CSM-wrapperCM">
+				<table border="0" cellpadding="0" cellspacing="0" class="typo3-CSM">
+					' . implode('', $this->menuItemsForClickMenu($menuItems)) . '
+				</table></div>';
+            return '<data><clickmenu><htmltable><![CDATA[' . $CMtable . ']]></htmltable><cmlevel>' . $this->cmLevel . '</cmlevel></clickmenu></data>';
         }
+    }
+
+    /**
+     * Wrapping the input string in a table with background color 4 and a black border style.
+     * For the pop-up menu
+     *
+     * @param string $str HTML content to wrap in table.
+     * @return string
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function wrapColorTableCM($str)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        return '<div class="typo3-CSM-wrapperCM">
+			' . $str . '
+			</div>';
     }
 
     /**
@@ -1380,11 +1421,14 @@ class ClickMenu
      */
     public function menuItemsForClickMenu($menuItems)
     {
-        $out = array();
+        $out = [];
         foreach ($menuItems as $cc => $i) {
             // MAKE horizontal spacer
             if (is_string($i) && $i === 'spacer') {
-                $out[] = '<span class="list-group-item list-group-item-divider"></span>';
+                $out[] = '
+					<tr style="height: 1px;" class="bgColor2">
+						<td colspan="2"></td>
+					</tr>';
             } else {
                 // Just make normal element:
                 $onClick = $i[3];
@@ -1394,10 +1438,11 @@ class ClickMenu
                 if (!$i[5]) {
                     $onClick .= 'TYPO3.ClickMenu.hideAll();';
                 }
+                $CSM = ' oncontextmenu="this.click();return false;"';
                 $out[] = '
-					<a href="javascript:;" class="list-group-item" onclick="' . htmlspecialchars($onClick) . '">
-						<span class="list-group-item-icon">' . $i[2] . '</span> ' . $i[1] . '
-					</a>';
+					<tr class="typo3-CSM-itemRow" onclick="' . htmlspecialchars($onClick) . '"' . $CSM . '>
+						' . (!$this->leftIcons ? '<td class="typo3-CSM-item">' . $i[1] . '</td><td align="center">' . $i[2] . '</td>' : '<td align="center">' . $i[2] . '</td><td class="typo3-CSM-item">' . $i[1] . '</td>') . '
+					</tr>';
             }
         }
         return $out;
@@ -1491,14 +1536,28 @@ class ClickMenu
      */
     public function linkItem($str, $icon, $onClick, $onlyCM = 0, $dontHide = 0)
     {
-        return array(
-            '<a href="javascript:;" onclick="' . htmlspecialchars($onClick) . '">' . $str . $icon . '</a>',
+        $onClick = str_replace('top.loadTopMenu', 'showClickmenu_raw', $onClick);
+        return [
+            '<a href="#" onclick="' . htmlspecialchars($onClick) . '">' . $str . $icon . '</a>',
             $str,
             $icon,
             $onClick,
             $onlyCM,
             $dontHide
-        );
+        ];
+    }
+
+    /**
+     * Returns the input string IF not a user setting has disabled display of icons.
+     *
+     * @param string $iconCode The icon-image tag
+     * @return string The icon-image tag prefixed with space char IF the icon should be printed at all due to user settings
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8
+     */
+    public function excludeIcon($iconCode)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        return $this->backendUser->uc['noMenuMode'] && $this->backendUser->uc['noMenuMode'] !== 'icons' ? '' : ' ' . $iconCode;
     }
 
     /**
@@ -1520,7 +1579,7 @@ class ClickMenu
             // Do filtering:
             // Transfer ONLY elements which are mentioned (or are spacers)
             if ($only) {
-                $newMenuArray = array();
+                $newMenuArray = [];
                 foreach ($menuItems as $key => $value) {
                     if (GeneralUtility::inList($this->iParts[3], $key) || is_string($value) && $value === 'spacer') {
                         $newMenuArray[$key] = $value;
@@ -1585,7 +1644,7 @@ class ClickMenu
      */
     public function label($label)
     {
-        return htmlspecialchars($this->languageService->sL('LLL:EXT:lang/locallang_core.xlf:cm.' . $label));
+        return $this->languageService->makeEntities($this->languageService->sL('LLL:EXT:lang/locallang_core.xlf:cm.' . $label, true));
     }
 
     /**

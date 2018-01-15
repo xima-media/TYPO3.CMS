@@ -15,15 +15,10 @@ namespace TYPO3\CMS\Core\Authentication;
  */
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Database\Query\Expression\ExpressionBuilder;
-use TYPO3\CMS\Core\Database\Query\QueryHelper;
-use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
-use TYPO3\CMS\Core\Database\Query\Restriction\HiddenRestriction;
-use TYPO3\CMS\Core\Database\Query\Restriction\RootLevelRestriction;
 use TYPO3\CMS\Core\Resource\ResourceStorage;
 use TYPO3\CMS\Core\Type\Bitmask\JsConfirmation;
 use TYPO3\CMS\Core\Type\Bitmask\Permission;
+use TYPO3\CMS\Core\Type\Exception\InvalidEnumerationValueException;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
@@ -52,21 +47,21 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      * @var array
      * @internal
      */
-    public $groupData = array(
-        'filemounts' => array()
-    );
+    public $groupData = [
+        'filemounts' => []
+    ];
 
     /**
      * This array will hold the groups that the user is a member of
      * @var array
      */
-    public $userGroups = array();
+    public $userGroups = [];
 
     /**
      * This array holds the uid's of the groups in the listed order
      * @var array
      */
-    public $userGroupsUID = array();
+    public $userGroupsUID = [];
 
     /**
      * This is $this->userGroupsUID imploded to a comma list... Will correspond to the 'usergroup_cached_list'
@@ -88,7 +83,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      * Custom workspace record if any
      * @var array
      */
-    public $workspaceRec = array();
+    public $workspaceRec = [];
 
     /**
      * Used to accumulate data for the user-group.
@@ -97,7 +92,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      * @var array
      * @internal
      */
-    public $dataLists = array(
+    public $dataLists = [
         'webmount_list' => '',
         'filemount_list' => '',
         'file_permissions' => '',
@@ -110,19 +105,32 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
         'allowed_languages' => '',
         'workspace_perms' => '',
         'custom_options' => ''
-    );
+    ];
+
+    /**
+     * For debugging/display of order in which subgroups are included.
+     * @var array
+     */
+    public $includeHierarchy = [];
 
     /**
      * List of group_id's in the order they are processed.
      * @var array
      */
-    public $includeGroupArray = array();
+    public $includeGroupArray = [];
+
+    /**
+     * Set to 'WIN', if windows
+     * @var string
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, use the constant TYPO3_OS directly
+     */
+    public $OS = '';
 
     /**
      * Used to accumulate the TSconfig data of the user
      * @var array
      */
-    public $TSdataArray = array();
+    public $TSdataArray = [];
 
     /**
      * Contains the non-parsed user TSconfig
@@ -134,7 +142,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      * Contains the parsed user TSconfig
      * @var array
      */
-    public $userTS = array();
+    public $userTS = [];
 
     /**
      * Set internally if the user TSconfig was parsed and needs to be cached.
@@ -208,13 +216,13 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
     /**
      * @var array
      */
-    public $enablecolumns = array(
+    public $enablecolumns = [
         'rootLevel' => 1,
         'deleted' => 'deleted',
         'disabled' => 'disable',
         'starttime' => 'starttime',
         'endtime' => 'endtime'
-    );
+    ];
 
     /**
      * Form field with login-name
@@ -247,12 +255,12 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
     public $writeAttemptLog = true;
 
     /**
-     * if > 0 : session-timeout in seconds.
-     * if FALSE/<0 : no timeout.
+     * if > 0: session-timeout in seconds.
+     * If <=0: Instant logout after login.
      * if string: The string is field name from the user table where the timeout can be found.
-     * @var string|int
+     * @var int|string
      */
-    public $sessionTimeout = 6000;
+    public $auth_timeout_field = 6000;
 
     /**
      * @var int
@@ -274,21 +282,24 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      * moduleSessionID
      * @var array
      */
-    public $uc_default = array(
+    public $uc_default = [
         'interfaceSetup' => '',
         // serialized content that is used to store interface pane and menu positions. Set by the logout.php-script
-        'moduleData' => array(),
+        'moduleData' => [],
         // user-data for the modules
         'thumbnailsByDefault' => 1,
         'emailMeAtLogin' => 0,
-        'startModule' => 'help_AboutAboutmodules',
+        'startModule' => 'help_AboutmodulesAboutmodules',
+        'hideSubmoduleIcons' => 0,
         'titleLen' => 50,
         'edit_RTE' => '1',
         'edit_docModuleUpload' => '1',
+        // Default is 245 pixels
+        'navFrameResizable' => 0,
         'resizeTextareas' => 1,
         'resizeTextareas_MaxHeight' => 500,
         'resizeTextareas_Flexible' => 0
-    );
+    ];
 
     /**
      * Constructor
@@ -298,6 +309,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
         parent::__construct();
         $this->name = self::getCookieName();
         $this->loginType = 'BE';
+        $this->OS = TYPO3_OS;
     }
 
     /**
@@ -460,58 +472,27 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
             if ($this->isAdmin()) {
                 return ' 1=1';
             }
-            // Make sure it's integer.
             $perms = (int)$perms;
-            $expressionBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-                ->getQueryBuilderForTable('pages')
-                ->expr();
-
+            // Make sure it's integer.
+            $str = ' (' . '(pages.perms_everybody & ' . $perms . ' = ' . $perms . ')' . ' OR (pages.perms_userid = '
+                . $this->user['uid'] . ' AND pages.perms_user & ' . $perms . ' = ' . $perms . ')';
             // User
-            $constraint = $expressionBuilder->orX(
-                $expressionBuilder->comparison(
-                    $expressionBuilder->bitAnd('pages.perms_everybody', $perms),
-                    ExpressionBuilder::EQ,
-                    $perms
-                ),
-                $expressionBuilder->andX(
-                    $expressionBuilder->eq('pages.perms_userid', (int)$this->user['uid']),
-                    $expressionBuilder->comparison(
-                        $expressionBuilder->bitAnd('pages.perms_user', $perms),
-                        ExpressionBuilder::EQ,
-                        $perms
-                    )
-                )
-            );
-
-            // Group (if any is set)
             if ($this->groupList) {
-                $constraint->add(
-                    $expressionBuilder->andX(
-                        $expressionBuilder->in(
-                            'pages.perms_groupid',
-                            GeneralUtility::intExplode(',', $this->groupList)
-                        ),
-                        $expressionBuilder->comparison(
-                            $expressionBuilder->bitAnd('pages.perms_group', $perms),
-                            ExpressionBuilder::EQ,
-                            $perms
-                        )
-                    )
-                );
+                // Group (if any is set)
+                $str .= ' OR (pages.perms_groupid in (' . $this->groupList . ') AND pages.perms_group & '
+                    . $perms . ' = ' . $perms . ')';
             }
-
-            $constraint = ' (' . (string)$constraint . ')';
-
+            $str .= ')';
             // ****************
             // getPagePermsClause-HOOK
             // ****************
             if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauthgroup.php']['getPagePermsClause'])) {
                 foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauthgroup.php']['getPagePermsClause'] as $_funcRef) {
-                    $_params = array('currentClause' => $constraint, 'perms' => $perms);
+                    $_params = ['currentClause' => $str, 'perms' => $perms];
                     $str = GeneralUtility::callUserFunction($_funcRef, $_params, $this);
                 }
             }
-            return $constraint;
+            return $str;
         } else {
             return ' 1=0';
         }
@@ -554,10 +535,10 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
         // ****************
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauthgroup.php']['calcPerms'])) {
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauthgroup.php']['calcPerms'] as $_funcRef) {
-                $_params = array(
+                $_params = [
                     'row' => $row,
                     'outputPermissions' => $out
-                );
+                ];
                 $out = GeneralUtility::callUserFunction($_funcRef, $_params, $this);
             }
         }
@@ -810,11 +791,11 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
         // Process any hooks
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauthgroup.php']['recordEditAccessInternals'])) {
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauthgroup.php']['recordEditAccessInternals'] as $funcRef) {
-                $params = array(
+                $params = [
                     'table' => $table,
                     'idOrRow' => $idOrRow,
                     'newRecord' => $newRecord
-                );
+                ];
                 if (!GeneralUtility::callUserFunction($funcRef, $params, $this)) {
                     return false;
                 }
@@ -881,7 +862,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      *   and where the stage is not preventing records
      *
      * @param string $table Table of record
-     * @param array|int $recData Integer (record uid) or array where fields are at least: pid, t3ver_wsid, t3ver_stage (if versioningWS is set)
+     * @param array $recData Integer (record uid) or array where fields are at least: pid, t3ver_wsid, t3ver_stage (if versioningWS is set)
      * @return string String error code, telling the failure state. FALSE=All ok
      */
     public function workspaceCannotEditRecord($table, $recData)
@@ -938,7 +919,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      * Evaluates if a user is allowed to edit the offline version
      *
      * @param string $table Table of record
-     * @param array|int $recData Integer (record uid) or array where fields are at least: pid, t3ver_wsid, t3ver_stage (if versioningWS is set)
+     * @param array $recData Integer (record uid) or array where fields are at least: pid, t3ver_wsid, t3ver_stage (if versioningWS is set)
      * @return string String error code, telling the failure state. FALSE=All ok
      * @see workspaceCannotEditRecord()
      */
@@ -1164,7 +1145,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
             // Getting Root-ts if not sent
             $config = $this->userTS;
         }
-        $TSConf = array('value' => null, 'properties' => null);
+        $TSConf = ['value' => null, 'properties' => null];
         $parts = GeneralUtility::trimExplode('.', $objectString, true, 2);
         $key = $parts[0];
         if ($key !== '') {
@@ -1217,7 +1198,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      */
     public function returnWebmounts()
     {
-        return (string)$this->groupData['webmounts'] != '' ? explode(',', $this->groupData['webmounts']) : array();
+        return (string)$this->groupData['webmounts'] != '' ? explode(',', $this->groupData['webmounts']) : [];
     }
 
     /**
@@ -1242,25 +1223,21 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
     /**
      * Returns TRUE or FALSE, depending if an alert popup (a javascript confirmation) should be shown
      * call like $GLOBALS['BE_USER']->jsConfirmation($BITMASK).
+     * See \TYPO3\CMS\Core\Type\Bitmask\JsConfirmation.
      *
-     * @param int $bitmask Bitmask, one of \TYPO3\CMS\Core\Type\Bitmask\JsConfirmation
+     * @param int $bitmask Bitmask
      * @return bool TRUE if the confirmation should be shown
-     * @see JsConfirmation
      */
     public function jsConfirmation($bitmask)
     {
-        $alertPopup = $this->getTSConfig('options.alertPopups');
-
-        if (trim((string)$alertPopup['value']) === '') {
-            // Default: show all confirmations
-            $alertPopup = JsConfirmation::ALL;
-        } else {
-            $alertPopup = $alertPopup['value'];
+        try {
+            $alertPopupsSetting = trim((string)$this->getTSConfig('options.alertPopups')['value']);
+            $alertPopup = JsConfirmation::cast($alertPopupsSetting === '' ? null : (int)$alertPopupsSetting);
+        } catch (InvalidEnumerationValueException $e) {
+            $alertPopup = new JsConfirmation();
         }
 
-        $bitmask = JsConfirmation::cast($bitmask);
-        $alertPopup = JsConfirmation::cast($alertPopup);
-        return $bitmask->matches($alertPopup);
+        return JsConfirmation::cast($bitmask)->matches($alertPopup);
     }
 
     /**
@@ -1373,24 +1350,8 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
                 $webmounts = explode(',', $this->groupData['webmounts']);
                 // Explode mounts
                 // Selecting all webmounts with permission clause for reading
-                $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('pages');
-                $queryBuilder->getRestrictions()
-                    ->removeAll()
-                    ->add(GeneralUtility::makeInstance(DeletedRestriction::class));
-
-                $MProws = $queryBuilder->select('uid')
-                    ->from('pages')
-                    // @todo DOCTRINE: check how to make getPagePermsClause() portable
-                    ->where(
-                        $this->getPagePermsClause(1),
-                        $queryBuilder->expr()->in(
-                            'uid',
-                            $queryBuilder->createNamedParameter($this->groupData['webmounts'])
-                        )
-                    )
-                    ->execute()
-                    ->fetchAll();
-                $MProws = array_column(($MProws ?: []), 'uid', 'uid');
+                $where = 'deleted=0 AND uid IN (' . $this->groupData['webmounts'] . ') AND ' . $this->getPagePermsClause(1);
+                $MProws = $this->db->exec_SELECTgetRows('uid', 'pages', $where, '', '', '', 'uid');
                 foreach ($webmounts as $idx => $mountPointUid) {
                     // If the mount ID is NOT found among selected pages, unset it:
                     if ($mountPointUid > 0 && !isset($MProws[$mountPointUid])) {
@@ -1417,37 +1378,24 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
     public function fetchGroups($grList, $idList = '')
     {
         // Fetching records of the groups in $grList (which are not blocked by lockedToDomain either):
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable($this->usergroup_table);
-        $expressionBuilder = $queryBuilder->expr();
-        $constraints = $expressionBuilder->andX(
-            $expressionBuilder->eq('pid', 0),
-            $expressionBuilder->in('uid', GeneralUtility::intExplode(',', $grList)),
-            $expressionBuilder->orX(
-                $expressionBuilder->eq('lockToDomain', $queryBuilder->quote('')),
-                $expressionBuilder->isNull('lockToDomain'),
-                $expressionBuilder->eq(
-                    'lockToDomain',
-                    $queryBuilder->createNamedParameter(GeneralUtility::getIndpEnv('HTTP_HOST'))
-                )
-            )
-        );
+        $lockToDomain_SQL = ' AND (lockToDomain=\'\' OR lockToDomain IS NULL OR lockToDomain=' . $this->db->fullQuoteStr(GeneralUtility::getIndpEnv('HTTP_HOST'), $this->usergroup_table) . ')';
+        $grList = $this->db->cleanIntList($grList);
+        $whereSQL = 'deleted=0 AND hidden=0 AND pid=0 AND uid IN (' . $grList . ')' . $lockToDomain_SQL;
         // Hook for manipulation of the WHERE sql sentence which controls which BE-groups are included
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauthgroup.php']['fetchGroupQuery'])) {
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauthgroup.php']['fetchGroupQuery'] as $classRef) {
                 $hookObj = GeneralUtility::getUserObj($classRef);
                 if (method_exists($hookObj, 'fetchGroupQuery_processQuery')) {
-                    $constraints = $hookObj->fetchGroupQuery_processQuery($this, $grList, $idList, (string)$constraints);
+                    $whereSQL = $hookObj->fetchGroupQuery_processQuery($this, $grList, $idList, $whereSQL);
                 }
             }
         }
-        $res = $queryBuilder->select('*')
-            ->from($this->usergroup_table)
-            ->where($constraints)
-            ->execute();
+        $res = $this->db->exec_SELECTquery('*', $this->usergroup_table, $whereSQL);
         // The userGroups array is filled
-        while ($row = $res->fetch(\PDO::FETCH_ASSOC)) {
+        while ($row = $this->db->sql_fetch_assoc($res)) {
             $this->userGroups[$row['uid']] = $row;
         }
+        $this->db->sql_free_result($res);
         // Traversing records in the correct order
         foreach (explode(',', $grList) as $uid) {
             // Get row:
@@ -1463,6 +1411,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
                 }
                 // Add the group uid, current list, TSconfig to the internal arrays.
                 $this->includeGroupArray[] = $uid;
+                $this->includeHierarchy[] = $idList;
                 $this->TSdataArray[] = $this->addTScomment('Group "' . $row['title'] . '" [' . $row['uid'] . '] TSconfig field:') . $row['TSconfig'];
                 // Mount group database-mounts
                 if (($this->user['options'] & Permission::PAGE_SHOW) == 1) {
@@ -1494,7 +1443,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
         // HOOK: fetchGroups_postProcessing
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauthgroup.php']['fetchGroups_postProcessing'])) {
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauthgroup.php']['fetchGroups_postProcessing'] as $_funcRef) {
-                $_params = array();
+                $_params = [];
                 GeneralUtility::callUserFunction($_funcRef, $_params, $this);
             }
         }
@@ -1514,11 +1463,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
     public function setCachedList($cList)
     {
         if ((string)$cList != (string)$this->user['usergroup_cached_list']) {
-            GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable('be_users')->update(
-                'be_users',
-                ['usergroup_cached_list' => $cList],
-                ['uid' => (int)$this->user['uid']]
-            );
+            $this->db->exec_UPDATEquery('be_users', 'uid=' . (int)$this->user['uid'], ['usergroup_cached_list' => $cList]);
         }
     }
 
@@ -1530,7 +1475,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      */
     protected function initializeFileStorages()
     {
-        $this->fileStorages = array();
+        $this->fileStorages = [];
         /** @var $storageRepository \TYPO3\CMS\Core\Resource\StorageRepository */
         $storageRepository = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Resource\StorageRepository::class);
         // Admin users have all file storages visible, without any filters
@@ -1597,13 +1542,11 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      */
     public function getFileMountRecords()
     {
-        static $fileMountRecordCache = array();
+        static $fileMountRecordCache = [];
 
         if (!empty($fileMountRecordCache)) {
             return $fileMountRecordCache;
         }
-
-        $connectionPool = GeneralUtility::makeInstance(ConnectionPool::class);
 
         // Processing file mounts (both from the user and the groups)
         $fileMounts = array_unique(GeneralUtility::intExplode(',', $this->dataLists['filemount_list'], true));
@@ -1615,28 +1558,18 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
         }
 
         if (!empty($fileMounts)) {
-            $orderBy = $GLOBALS['TCA']['sys_filemounts']['ctrl']['default_sortby'] ?? 'sorting';
-
-            $queryBuilder = $connectionPool->getQueryBuilderForTable('sys_filemounts');
-            $queryBuilder->getRestrictions()
-                ->removeAll()
-                ->add(GeneralUtility::makeInstance(DeletedRestriction::class))
-                ->add(GeneralUtility::makeInstance(HiddenRestriction::class))
-                ->add(GeneralUtility::makeInstance(RootLevelRestriction::class));
-
-            $queryBuilder->select('*')
-                ->from('sys_filemounts')
-                ->where($queryBuilder->expr()->in('uid', array_map('intval', $fileMounts)));
-
-            foreach (QueryHelper::parseOrderBy($orderBy) as $fieldAndDirection) {
-                $queryBuilder->addOrderBy(...$fieldAndDirection);
-            }
-
-            $fileMountRecords = $queryBuilder->execute()->fetchAll(\PDO::FETCH_ASSOC);
-            if ($fileMountRecords !== false) {
-                foreach ($fileMountRecords as $fileMount) {
-                    $fileMountRecordCache[$fileMount['base'] . $fileMount['path']] = $fileMount;
-                }
+            $orderBy = isset($GLOBALS['TCA']['sys_filemounts']['ctrl']['default_sortby'])
+                ? $this->db->stripOrderBy($GLOBALS['TCA']['sys_filemounts']['ctrl']['default_sortby'])
+                : 'sorting';
+            $fileMountRecords = $this->db->exec_SELECTgetRows(
+                '*',
+                'sys_filemounts',
+                'deleted=0 AND hidden=0 AND pid=0 AND uid IN (' . implode(',', $fileMounts) . ')',
+                '',
+                $orderBy
+            );
+            foreach ($fileMountRecords as $fileMount) {
+                $fileMountRecordCache[$fileMount['base'] . $fileMount['path']] = $fileMount;
             }
         }
 
@@ -1645,14 +1578,8 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
         if ($readOnlyMountPoints) {
             // We cannot use the API here but need to fetch the default storage record directly
             // to not instantiate it (which directly applies mount points) before all mount points are resolved!
-            $queryBuilder = $connectionPool->getQueryBuilderForTable('sys_file_storage');
-            $defaultStorageRow = $queryBuilder->select('uid')
-                ->from('sys_file_storage')
-                ->where($queryBuilder->expr()->eq('is_default', 1))
-                ->setMaxResults(1)
-                ->execute()
-                ->fetch(\PDO::FETCH_ASSOC);
-
+            $whereClause = 'is_default=1 ' . BackendUtility::BEenableFields('sys_file_storage') . BackendUtility::deleteClause('sys_file_storage');
+            $defaultStorageRow = $this->db->exec_SELECTgetSingleRow('uid', 'sys_file_storage', $whereClause);
             $readOnlyMountPointArray = GeneralUtility::trimExplode(',', $readOnlyMountPoints);
             foreach ($readOnlyMountPointArray as $readOnlyMountPoint) {
                 $readOnlyMountPointConfiguration = GeneralUtility::trimExplode(':', $readOnlyMountPoint);
@@ -1668,12 +1595,12 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
                     $storageUid = $defaultStorageRow['uid'];
                     $path = $readOnlyMountPointConfiguration[0];
                 }
-                $fileMountRecordCache[$storageUid . $path] = array(
+                $fileMountRecordCache[$storageUid . $path] = [
                     'base' => $storageUid,
                     'title' => $path,
                     'path' => $path,
                     'read_only' => true
-                );
+                ];
             }
         }
 
@@ -1687,22 +1614,22 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
                 if ($userHomeStorageUid > 0) {
                     // Try and mount with [uid]_[username]
                     $path = $userHomeFilter . $this->user['uid'] . '_' . $this->user['username'] . $GLOBALS['TYPO3_CONF_VARS']['BE']['userUploadDir'];
-                    $fileMountRecordCache[$userHomeStorageUid . $path] = array(
+                    $fileMountRecordCache[$userHomeStorageUid . $path] = [
                         'base' => $userHomeStorageUid,
                         'title' => $this->user['username'],
                         'path' => $path,
                         'read_only' => false,
                         'user_mount' => true
-                    );
+                    ];
                     // Try and mount with only [uid]
                     $path = $userHomeFilter . $this->user['uid'] . $GLOBALS['TYPO3_CONF_VARS']['BE']['userUploadDir'];
-                    $fileMountRecordCache[$userHomeStorageUid . $path] = array(
+                    $fileMountRecordCache[$userHomeStorageUid . $path] = [
                         'base' => $userHomeStorageUid,
                         'title' => $this->user['username'],
                         'path' => $path,
                         'read_only' => false,
                         'user_mount' => true
-                    );
+                    ];
                 }
             }
 
@@ -1715,13 +1642,13 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
                 if ($groupHomeStorageUid > 0) {
                     foreach ($this->userGroups as $groupData) {
                         $path = $groupHomeFilter . $groupData['uid'];
-                        $fileMountRecordCache[$groupHomeStorageUid . $path] = array(
+                        $fileMountRecordCache[$groupHomeStorageUid . $path] = [
                             'base' => $groupHomeStorageUid,
                             'title' => $groupData['title'],
                             'path' => $path,
                             'read_only' => false,
                             'user_mount' => true
-                        );
+                        ];
                     }
                 }
             }
@@ -1774,6 +1701,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      * copyFile = 1
      * moveFile = 1
      * renameFile = 1
+     * unzipFile = 1
      * deleteFile = 1
      *
      * addFolder = 1
@@ -1801,7 +1729,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
     public function getFilePermissions()
     {
         if (!isset($this->filePermissions)) {
-            $filePermissions = array(
+            $filePermissions = [
                 // File permissions
                 'addFile' => false,
                 'readFile' => false,
@@ -1809,6 +1737,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
                 'copyFile' => false,
                 'moveFile' => false,
                 'renameFile' => false,
+                'unzipFile' => false,
                 'deleteFile' => false,
                 // Folder permissions
                 'addFolder' => false,
@@ -1819,7 +1748,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
                 'renameFolder' => false,
                 'deleteFolder' => false,
                 'recursivedeleteFolder' => false
-            );
+            ];
             if ($this->isAdmin()) {
                 $filePermissions = array_map('is_bool', $filePermissions);
             } else {
@@ -1901,7 +1830,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
                 if ($storage->isDefault() && $storage->isWritable()) {
                     try {
                         $uploadFolder = $storage->getDefaultFolder();
-                        if ($uploadFolder->checkActionPermission('add')) {
+                        if ($uploadFolder->checkActionPermission('write')) {
                             break;
                         }
                         $uploadFolder = null;
@@ -1917,7 +1846,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
                     if ($storage->isWritable()) {
                         try {
                             $uploadFolder = $storage->getDefaultFolder();
-                            if ($uploadFolder->checkActionPermission('add')) {
+                            if ($uploadFolder->checkActionPermission('write')) {
                                 break;
                             }
                             $uploadFolder = null;
@@ -1932,12 +1861,12 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
         // HOOK: getDefaultUploadFolder
         if (is_array($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauthgroup.php']['getDefaultUploadFolder'])) {
             foreach ($GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['t3lib/class.t3lib_userauthgroup.php']['getDefaultUploadFolder'] as $_funcRef) {
-                $_params = array(
+                $_params = [
                     'uploadFolder' => $uploadFolder,
                     'pid' => $pid,
                     'table' => $table,
                     'field' => $field,
-                );
+                ];
                 $uploadFolder = GeneralUtility::callUserFunction($_funcRef, $_params, $this);
             }
         }
@@ -2024,7 +1953,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
     {
         $dbMountpoints = trim($this->workspaceRec['db_mountpoints']);
         if ($this->workspace > 0 && $dbMountpoints != '') {
-            $filteredDbMountpoints = array();
+            $filteredDbMountpoints = [];
             // Notice: We cannot call $this->getPagePermsClause(1);
             // as usual because the group-list is not available at this point.
             // But bypassing is fine because all we want here is check if the
@@ -2059,67 +1988,59 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
         if (!is_array($wsRec)) {
             switch ((string)$wsRec) {
                 case '0':
-                    $wsRec = array('uid' => $wsRec);
+                    $wsRec = ['uid' => $wsRec];
                     break;
                 default:
                     if (\TYPO3\CMS\Core\Utility\ExtensionManagementUtility::isLoaded('workspaces')) {
-                        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('sys_workspace');
-                        $queryBuilder->getRestrictions()->add(GeneralUtility::makeInstance(RootLevelRestriction::class));
-                        $wsRec = $queryBuilder->select(...GeneralUtility::trimExplode(',', $fields))
-                            ->from('sys_workspace')
-                            ->where(
-                                $queryBuilder->expr()->eq(
-                                    'uid',
-                                    (int)$wsRec
-                                )
-                            )
-                            ->orderBy('title')
-                            ->setMaxResults(1)
-                            ->execute()
-                            ->fetch(\PDO::FETCH_ASSOC);
+                        $wsRec = $this->db->exec_SELECTgetSingleRow($fields,
+                            'sys_workspace',
+                            'pid=0 AND uid=' . (int)$wsRec . BackendUtility::deleteClause('sys_workspace'),
+                            '',
+                            'title'
+                        );
                     }
             }
         }
         // If wsRec is set to an array, evaluate it:
         if (is_array($wsRec)) {
             if ($this->isAdmin()) {
-                return array_merge($wsRec, array('_ACCESS' => 'admin'));
+                return array_merge($wsRec, ['_ACCESS' => 'admin']);
             } else {
                 switch ((string)$wsRec['uid']) {
                     case '0':
                         $retVal = $this->groupData['workspace_perms'] & Permission::PAGE_SHOW
-                            ? array_merge($wsRec, array('_ACCESS' => 'online'))
+                            ? array_merge($wsRec, ['_ACCESS' => 'online'])
                             : false;
                         break;
                     default:
                         // Checking if the guy is admin:
                         if (GeneralUtility::inList($wsRec['adminusers'], 'be_users_' . $this->user['uid'])) {
-                            return array_merge($wsRec, array('_ACCESS' => 'owner'));
+                            return array_merge($wsRec, ['_ACCESS' => 'owner']);
                         }
                         // Checking if he is owner through a user group of his:
                         foreach ($this->userGroupsUID as $groupUid) {
                             if (GeneralUtility::inList($wsRec['adminusers'], 'be_groups_' . $groupUid)) {
-                                return array_merge($wsRec, array('_ACCESS' => 'owner'));
+                                return array_merge($wsRec, ['_ACCESS' => 'owner']);
                             }
                         }
                         // Checking if he is reviewer user:
                         if (GeneralUtility::inList($wsRec['reviewers'], 'be_users_' . $this->user['uid'])) {
-                            return array_merge($wsRec, array('_ACCESS' => 'reviewer'));
+                            return array_merge($wsRec, ['_ACCESS' => 'reviewer']);
                         }
                         // Checking if he is reviewer through a user group of his:
                         foreach ($this->userGroupsUID as $groupUid) {
                             if (GeneralUtility::inList($wsRec['reviewers'], 'be_groups_' . $groupUid)) {
-                                return array_merge($wsRec, array('_ACCESS' => 'reviewer'));
+                                return array_merge($wsRec, ['_ACCESS' => 'reviewer']);
                             }
                         }
                         // Checking if he is member as user:
                         if (GeneralUtility::inList($wsRec['members'], 'be_users_' . $this->user['uid'])) {
-                            return array_merge($wsRec, array('_ACCESS' => 'member'));
+                            return array_merge($wsRec, ['_ACCESS' => 'member']);
                         }
                         // Checking if he is member through a user group of his:
                         foreach ($this->userGroupsUID as $groupUid) {
                             if (GeneralUtility::inList($wsRec['members'], 'be_groups_' . $groupUid)) {
-                                return array_merge($wsRec, array('_ACCESS' => 'member'));
+                                return array_merge($wsRec, ['_ACCESS' => 'member']);
                             }
                         }
                 }
@@ -2160,11 +2081,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
         // If ID is different from the stored one, change it:
         if ((int)$this->workspace !== (int)$this->user['workspace_id']) {
             $this->user['workspace_id'] = $this->workspace;
-            GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable('be_users')->update(
-                'be_users',
-                ['workspace_id' => $this->user['workspace_id']],
-                ['uid' => (int)$this->user['uid']]
-            );
+            $this->db->exec_UPDATEquery('be_users', 'uid=' . (int)$this->user['uid'], ['workspace_id' => $this->user['workspace_id']]);
             $this->simplelog('User changed workspace to "' . $this->workspace . '"');
         }
     }
@@ -2209,11 +2126,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
     public function setWorkspacePreview($previewState)
     {
         $this->user['workspace_preview'] = $previewState;
-        GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable('be_users')->update(
-            'be_users',
-            ['workspace_preview_id' => $this->user['workspace_preview']],
-            ['uid' => (int)$this->user['uid']]
-        );
+        $this->db->exec_UPDATEquery('be_users', 'uid=' . (int)$this->user['uid'], ['workspace_preview' => $this->user['workspace_preview']]);
     }
 
     /**
@@ -2234,20 +2147,11 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
             $defaultWorkspace = -1;
         } elseif (\TYPO3\CMS\Core\Utility\ExtensionManagementUtility::isLoaded('workspaces')) {
             // Traverse custom workspaces:
-            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('sys_workspace');
-            $queryBuilder->getRestrictions()->add(GeneralUtility::makeInstance(RootLevelRestriction::class));
-            $workspaces = $queryBuilder->select('uid', 'title', 'adminusers', 'reviewers')
-                ->from('sys_workspace')
-                ->orderBy('title')
-                ->execute()
-                ->fetchAll(\PDO::FETCH_ASSOC);
-
-            if ($workspaces !== false) {
-                foreach ($workspaces as $rec) {
-                    if ($this->checkWorkspace($rec)) {
-                        $defaultWorkspace = $rec['uid'];
-                        break;
-                    }
+            $workspaces = $this->db->exec_SELECTgetRows('uid,title,adminusers,members,reviewers', 'sys_workspace', 'pid=0' . BackendUtility::deleteClause('sys_workspace'), '', 'title');
+            foreach ($workspaces as $rec) {
+                if ($this->checkWorkspace($rec)) {
+                    $defaultWorkspace = $rec['uid'];
+                    break;
                 }
             }
         }
@@ -2280,12 +2184,12 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
 
         if (!empty($this->user['ses_backuserid'])) {
             if (empty($data)) {
-                $data = array();
+                $data = [];
             }
             $data['originalUser'] = $this->user['ses_backuserid'];
         }
 
-        $fields = array(
+        $fields_values = [
             'userid' => (int)$userId,
             'type' => (int)$type,
             'action' => (int)$action,
@@ -2296,35 +2200,13 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
             'tablename' => $tablename,
             'recuid' => (int)$recuid,
             'IP' => (string)GeneralUtility::getIndpEnv('REMOTE_ADDR'),
-            'tstamp' => time(),
+            'tstamp' => isset($GLOBALS['EXEC_TIME']) ? $GLOBALS['EXEC_TIME'] : time(),
             'event_pid' => (int)$event_pid,
             'NEWid' => $NEWid,
             'workspace' => $this->workspace
-        );
-
-        $connection = GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable('be_users');
-        $connection->insert(
-            'sys_log',
-            $fields,
-            [
-                \PDO::PARAM_INT,
-                \PDO::PARAM_INT,
-                \PDO::PARAM_INT,
-                \PDO::PARAM_INT,
-                \PDO::PARAM_INT,
-                \PDO::PARAM_STR,
-                \PDO::PARAM_STR,
-                \PDO::PARAM_STR,
-                \PDO::PARAM_INT,
-                \PDO::PARAM_STR,
-                \PDO::PARAM_INT,
-                \PDO::PARAM_INT,
-                \PDO::PARAM_STR,
-                \PDO::PARAM_STR,
-            ]
-        );
-
-        return (int)$connection->lastInsertId();
+        ];
+        $this->db->exec_INSERTquery('sys_log', $fields_values);
+        return $this->db->sql_insert_id();
     }
 
     /**
@@ -2337,7 +2219,7 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
      */
     public function simplelog($message, $extKey = '', $error = 0)
     {
-        return $this->writelog(4, 0, $error, 0, ($extKey ? '[' . $extKey . '] ' : '') . $message, array());
+        return $this->writelog(4, 0, $error, 0, ($extKey ? '[' . $extKey . '] ' : '') . $message, []);
     }
 
     /**
@@ -2355,52 +2237,30 @@ class BackendUserAuthentication extends \TYPO3\CMS\Core\Authentication\AbstractU
     public function checkLogFailures($email, $secondsBack = 3600, $max = 3)
     {
         if ($email) {
-            $connectionPool = GeneralUtility::makeInstance(ConnectionPool::class);
-
             // Get last flag set in the log for sending
             $theTimeBack = $GLOBALS['EXEC_TIME'] - $secondsBack;
-            $queryBuilder = $connectionPool->getQueryBuilderForTable('sys_log');
-            $queryBuilder->select('tstamp')
-                ->from('sys_log')
-                ->where(
-                    $queryBuilder->expr()->eq('type', 255),
-                    $queryBuilder->expr()->eq('action', 4),
-                    $queryBuilder->expr()->gt('tstamp', (int)$theTimeBack)
-                )
-                ->orderBy('tstamp', 'DESC')
-                ->setMaxResults(1);
-            if ($testRow = $queryBuilder->execute()->fetch(\PDO::FETCH_ASSOC)) {
+            $res = $this->db->exec_SELECTquery('tstamp', 'sys_log', 'type=255 AND action=4 AND tstamp>' . (int)$theTimeBack, '', 'tstamp DESC', '1');
+            if ($testRow = $this->db->sql_fetch_assoc($res)) {
                 $theTimeBack = $testRow['tstamp'];
             }
-
-            $queryBuilder = $connectionPool->getQueryBuilderForTable('sys_log');
-            $result = $queryBuilder->select('*')
-                ->from('sys_log')
-                ->where(
-                    $queryBuilder->expr()->eq('type', 255),
-                    $queryBuilder->expr()->eq('action', 3),
-                    $queryBuilder->expr()->neq('error', 0),
-                    $queryBuilder->expr()->gt('tstamp', (int)$theTimeBack)
-                )
-                ->orderBy('tstamp')
-                ->execute();
-
+            $this->db->sql_free_result($res);
             // Check for more than $max number of error failures with the last period.
-            if ($result->rowCount() > $max) {
+            $res = $this->db->exec_SELECTquery('*', 'sys_log', 'type=255 AND action=3 AND error<>0 AND tstamp>' . (int)$theTimeBack, '', 'tstamp');
+            if ($this->db->sql_num_rows($res) > $max) {
                 // OK, so there were more than the max allowed number of login failures - so we will send an email then.
                 $subject = 'TYPO3 Login Failure Warning (at ' . $GLOBALS['TYPO3_CONF_VARS']['SYS']['sitename'] . ')';
-                $email_body = 'There have been some attempts (' . $result->rowCount() . ') to login at the TYPO3
+                $email_body = 'There have been some attempts (' . $this->db->sql_num_rows($res) . ') to login at the TYPO3
 site "' . $GLOBALS['TYPO3_CONF_VARS']['SYS']['sitename'] . '" (' . GeneralUtility::getIndpEnv('HTTP_HOST') . ').
 
 This is a dump of the failures:
 
 ';
-                while ($row = $result->fetch(\PDO::FETCH_ASSOC)) {
-                    $theData = unserialize($row['log_data']);
+                while ($testRows = $this->db->sql_fetch_assoc($res)) {
+                    $theData = unserialize($testRows['log_data']);
                     $email_body .= date(
                             $GLOBALS['TYPO3_CONF_VARS']['SYS']['ddmmyy'] . ' ' . $GLOBALS['TYPO3_CONF_VARS']['SYS']['hhmm'],
-                            $row['tstamp']
-                        ) . ':  ' . @sprintf($row['details'], (string)$theData[0], (string)$theData[1], (string)$theData[2]);
+                            $testRows['tstamp']
+                        ) . ':  ' . @sprintf($testRows['details'], (string)$theData[0], (string)$theData[1], (string)$theData[2]);
                     $email_body .= LF;
                 }
                 $from = \TYPO3\CMS\Core\Utility\MailUtility::getSystemFrom();
@@ -2409,7 +2269,8 @@ This is a dump of the failures:
                 $mail->setTo($email)->setFrom($from)->setSubject($subject)->setBody($email_body);
                 $mail->send();
                 // Logout written to log
-                $this->writelog(255, 4, 0, 3, 'Failure warning (%s failures within %s seconds) sent by email to %s', array($result->rowCount(), $secondsBack, $email));
+                $this->writelog(255, 4, 0, 3, 'Failure warning (%s failures within %s seconds) sent by email to %s', [$this->db->sql_num_rows($res), $secondsBack, $email]);
+                $this->db->sql_free_result($res);
             }
         }
     }
@@ -2452,8 +2313,9 @@ This is a dump of the failures:
     /**
      * Check if user is logged in and if so, call ->fetchGroupData() to load group information and
      * access lists of all kind, further check IP, set the ->uc array and send login-notification email if required.
-     * If no user is logged in the default behaviour is to exit with an error message.
-     * This function is called right after ->start() in fx. the TYPO3 Bootstrap.
+     * If no user is logged in the default behaviour is to exit with an error message,
+     * but this will happen ONLY if the constant TYPO3_PROCEED_IF_NO_USER is set TRUE.
+     * This function is called right after ->start() in fx. the TYPO3 CMS bootsrap
      *
      * @param bool $proceedIfNoUserIsLoggedIn if this option is set, then there won't be a redirect to the login screen of the Backend - used for areas in the backend which do not need user rights like the login page.
      * @throws \RuntimeException
@@ -2487,6 +2349,44 @@ This is a dump of the failures:
     }
 
     /**
+     * If the backend script is in CLI mode, it will try to load a backend user named by the CLI module name (in lowercase)
+     *
+     * @return bool Returns TRUE if a CLI user was loaded, otherwise FALSE!
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8. Please implement this functionality in your own application directly from the outside
+     */
+    public function checkCLIuser()
+    {
+        GeneralUtility::logDeprecatedFunction();
+        // First, check if cliMode is enabled:
+        if (TYPO3_REQUESTTYPE & TYPO3_REQUESTTYPE_CLI) {
+            if (!$this->user['uid']) {
+                if (substr($GLOBALS['MCONF']['name'], 0, 5) == '_CLI_') {
+                    $userName = strtolower($GLOBALS['MCONF']['name']);
+                    $this->setBeUserByName($userName);
+                    if ($this->user['uid']) {
+                        if (!$this->isAdmin()) {
+                            return true;
+                        } else {
+                            fwrite(STDERR, 'ERROR: CLI backend user "' . $userName . '" was ADMIN which is not allowed!' . LF . LF);
+                            die(3);
+                        }
+                    } else {
+                        fwrite(STDERR, 'ERROR: No backend user named "' . $userName . '" was found!' . LF . LF);
+                        die(3);
+                    }
+                } else {
+                    fwrite(STDERR, 'ERROR: Module name, "' . $GLOBALS['MCONF']['name'] . '", was not prefixed with "_CLI_"' . LF . LF);
+                    die(3);
+                }
+            } else {
+                fwrite(STDERR, 'ERROR: Another user was already loaded which is impossible in CLI mode!' . LF . LF);
+                die(3);
+            }
+        }
+        return false;
+    }
+
+    /**
      * Initialize the internal ->uc array for the backend user
      * Will make the overrides if necessary, and write the UC back to the be_users record if changes has happened
      *
@@ -2503,7 +2403,7 @@ This is a dump of the failures:
         }
         // Setting defaults if uc is empty
         $updated = false;
-        $originalUc = array();
+        $originalUc = [];
         if (is_array($this->uc) && isset($this->uc['ucSetByInstallTool'])) {
             $originalUc = $this->uc;
             unset($originalUc['ucSetByInstallTool'], $this->uc);
@@ -2641,13 +2541,10 @@ This is a dump of the failures:
             $isUserAllowedToLogin = true;
         } elseif ($this->user['ses_backuserid']) {
             $backendUserId = (int)$this->user['ses_backuserid'];
-            $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)->getQueryBuilderForTable('be_users');
-            $isUserAllowedToLogin = (bool)$queryBuilder->count('uid')
-                ->from('be_users')
-                ->where($queryBuilder->expr()->eq('uid', (int)$backendUserId))
-                ->andWhere($queryBuilder->expr()->eq('admin', 1))
-                ->execute()
-                ->fetchColumn(0);
+            $whereAdmin = 'uid=' . $backendUserId . ' AND admin=1' . BackendUtility::BEenableFields('be_users');
+            if ($this->db->exec_SELECTcountRows('uid', 'be_users', $whereAdmin) > 0) {
+                $isUserAllowedToLogin = true;
+            }
         }
         return $isUserAllowedToLogin;
     }
@@ -2657,7 +2554,7 @@ This is a dump of the failures:
      */
     public function logoff()
     {
-        if (isset($GLOBALS['BE_USER']) && $GLOBALS['BE_USER'] instanceof BackendUserAuthentication && isset($GLOBALS['BE_USER']->user['uid'])) {
+        if (isset($GLOBALS['BE_USER']) && $GLOBALS['BE_USER'] instanceof self && isset($GLOBALS['BE_USER']->user['uid'])) {
             \TYPO3\CMS\Core\FormProtection\FormProtectionFactory::get()->clean();
         }
         parent::logoff();

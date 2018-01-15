@@ -104,7 +104,7 @@ class StorageRepository extends AbstractRepository
             // so check if there is any record. If no record is found, create the fileadmin/ storage
             // selecting just one row is enoung
 
-            if (static::$storageRowCache === array()) {
+            if (static::$storageRowCache === []) {
                 $storageObjectsExists = $this->db->exec_SELECTgetSingleRow('uid', $this->table, '');
                 if ($storageObjectsExists !== null) {
                     if ($this->createLocalStorage(
@@ -137,7 +137,7 @@ class StorageRepository extends AbstractRepository
         /** @var $driverRegistry Driver\DriverRegistry */
         $driverRegistry = GeneralUtility::makeInstance(Driver\DriverRegistry::class);
 
-        $storageObjects = array();
+        $storageObjects = [];
         foreach (static::$storageRowCache as $storageRow) {
             if ($storageRow['driver'] !== $storageType) {
                 continue;
@@ -146,7 +146,7 @@ class StorageRepository extends AbstractRepository
                 $storageObjects[] = $this->factory->getStorageObject($storageRow['uid'], $storageRow);
             } else {
                 $this->logger->warning(
-                    sprintf('Could not instantiate storage "%s" because of missing driver.', array($storageRow['name'])),
+                    sprintf('Could not instantiate storage "%s" because of missing driver.', [$storageRow['name']]),
                     $storageRow
                 );
             }
@@ -167,13 +167,13 @@ class StorageRepository extends AbstractRepository
         /** @var $driverRegistry Driver\DriverRegistry */
         $driverRegistry = GeneralUtility::makeInstance(Driver\DriverRegistry::class);
 
-        $storageObjects = array();
+        $storageObjects = [];
         foreach (static::$storageRowCache as $storageRow) {
             if ($driverRegistry->driverExists($storageRow['driver'])) {
                 $storageObjects[] = $this->factory->getStorageObject($storageRow['uid'], $storageRow);
             } else {
                 $this->logger->warning(
-                    sprintf('Could not instantiate storage "%s" because of missing driver.', array($storageRow['name'])),
+                    sprintf('Could not instantiate storage "%s" because of missing driver.', [$storageRow['name']]),
                     $storageRow
                 );
             }
@@ -195,24 +195,24 @@ class StorageRepository extends AbstractRepository
     {
         $caseSensitive = $this->testCaseSensitivity($pathType === 'relative' ? PATH_site . $basePath : $basePath);
         // create the FlexForm for the driver configuration
-        $flexFormData = array(
-            'data' => array(
-                'sDEF' => array(
-                    'lDEF' => array(
-                        'basePath' => array('vDEF' => rtrim($basePath, '/') . '/'),
-                        'pathType' => array('vDEF' => $pathType),
-                        'caseSensitive' => array('vDEF' => $caseSensitive)
-                    )
-                )
-            )
-        );
+        $flexFormData = [
+            'data' => [
+                'sDEF' => [
+                    'lDEF' => [
+                        'basePath' => ['vDEF' => rtrim($basePath, '/') . '/'],
+                        'pathType' => ['vDEF' => $pathType],
+                        'caseSensitive' => ['vDEF' => $caseSensitive]
+                    ]
+                ]
+            ]
+        ];
 
         /** @var $flexObj FlexFormTools */
         $flexObj = GeneralUtility::makeInstance(FlexFormTools::class);
         $flexFormXml = $flexObj->flexArray2Xml($flexFormData, true);
 
             // create the record
-        $field_values = array(
+        $field_values = [
             'pid' => 0,
             'tstamp' => $GLOBALS['EXEC_TIME'],
             'crdate' => $GLOBALS['EXEC_TIME'],
@@ -225,7 +225,7 @@ class StorageRepository extends AbstractRepository
             'is_public' => 1,
             'is_writable' => 1,
             'is_default' => $default ? 1 : 0
-        );
+        ];
         $this->db->exec_INSERTquery('sys_file_storage', $field_values);
         return (int)$this->db->sql_insert_id();
     }

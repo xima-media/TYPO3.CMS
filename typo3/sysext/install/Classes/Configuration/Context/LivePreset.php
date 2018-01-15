@@ -34,7 +34,7 @@ class LivePreset extends Configuration\AbstractPreset
     /**
      * @var array Configuration values handled by this preset
      */
-    protected $configurationValues = array(
+    protected $configurationValues = [
         'BE/debug' => false,
         'FE/debug' => false,
         'SYS/devIPmask' => '',
@@ -42,12 +42,15 @@ class LivePreset extends Configuration\AbstractPreset
         'SYS/enableDeprecationLog' => false,
         'SYS/sqlDebug' => 0,
         'SYS/systemLogLevel' => 2,
-    );
+        'SYS/clearCacheSystem' => false,
+        // E_RECOVERABLE_ERROR | E_USER_DEPRECATED
+        'SYS/exceptionalErrors' => 20480,
+    ];
 
     /**
      * Production preset is always available
      *
-     * @return bool Always TRUE
+     * @return bool TRUE if mbstring PHP module is loaded
      */
     public function isAvailable()
     {

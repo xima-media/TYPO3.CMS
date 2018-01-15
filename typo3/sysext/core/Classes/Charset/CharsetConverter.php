@@ -15,7 +15,6 @@ namespace TYPO3\CMS\Core\Charset;
  */
 
 use TYPO3\CMS\Core\Localization\Locales;
-use TYPO3\CMS\Core\SingletonInterface;
 use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 
@@ -51,24 +50,8 @@ use TYPO3\CMS\Core\Utility\GeneralUtility;
 /**
  * Class for conversion between charsets
  */
-class CharsetConverter implements SingletonInterface
+class CharsetConverter
 {
-    /**
-     * Possible strategies for handling multi-byte data
-     * Only used for internal purpose
-     * @internal
-     */
-    const STRATEGY_MBSTRING = 'mbstring';
-    const STRATEGY_ICONV = 'iconv';
-    const STRATEGY_FALLBACK = 'fallback';
-
-    /**
-     * Set to one of the strategies above, based on the availability of the environment.
-     *
-     * @var string
-     */
-    protected $conversionStrategy = null;
-
     /**
      * ASCII Value for chars with no equivalent.
      *
@@ -81,52 +64,52 @@ class CharsetConverter implements SingletonInterface
      *
      * @var array
      */
-    public $parsedCharsets = array();
+    public $parsedCharsets = [];
 
     /**
      * An array where case folding data will be stored (cached)
      *
      * @var array
      */
-    public $caseFolding = array();
+    public $caseFolding = [];
 
     /**
      * An array where charset-to-ASCII mappings are stored (cached)
      *
      * @var array
      */
-    public $toASCII = array();
+    public $toASCII = [];
 
     /**
      * This tells the converter which charsets has two bytes per char:
      *
      * @var array
      */
-    public $twoByteSets = array(
+    public $twoByteSets = [
         'ucs-2' => 1
-    );
+    ];
 
     /**
      * This tells the converter which charsets has four bytes per char:
      *
      * @var array
      */
-    public $fourByteSets = array(
+    public $fourByteSets = [
         'ucs-4' => 1, // 4-byte Unicode
         'utf-32' => 1
-    );
+    ];
 
     /**
      * This tells the converter which charsets use a scheme like the Extended Unix Code:
      *
      * @var array
      */
-    public $eucBasedSets = array(
+    public $eucBasedSets = [
         'gb2312' => 1, // Chinese, simplified.
         'big5' => 1, // Chinese, traditional.
         'euc-kr' => 1, // Korean
         'shift_jis' => 1
-    );
+    ];
 
     /**
      * @link http://developer.apple.com/documentation/macos8/TextIntlSvcs/TextEncodingConversionManager/TEC1.5/TEC.b0.html
@@ -134,7 +117,7 @@ class CharsetConverter implements SingletonInterface
      *
      * @var array
      */
-    public $synonyms = array(
+    public $synonyms = [
         'us' => 'ascii',
         'us-ascii' => 'ascii',
         'cp819' => 'iso-8859-1',
@@ -217,16 +200,254 @@ class CharsetConverter implements SingletonInterface
         'utf32' => 'utf-32',
         'ucs2' => 'ucs-2',
         'ucs4' => 'ucs-4'
-    );
+    ];
+
+    /**
+     * Mapping of iso-639-1 language codes to script names
+     *
+     * @var array
+     */
+    public $lang_to_script = [
+        // iso-639-1 language codes, see http://www.loc.gov/standards/iso639-2/php/code_list.php
+        'af' => 'west_european', // Afrikaans
+        'ar' => 'arabic',
+        'bg' => 'cyrillic', // Bulgarian
+        'bs' => 'east_european', // Bosnian
+        'cs' => 'east_european', // Czech
+        'da' => 'west_european', // Danish
+        'de' => 'west_european', // German
+        'es' => 'west_european', // Spanish
+        'et' => 'estonian',
+        'eo' => 'unicode', // Esperanto
+        'eu' => 'west_european', // Basque
+        'fa' => 'arabic', // Persian
+        'fi' => 'west_european', // Finish
+        'fo' => 'west_european', // Faroese
+        'fr' => 'west_european', // French
+        'ga' => 'west_european', // Irish
+        'gl' => 'west_european', // Galician
+        'gr' => 'greek',
+        'he' => 'hebrew', // Hebrew (since 1998)
+        'hi' => 'unicode', // Hindi
+        'hr' => 'east_european', // Croatian
+        'hu' => 'east_european', // Hungarian
+        'iw' => 'hebrew', // Hebrew (til 1998)
+        'is' => 'west_european', // Icelandic
+        'it' => 'west_european', // Italian
+        'ja' => 'japanese',
+        'ka' => 'unicode', // Georgian
+        'kl' => 'west_european', // Greenlandic
+        'km' => 'unicode', // Khmer
+        'ko' => 'korean',
+        'lt' => 'lithuanian',
+        'lv' => 'west_european', // Latvian/Lettish
+        'nl' => 'west_european', // Dutch
+        'no' => 'west_european', // Norwegian
+        'nb' => 'west_european', // Norwegian Bokmal
+        'nn' => 'west_european', // Norwegian Nynorsk
+        'pl' => 'east_european', // Polish
+        'pt' => 'west_european', // Portuguese
+        'ro' => 'east_european', // Romanian
+        'ru' => 'cyrillic', // Russian
+        'sk' => 'east_european', // Slovak
+        'sl' => 'east_european', // Slovenian
+        'sr' => 'cyrillic', // Serbian
+        'sv' => 'west_european', // Swedish
+        'sq' => 'albanian', // Albanian
+        'th' => 'thai',
+        'uk' => 'cyrillic', // Ukranian
+        'vi' => 'vietnamese',
+        'zh' => 'chinese',
+
+        // MS language codes, see http://msdn.microsoft.com/library/default.asp?url=/library/en-us/vclib/html/_crt_language_strings.asp
+        // http://msdn.microsoft.com/library/default.asp?url=/library/en-us/wceinternational5/html/wce50conLanguageIdentifiersandLocales.asp
+        'afk' => 'west_european', // Afrikaans
+        'ara' => 'arabic',
+        'bgr' => 'cyrillic', // Bulgarian
+        'cat' => 'west_european', // Catalan
+        'chs' => 'simpl_chinese',
+        'cht' => 'trad_chinese',
+        'csy' => 'east_european', // Czech
+        'dan' => 'west_european', // Danish
+        'deu' => 'west_european', // German
+        'dea' => 'west_european', // German (Austrian)
+        'des' => 'west_european', // German (Swiss)
+        'ena' => 'west_european', // English (Australian)
+        'enc' => 'west_european', // English (Canadian)
+        'eng' => 'west_european', // English
+        'enz' => 'west_european', // English (New Zealand)
+        'enu' => 'west_european', // English (United States)
+        'euq' => 'west_european', // Basque
+        'fos' => 'west_european', // Faroese
+        'far' => 'arabic', // Persian
+        'fin' => 'west_european', // Finish
+        'fra' => 'west_european', // French
+        'frb' => 'west_european', // French (Belgian)
+        'frc' => 'west_european', // French (Canadian)
+        'frs' => 'west_european', // French (Swiss)
+        'geo' => 'unicode', // Georgian
+        'glg' => 'west_european', // Galician
+        'ell' => 'greek',
+        'heb' => 'hebrew',
+        'hin' => 'unicode', // Hindi
+        'hun' => 'east_european', // Hungarian
+        'isl' => 'west_european', // Icelandic
+        'ita' => 'west_european', // Italian
+        'its' => 'west_european', // Italian (Swiss)
+        'jpn' => 'japanese',
+        'khm' => 'unicode', // Khmer
+        'kor' => 'korean',
+        'lth' => 'lithuanian',
+        'lvi' => 'west_european', // Latvian/Lettish
+        'msl' => 'west_european', // Malay
+        'nlb' => 'west_european', // Dutch (Belgian)
+        'nld' => 'west_european', // Dutch
+        'nor' => 'west_european', // Norwegian (bokmal)
+        'non' => 'west_european', // Norwegian (nynorsk)
+        'plk' => 'east_european', // Polish
+        'ptg' => 'west_european', // Portuguese
+        'ptb' => 'west_european', // Portuguese (Brazil)
+        'rom' => 'east_european', // Romanian
+        'rus' => 'cyrillic', // Russian
+        'slv' => 'east_european', // Slovenian
+        'sky' => 'east_european', // Slovak
+        'srl' => 'east_european', // Serbian (Latin)
+        'srb' => 'cyrillic', // Serbian (Cyrillic)
+        'esp' => 'west_european', // Spanish (trad. sort)
+        'esm' => 'west_european', // Spanish (Mexican)
+        'esn' => 'west_european', // Spanish (internat. sort)
+        'sve' => 'west_european', // Swedish
+        'sqi' => 'albanian', // Albanian
+        'tha' => 'thai',
+        'trk' => 'turkish',
+        'ukr' => 'cyrillic', // Ukrainian
+
+        // English language names
+        'afrikaans' => 'west_european',
+        'albanian' => 'albanian',
+        'arabic' => 'arabic',
+        'basque' => 'west_european',
+        'bosnian' => 'east_european',
+        'bulgarian' => 'east_european',
+        'catalan' => 'west_european',
+        'croatian' => 'east_european',
+        'czech' => 'east_european',
+        'danish' => 'west_european',
+        'dutch' => 'west_european',
+        'english' => 'west_european',
+        'esperanto' => 'unicode',
+        'estonian' => 'estonian',
+        'faroese' => 'west_european',
+        'farsi' => 'arabic',
+        'finnish' => 'west_european',
+        'french' => 'west_european',
+        'galician' => 'west_european',
+        'georgian' => 'unicode',
+        'german' => 'west_european',
+        'greek' => 'greek',
+        'greenlandic' => 'west_european',
+        'hebrew' => 'hebrew',
+        'hindi' => 'unicode',
+        'hungarian' => 'east_european',
+        'icelandic' => 'west_european',
+        'italian' => 'west_european',
+        'khmer' => 'unicode',
+        'latvian' => 'west_european',
+        'lettish' => 'west_european',
+        'lithuanian' => 'lithuanian',
+        'malay' => 'west_european',
+        'norwegian' => 'west_european',
+        'persian' => 'arabic',
+        'polish' => 'east_european',
+        'portuguese' => 'west_european',
+        'russian' => 'cyrillic',
+        'romanian' => 'east_european',
+        'serbian' => 'cyrillic',
+        'slovak' => 'east_european',
+        'slovenian' => 'east_european',
+        'spanish' => 'west_european',
+        'svedish' => 'west_european',
+        'that' => 'thai',
+        'turkish' => 'turkish',
+        'ukrainian' => 'cyrillic'
+    ];
+
+    /**
+     * Mapping of language (family) names to charsets on Unix
+     *
+     * @var array
+     */
+    public $script_to_charset_unix = [
+        'west_european' => 'iso-8859-1',
+        'estonian' => 'iso-8859-1',
+        'east_european' => 'iso-8859-2',
+        'baltic' => 'iso-8859-4',
+        'cyrillic' => 'iso-8859-5',
+        'arabic' => 'iso-8859-6',
+        'greek' => 'iso-8859-7',
+        'hebrew' => 'iso-8859-8',
+        'turkish' => 'iso-8859-9',
+        'thai' => 'iso-8859-11', // = TIS-620
+        'lithuanian' => 'iso-8859-13',
+        'chinese' => 'gb2312', // = euc-cn
+        'japanese' => 'euc-jp',
+        'korean' => 'euc-kr',
+        'simpl_chinese' => 'gb2312',
+        'trad_chinese' => 'big5',
+        'vietnamese' => '',
+        'unicode' => 'utf-8',
+        'albanian' => 'utf-8'
+    ];
+
+    /**
+     * Mapping of language (family) names to charsets on Windows
+     *
+     * @var array
+     */
+    public $script_to_charset_windows = [
+        'east_european' => 'windows-1250',
+        'cyrillic' => 'windows-1251',
+        'west_european' => 'windows-1252',
+        'greek' => 'windows-1253',
+        'turkish' => 'windows-1254',
+        'hebrew' => 'windows-1255',
+        'arabic' => 'windows-1256',
+        'baltic' => 'windows-1257',
+        'estonian' => 'windows-1257',
+        'lithuanian' => 'windows-1257',
+        'vietnamese' => 'windows-1258',
+        'thai' => 'cp874',
+        'korean' => 'cp949',
+        'chinese' => 'gb2312',
+        'japanese' => 'shift_jis',
+        'simpl_chinese' => 'gb2312',
+        'trad_chinese' => 'big5',
+        'albanian' => 'windows-1250',
+        'unicode' => 'utf-8'
+    ];
+
+    /**
+     * Mapping of locale names to charsets
+     *
+     * @var array
+     */
+    public $locale_to_charset = [
+        'japanese.euc' => 'euc-jp',
+        'ja_jp.ujis' => 'euc-jp',
+        'korean.euc' => 'euc-kr',
+        'sr@Latn' => 'iso-8859-2',
+        'zh_cn' => 'gb2312',
+        'zh_hk' => 'big5',
+        'zh_tw' => 'big5'
+    ];
 
     /**
      * TYPO3 specific: Array with the system charsets used for each system language in TYPO3:
      * Empty values means "utf-8"
      *
      * @var array
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9, use Locales
      */
-    public $charSetArray = array(
+    public $charSetArray = [
         'af' => '',
         'ar' => 'iso-8859-6',
         'ba' => 'iso-8859-2',
@@ -293,7 +514,7 @@ class CharsetConverter implements SingletonInterface
         'vi' => 'utf-8',
         'vn' => 'utf-8',
         'zh' => 'big5'
-    );
+    ];
 
     /**
      * Normalize - changes input character set to lowercase letters.
@@ -308,6 +529,48 @@ class CharsetConverter implements SingletonInterface
             $charset = $this->synonyms[$charset];
         }
         return $charset;
+    }
+
+    /**
+     * Get the charset of a locale.
+     *
+     * ln      language
+     * ln_CN     language / country
+     * ln_CN.cs    language / country / charset
+     * ln_CN.cs@mod  language / country / charset / modifier
+     *
+     * @param string $locale Locale string
+     * @return string Charset resolved for locale string
+     */
+    public function get_locale_charset($locale)
+    {
+        $locale = strtolower($locale);
+        // Exact locale specific charset?
+        if (isset($this->locale_to_charset[$locale])) {
+            return $this->locale_to_charset[$locale];
+        }
+        // Get modifier
+        list($locale, $modifier) = explode('@', $locale);
+        // Locale contains charset: use it
+        list($locale, $charset) = explode('.', $locale);
+        if ($charset) {
+            return $this->parse_charset($charset);
+        }
+        // Modifier is 'euro' (after charset check, because of xx.utf-8@euro)
+        if ($modifier === 'euro') {
+            return 'iso-8859-15';
+        }
+        // Get language
+        list($language, ) = explode('_', $locale);
+        if (isset($this->lang_to_script[$language])) {
+            $script = $this->lang_to_script[$language];
+        }
+        if (TYPO3_OS === 'WIN') {
+            $cs = $this->script_to_charset_windows[$script] ?: 'windows-1252';
+        } else {
+            $cs = $this->script_to_charset_unix[$script] ?: 'utf-8';
+        }
+        return $cs;
     }
 
     /********************************************
@@ -332,16 +595,22 @@ class CharsetConverter implements SingletonInterface
         }
         // PHP-libs don't support fallback to SGML entities, but UTF-8 handles everything
         if ($toCharset === 'utf-8' || !$useEntityForNoChar) {
-            switch ($this->getConversionStrategy()) {
-                case self::STRATEGY_MBSTRING:
+            switch ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_convMethod']) {
+                case 'mbstring':
                     $convertedString = mb_convert_encoding($inputString, $toCharset, $fromCharset);
                     if (false !== $convertedString) {
                         return $convertedString;
                     }
                     // Returns FALSE for unsupported charsets
                     break;
-                case self::STRATEGY_ICONV:
+                case 'iconv':
                     $convertedString = iconv($fromCharset, $toCharset . '//TRANSLIT', $inputString);
+                    if (false !== $convertedString) {
+                        return $convertedString;
+                    }
+                    break;
+                case 'recode':
+                    $convertedString = recode_string($fromCharset . '..' . $toCharset, $inputString);
                     if (false !== $convertedString) {
                         return $convertedString;
                     }
@@ -551,14 +820,17 @@ class CharsetConverter implements SingletonInterface
     }
 
     /**
-     * Converts numeric entities (UNICODE, eg. decimal (&#1234;) or hexadecimal (&#x1b;)) to UTF-8 multibyte chars.
-     * All string-HTML entities (like &amp; or &pound;) will be converted as well
+     * Converts numeric entities (UNICODE, eg. decimal (&#1234;) or hexadecimal (&#x1b;)) to UTF-8 multibyte chars
+     *
      * @param string $str Input string, UTF-8
+     * @param bool $alsoStdHtmlEnt If set, then all string-HTML entities (like &amp; or &pound; will be converted as well)
      * @return string Output string
      */
-    public function entities_to_utf8($str)
+    public function entities_to_utf8($str, $alsoStdHtmlEnt = false)
     {
-        $trans_tbl = array_flip(get_html_translation_table(HTML_ENTITIES, ENT_COMPAT));
+        if ($alsoStdHtmlEnt) {
+            $trans_tbl = array_flip(get_html_translation_table(HTML_ENTITIES, ENT_COMPAT, 'UTF-8'));
+        }
         $token = md5(microtime());
         $parts = explode($token, preg_replace('/(&([#[:alnum:]]*);)/', $token . '${2}' . $token, $str));
         foreach ($parts as $k => $v) {
@@ -576,7 +848,7 @@ class CharsetConverter implements SingletonInterface
                     $v = substr($v, $position);
                 }
                 $parts[$k] = $this->UnumberToChar($v);
-            } elseif (isset($trans_tbl['&' . $v . ';'])) {
+            } elseif ($alsoStdHtmlEnt && isset($trans_tbl['&' . $v . ';'])) {
                 // Other entities:
                 $v = $trans_tbl['&' . $v . ';'];
                 $parts[$k] = $v;
@@ -589,21 +861,22 @@ class CharsetConverter implements SingletonInterface
     }
 
     /**
-     * Converts all chars in the input UTF-8 string into integer numbers returned in an array.
-     * All HTML entities (like &amp; or &pound; or &#123; or &#x3f5d;) will be detected as characters.
-     * Also, instead of integer numbers the real UTF-8 char is returned.
+     * Converts all chars in the input UTF-8 string into integer numbers returned in an array
      *
      * @param string $str Input string, UTF-8
+     * @param bool $convEntities If set, then all HTML entities (like &amp; or &pound; or &#123; or &#x3f5d;) will be detected as characters.
+     * @param bool $retChar If set, then instead of integer numbers the real UTF-8 char is returned.
      * @return array Output array with the char numbers
      */
-    public function utf8_to_numberarray($str)
+    public function utf8_to_numberarray($str, $convEntities = false, $retChar = false)
     {
-        // Entities must be registered as well
-        $str = $this->entities_to_utf8($str);
-
+        // If entities must be registered as well...:
+        if ($convEntities) {
+            $str = $this->entities_to_utf8($str, 1);
+        }
         // Do conversion:
         $strLen = strlen($str);
-        $outArr = array();
+        $outArr = [];
         // Traverse each char in UTF-8 string.
         for ($a = 0; $a < $strLen; $a++) {
             $chr = substr($str, $a, 1);
@@ -627,12 +900,12 @@ class CharsetConverter implements SingletonInterface
                             break;
                         }
                     }
-                    $outArr[] = $buf;
+                    $outArr[] = $retChar ? $buf : $this->utf8CharToUnumber($buf);
                 } else {
-                    $outArr[] = chr($this->noCharByteVal);
+                    $outArr[] = $retChar ? chr($this->noCharByteVal) : $this->noCharByteVal;
                 }
             } else {
-                $outArr[] = chr($ord);
+                $outArr[] = $retChar ? chr($ord) : $ord;
             }
         }
         return $outArr;
@@ -755,14 +1028,14 @@ class CharsetConverter implements SingletonInterface
             if ($charset && GeneralUtility::validPathStr($charsetConvTableFile) && @is_file($charsetConvTableFile)) {
                 // Cache file for charsets:
                 // Caching brought parsing time for gb2312 down from 2400 ms to 150 ms. For other charsets we are talking 11 ms down to zero.
-                $cacheFile = GeneralUtility::getFileAbsFileName('typo3temp/var/charset/charset_' . $charset . '.tbl');
+                $cacheFile = GeneralUtility::getFileAbsFileName('typo3temp/cs/charset_' . $charset . '.tbl');
                 if ($cacheFile && @is_file($cacheFile)) {
-                    $this->parsedCharsets[$charset] = unserialize(file_get_contents($cacheFile));
+                    $this->parsedCharsets[$charset] = unserialize(GeneralUtility::getUrl($cacheFile));
                 } else {
                     // Parse conversion table into lines:
-                    $lines = GeneralUtility::trimExplode(LF, file_get_contents($charsetConvTableFile), true);
+                    $lines = GeneralUtility::trimExplode(LF, GeneralUtility::getUrl($charsetConvTableFile), true);
                     // Initialize the internal variable holding the conv. table:
-                    $this->parsedCharsets[$charset] = array('local' => array(), 'utf8' => array());
+                    $this->parsedCharsets[$charset] = ['local' => [], 'utf8' => []];
                     // traverse the lines:
                     $detectedType = '';
                     foreach ($lines as $value) {
@@ -776,7 +1049,7 @@ class CharsetConverter implements SingletonInterface
                             if ($detectedType === 'ms-token') {
                                 list($hexbyte, $utf8) = preg_split('/[=:]/', $value, 3);
                             } elseif ($detectedType === 'whitespaced') {
-                                $regA = array();
+                                $regA = [];
                                 preg_match('/[[:space:]]*0x([[:alnum:]]*)[[:space:]]+0x([[:alnum:]]*)[[:space:]]+/', $value, $regA);
                                 $hexbyte = $regA[1];
                                 $utf8 = 'U+' . $regA[2];
@@ -814,8 +1087,8 @@ class CharsetConverter implements SingletonInterface
     public function initUnicodeData($mode = null)
     {
         // Cache files
-        $cacheFileCase = GeneralUtility::getFileAbsFileName('typo3temp/var/charset/cscase_utf-8.tbl');
-        $cacheFileASCII = GeneralUtility::getFileAbsFileName('typo3temp/var/charset/csascii_utf-8.tbl');
+        $cacheFileCase = GeneralUtility::getFileAbsFileName('typo3temp/cs/cscase_utf-8.tbl');
+        $cacheFileASCII = GeneralUtility::getFileAbsFileName('typo3temp/cs/csascii_utf-8.tbl');
         // Only process if the tables are not yet loaded
         switch ($mode) {
             case 'case':
@@ -824,7 +1097,7 @@ class CharsetConverter implements SingletonInterface
                 }
                 // Use cached version if possible
                 if ($cacheFileCase && @is_file($cacheFileCase)) {
-                    $this->caseFolding['utf-8'] = unserialize(file_get_contents($cacheFileCase));
+                    $this->caseFolding['utf-8'] = unserialize(GeneralUtility::getUrl($cacheFileCase));
                     return 2;
                 }
                 break;
@@ -834,7 +1107,7 @@ class CharsetConverter implements SingletonInterface
                 }
                 // Use cached version if possible
                 if ($cacheFileASCII && @is_file($cacheFileASCII)) {
-                    $this->toASCII['utf-8'] = unserialize(file_get_contents($cacheFileASCII));
+                    $this->toASCII['utf-8'] = unserialize(GeneralUtility::getUrl($cacheFileASCII));
                     return 2;
                 }
                 break;
@@ -850,20 +1123,20 @@ class CharsetConverter implements SingletonInterface
         }
         // key = utf8 char (single codepoint), value = utf8 string (codepoint sequence)
         // Note: we use the UTF-8 characters here and not the Unicode numbers to avoid conversion roundtrip in utf8_strtolower/-upper)
-        $this->caseFolding['utf-8'] = array();
+        $this->caseFolding['utf-8'] = [];
         $utf8CaseFolding = &$this->caseFolding['utf-8'];
         // a shorthand
-        $utf8CaseFolding['toUpper'] = array();
-        $utf8CaseFolding['toLower'] = array();
-        $utf8CaseFolding['toTitle'] = array();
+        $utf8CaseFolding['toUpper'] = [];
+        $utf8CaseFolding['toLower'] = [];
+        $utf8CaseFolding['toTitle'] = [];
         // Array of temp. decompositions
-        $decomposition = array();
+        $decomposition = [];
         // Array of chars that are marks (eg. composing accents)
-        $mark = array();
+        $mark = [];
         // Array of chars that are numbers (eg. digits)
-        $number = array();
+        $number = [];
         // Array of chars to be omitted (eg. Russian hard sign)
-        $omit = array();
+        $omit = [];
         while (!feof($fh)) {
             $line = fgets($fh, 4096);
             // Has a lot of info
@@ -896,16 +1169,16 @@ class CharsetConverter implements SingletonInterface
                     }
             }
             // Accented Latin letters without "official" decomposition
-            $match = array();
+            $match = [];
             if (preg_match('/^LATIN (SMALL|CAPITAL) LETTER ([A-Z]) WITH/', $name, $match) && !$decomp) {
                 $c = ord($match[2]);
                 if ($match[1] === 'SMALL') {
                     $c += 32;
                 }
-                $decomposition['U+' . $char] = array(dechex($c));
+                $decomposition['U+' . $char] = [dechex($c)];
                 continue;
             }
-            $match = array();
+            $match = [];
             if (preg_match('/(<.*>)? *(.+)/', $decomp, $match)) {
                 switch ($match[1]) {
                     case '<circle>':
@@ -991,7 +1264,7 @@ class CharsetConverter implements SingletonInterface
         }
         // Decompose and remove marks; inspired by unac (Loic Dachary <loic@senga.org>)
         foreach ($decomposition as $from => $to) {
-            $code_decomp = array();
+            $code_decomp = [];
             while ($code_value = array_shift($to)) {
                 // Do recursive decomposition
                 if (isset($decomposition['U+' . $code_value])) {
@@ -1010,10 +1283,10 @@ class CharsetConverter implements SingletonInterface
             }
         }
         // Create ascii only mapping
-        $this->toASCII['utf-8'] = array();
+        $this->toASCII['utf-8'] = [];
         $ascii = &$this->toASCII['utf-8'];
         foreach ($decomposition as $from => $to) {
-            $code_decomp = array();
+            $code_decomp = [];
             while ($code_value = array_shift($to)) {
                 $ord = hexdec($code_value);
                 if ($ord > 127) {
@@ -1023,7 +1296,7 @@ class CharsetConverter implements SingletonInterface
                     array_push($code_decomp, chr($ord));
                 }
             }
-            $ascii[$this->UnumberToChar(hexdec($from))] = join('', $code_decomp);
+            $ascii[$this->UnumberToChar(hexdec($from))] = implode('', $code_decomp);
         }
         // Add numeric decompositions
         foreach ($number as $from => $to) {
@@ -1056,9 +1329,9 @@ class CharsetConverter implements SingletonInterface
             return 1;
         }
         // Use cached version if possible
-        $cacheFile = GeneralUtility::getFileAbsFileName('typo3temp/var/charset/cscase_' . $charset . '.tbl');
+        $cacheFile = GeneralUtility::getFileAbsFileName('typo3temp/cs/cscase_' . $charset . '.tbl');
         if ($cacheFile && @is_file($cacheFile)) {
-            $this->caseFolding[$charset] = unserialize(file_get_contents($cacheFile));
+            $this->caseFolding[$charset] = unserialize(GeneralUtility::getUrl($cacheFile));
             return 2;
         }
         // init UTF-8 conversion for this charset
@@ -1118,9 +1391,9 @@ class CharsetConverter implements SingletonInterface
             return 1;
         }
         // Use cached version if possible
-        $cacheFile = GeneralUtility::getFileAbsFileName('typo3temp/var/charset/csascii_' . $charset . '.tbl');
+        $cacheFile = GeneralUtility::getFileAbsFileName('typo3temp/cs/csascii_' . $charset . '.tbl');
         if ($cacheFile && @is_file($cacheFile)) {
-            $this->toASCII[$charset] = unserialize(file_get_contents($cacheFile));
+            $this->toASCII[$charset] = unserialize(GeneralUtility::getUrl($cacheFile));
             return 2;
         }
         // Init UTF-8 conversion for this charset
@@ -1165,7 +1438,7 @@ class CharsetConverter implements SingletonInterface
         if ($len === 0 || $string === '') {
             return '';
         }
-        if ($this->getConversionStrategy() === self::STRATEGY_MBSTRING) {
+        if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_utils'] === 'mbstring') {
             // Cannot omit $len, when specifying charset
             if ($len === null) {
                 // Save internal encoding
@@ -1178,7 +1451,7 @@ class CharsetConverter implements SingletonInterface
             } else {
                 return mb_substr($string, $start, $len, $charset);
             }
-        } elseif ($this->getConversionStrategy() === self::STRATEGY_ICONV) {
+        } elseif ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_utils'] === 'iconv') {
             // Cannot omit $len, when specifying charset
             if ($len === null) {
                 // Save internal encoding
@@ -1215,9 +1488,9 @@ class CharsetConverter implements SingletonInterface
      */
     public function strlen($charset, $string)
     {
-        if ($this->getConversionStrategy() === self::STRATEGY_MBSTRING) {
+        if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_utils'] === 'mbstring') {
             return mb_strlen($string, $charset);
-        } elseif ($this->getConversionStrategy() === self::STRATEGY_ICONV) {
+        } elseif ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_utils'] === 'iconv') {
             return iconv_strlen($string, $charset);
         } elseif ($charset === 'utf-8') {
             return $this->utf8_strlen($string);
@@ -1268,7 +1541,7 @@ class CharsetConverter implements SingletonInterface
      */
     public function crop($charset, $string, $len, $crop = '')
     {
-        if ($this->getConversionStrategy() === self::STRATEGY_MBSTRING) {
+        if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_utils'] === 'mbstring') {
             return $this->cropMbstring($charset, $string, $len, $crop);
         }
         if ((int)$len === 0) {
@@ -1319,7 +1592,7 @@ class CharsetConverter implements SingletonInterface
         if ($len <= 0) {
             return '';
         }
-        if ($this->getConversionStrategy() === self::STRATEGY_MBSTRING) {
+        if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_utils'] === 'mbstring') {
             return mb_strcut($string, 0, $len, $charset);
         } elseif ($charset === 'utf-8') {
             return $this->utf8_strtrunc($string, $len);
@@ -1354,7 +1627,7 @@ class CharsetConverter implements SingletonInterface
      */
     public function conv_case($charset, $string, $case)
     {
-        if ($this->getConversionStrategy() === self::STRATEGY_MBSTRING) {
+        if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_utils'] === 'mbstring') {
             if ($case === 'toLower') {
                 $string = mb_strtolower($string, $charset);
             } else {
@@ -1389,6 +1662,22 @@ class CharsetConverter implements SingletonInterface
     }
 
     /**
+     * Capitalize the given string
+     *
+     * @param string $charset
+     * @param string $string
+     * @return string
+     */
+    public function convCapitalize($charset, $string)
+    {
+        if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_utils'] === 'mbstring') {
+            return mb_convert_case($string, MB_CASE_TITLE, $charset);
+        } else {
+            return ucwords($string);
+        }
+    }
+
+    /**
      * Converts special chars (like æøåÆØÅ, umlauts etc) to ascii equivalents (usually double-bytes, like æ => ae etc.)
      *
      * @param string $charset Character set of string
@@ -1414,14 +1703,65 @@ class CharsetConverter implements SingletonInterface
      *
      * @param string $languageCodesList List of language codes. something like 'de,en-us;q=0.9,de-de;q=0.7,es-cl;q=0.6,en;q=0.4,es;q=0.3,zh;q=0.1'
      * @return string A preferred language that TYPO3 supports, or "default" if none found
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9, use Locales::getPreferredClientLanguage() for usage
      */
     public function getPreferredClientLanguage($languageCodesList)
     {
-        GeneralUtility::logDeprecatedFunction();
+        $allLanguageCodes = $this->getAllLanguageCodes();
+        $selectedLanguage = 'default';
+        $preferredLanguages = GeneralUtility::trimExplode(',', $languageCodesList);
+        // Order the preferred languages after they key
+        $sortedPreferredLanguages = [];
+        foreach ($preferredLanguages as $preferredLanguage) {
+            $quality = 1.0;
+            if (strpos($preferredLanguage, ';q=') !== false) {
+                list($preferredLanguage, $quality) = explode(';q=', $preferredLanguage);
+            }
+            $sortedPreferredLanguages[$preferredLanguage] = $quality;
+        }
+        // Loop through the languages, with the highest priority first
+        arsort($sortedPreferredLanguages, SORT_NUMERIC);
+        foreach ($sortedPreferredLanguages as $preferredLanguage => $quality) {
+            if (isset($allLanguageCodes[$preferredLanguage])) {
+                $selectedLanguage = $allLanguageCodes[$preferredLanguage];
+                break;
+            }
+            // Strip the country code from the end
+            list($preferredLanguage, ) = explode('-', $preferredLanguage);
+            if (isset($allLanguageCodes[$preferredLanguage])) {
+                $selectedLanguage = $allLanguageCodes[$preferredLanguage];
+                break;
+            }
+        }
+        if (!$selectedLanguage || $selectedLanguage === 'en') {
+            $selectedLanguage = 'default';
+        }
+        return $selectedLanguage;
+    }
+
+    /**
+     * Merges all available charsets and locales, currently only used for getPreferredClientLanguage()
+     *
+     * @return array
+     */
+    protected function getAllLanguageCodes()
+    {
+        // Get all languages where TYPO3 code is the same as the ISO code
+        $typo3LanguageCodes = array_keys($this->charSetArray);
+        $allLanguageCodes = array_combine($typo3LanguageCodes, $typo3LanguageCodes);
+        // Get all languages where TYPO3 code differs from ISO code
+        // or needs the country part
+        // the iso codes will here overwrite the default typo3 language in the key
         /** @var Locales $locales */
         $locales = GeneralUtility::makeInstance(Locales::class);
-        return $locales->getPreferredClientLanguage($languageCodesList);
+        foreach ($locales->getIsoMapping() as $typo3Lang => $isoLang) {
+            $isoLang = implode('-', explode('_', $isoLang));
+            $allLanguageCodes[$typo3Lang] = $isoLang;
+        }
+        // Move the iso codes to the (because we're comparing the keys with "isset" later on)
+        $allLanguageCodes = array_flip($allLanguageCodes);
+        // We need to add the default language (English)
+        $allLanguageCodes['en'] = 'default';
+        return $allLanguageCodes;
     }
 
     /********************************************
@@ -1577,9 +1917,9 @@ class CharsetConverter implements SingletonInterface
      */
     public function utf8_strpos($haystack, $needle, $offset = 0)
     {
-        if ($this->getConversionStrategy() === self::STRATEGY_MBSTRING) {
+        if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_utils'] === 'mbstring') {
             return mb_strpos($haystack, $needle, $offset, 'utf-8');
-        } elseif ($this->getConversionStrategy() === self::STRATEGY_ICONV) {
+        } elseif ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_utils'] === 'iconv') {
             return iconv_strpos($haystack, $needle, $offset, 'utf-8');
         }
         $byte_offset = $this->utf8_char2byte_pos($haystack, $offset);
@@ -1605,9 +1945,9 @@ class CharsetConverter implements SingletonInterface
      */
     public function utf8_strrpos($haystack, $needle)
     {
-        if ($this->getConversionStrategy() === self::STRATEGY_MBSTRING) {
+        if ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_utils'] === 'mbstring') {
             return mb_strrpos($haystack, $needle, 'utf-8');
-        } elseif ($this->getConversionStrategy() === self::STRATEGY_ICONV) {
+        } elseif ($GLOBALS['TYPO3_CONF_VARS']['SYS']['t3lib_cs_utils'] === 'iconv') {
             return iconv_strrpos($haystack, $needle, 'utf-8');
         }
         $byte_pos = strrpos($haystack, $needle);
@@ -1947,26 +2287,5 @@ class CharsetConverter implements SingletonInterface
             }
         }
         return $out;
-    }
-
-    /**
-     * Checks the selected strategy based on which method is available in the system.
-     * "mbstring" takes precedence over "iconv".
-     * See http://stackoverflow.com/questions/8233517/what-is-the-difference-between-iconv-and-mb-convert-encoding-in-php
-     *
-     * @return string could be "mbstring", "iconv" or "fallback"
-     */
-    protected function getConversionStrategy()
-    {
-        if ($this->conversionStrategy === null) {
-            if (extension_loaded('mbstring')) {
-                $this->conversionStrategy = self::STRATEGY_MBSTRING;
-            } elseif (extension_loaded('iconv')) {
-                $this->conversionStrategy = self::STRATEGY_ICONV;
-            } else {
-                $this->conversionStrategy = self::STRATEGY_FALLBACK;
-            }
-        }
-        return $this->conversionStrategy;
     }
 }

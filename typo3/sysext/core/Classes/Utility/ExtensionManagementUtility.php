@@ -15,8 +15,6 @@ namespace TYPO3\CMS\Core\Utility;
  */
 
 use TYPO3\CMS\Core\Category\CategoryRegistry;
-use TYPO3\CMS\Core\Imaging\IconProvider\BitmapIconProvider;
-use TYPO3\CMS\Core\Imaging\IconRegistry;
 use TYPO3\CMS\Core\Migrations\TcaMigration;
 use TYPO3\CMS\Core\Package\PackageManager;
 
@@ -197,7 +195,7 @@ class ExtensionManagementUtility
         $result = false;
         // Build map of short keys referencing to real keys:
         if (!isset(self::$extensionKeyMap)) {
-            self::$extensionKeyMap = array();
+            self::$extensionKeyMap = [];
             foreach (static::$packageManager->getActivePackages() as $package) {
                 $shortKey = str_replace('_', '', $package->getPackageKey());
                 self::$extensionKeyMap[$shortKey] = $package->getPackageKey();
@@ -261,13 +259,18 @@ class ExtensionManagementUtility
      *
      * @param string $table The table name of a table already present in $GLOBALS['TCA'] with a columns section
      * @param array $columnArray The array with the additional columns (typical some fields an extension wants to add)
+     * @param bool $addTofeInterface DEPRECATED: Usage of feInterface is no longer part of the TYPO3 CMS Core. Please check EXT:statictemplates.
      * @return void
      */
-    public static function addTCAcolumns($table, $columnArray)
+    public static function addTCAcolumns($table, $columnArray, $addTofeInterface = false)
     {
         if (is_array($columnArray) && is_array($GLOBALS['TCA'][$table]) && is_array($GLOBALS['TCA'][$table]['columns'])) {
             // Candidate for array_merge() if integer-keys will some day make trouble...
             $GLOBALS['TCA'][$table]['columns'] = array_merge($GLOBALS['TCA'][$table]['columns'], $columnArray);
+            if ($addTofeInterface) {
+                $message = 'Usage of feInterface is no longer part of the TYPO3 CMS Core. Please check EXT:%s for table "%s".';
+                GeneralUtility::deprecationLog(sprintf($message, $GLOBALS['_EXTKEY'], $table));
+            }
         }
     }
 
@@ -292,7 +295,7 @@ class ExtensionManagementUtility
             return;
         }
         list($positionIdentifier, $entityName) = GeneralUtility::trimExplode(':', $position);
-        $palettesChanged = array();
+        $palettesChanged = [];
 
         foreach ($GLOBALS['TCA'][$table]['types'] as $type => &$typeDetails) {
             // skip if we don't want to add the field for this type
@@ -300,7 +303,12 @@ class ExtensionManagementUtility
                 continue;
             }
             // skip if fields were already added
-            if (!isset($typeDetails['showitem']) || strpos($typeDetails['showitem'], $newFieldsString) !== false) {
+            if (!isset($typeDetails['showitem'])) {
+                continue;
+            }
+
+            $fieldArray = GeneralUtility::trimExplode(',', $typeDetails['showitem'], true);
+            if (in_array($newFieldsString, $fieldArray, true)) {
                 continue;
             }
 
@@ -310,8 +318,8 @@ class ExtensionManagementUtility
                 // Get the palette names used in current showitem
                 $paletteCount = preg_match_all('/(?:^|,)                    # Line start or a comma
 					(?:
-					    \\s*\\-\\-palette\\-\\-;[^;]*;([^,$]*)|             # --palette--;label;paletteName
-					    \\s*\\b[^;,]+\\b(?:;[^;]*;([^;,]+))?[^,]*           # field;label;paletteName
+					    \\s*\\-\\-palette\\-\\-;[^;]*;([^,$]*)|              # --palette--;label;paletteName
+					    \\s*\\b[^;,]+\\b(?:;[^;]*;([^;,]+);?[^;,]*;?)?[^,]*  # @deprecated since TYPO3 CMS 7: field;label;paletteName[;options[;colors]]
 					)/x', $typeDetails['showitem'], $paletteMatches);
                 if ($paletteCount > 0) {
                     $paletteNames = array_filter(array_merge($paletteMatches[1], $paletteMatches[2]));
@@ -417,7 +425,7 @@ class ExtensionManagementUtility
             }
             $fieldArrayWithOptions = GeneralUtility::trimExplode(',', $typeArray['showitem']);
             // Find the field we're handling
-            $newFieldStringArray = array();
+            $newFieldStringArray = [];
             foreach ($fieldArrayWithOptions as $fieldNumber => $fieldString) {
                 $newFieldStringArray[] = $fieldString;
                 $fieldArray = GeneralUtility::trimExplode(';', $fieldString);
@@ -426,7 +434,7 @@ class ExtensionManagementUtility
                 }
                 if (
                     isset($fieldArrayWithOptions[$fieldNumber + 1])
-                    && StringUtility::beginsWith($fieldArrayWithOptions[$fieldNumber + 1],  '--palette--')
+                    && StringUtility::beginsWith($fieldArrayWithOptions[$fieldNumber + 1], '--palette--')
                 ) {
                     // Match for $field and next field is a palette - add fields to this one
                     $paletteName = GeneralUtility::trimExplode(';', $fieldArrayWithOptions[$fieldNumber + 1]);
@@ -480,7 +488,7 @@ class ExtensionManagementUtility
      * - $item = array(
      * 'LLL:EXT:frontend/Resources/Private/Language/locallang_ttc.xlf:CType.I.10',
      * 'login',
-     * 'i/imagename.gif',
+     * 'i/tt_content_login.gif',
      * ),
      * - $relativeToField = mailform
      * - $relativePosition = after
@@ -529,7 +537,7 @@ class ExtensionManagementUtility
                     } else {
                         $offset = $relativeItemKey + 1;
                     }
-                    array_splice($GLOBALS['TCA'][$table]['columns'][$field]['config']['items'], $offset, 0, array(0 => $item));
+                    array_splice($GLOBALS['TCA'][$table]['columns'][$field]['config']['items'], $offset, 0, [0 => $item]);
                 }
             } else {
                 // Insert at new item at the end of the array if relative position was not found
@@ -551,49 +559,49 @@ class ExtensionManagementUtility
      *
      * @return array
      */
-    public static function getFileFieldTCAConfig($fieldName, array $customSettingOverride = array(), $allowedFileExtensions = '', $disallowedFileExtensions = '')
+    public static function getFileFieldTCAConfig($fieldName, array $customSettingOverride = [], $allowedFileExtensions = '', $disallowedFileExtensions = '')
     {
-        $fileFieldTCAConfig = array(
+        $fileFieldTCAConfig = [
             'type' => 'inline',
             'foreign_table' => 'sys_file_reference',
             'foreign_field' => 'uid_foreign',
             'foreign_sortby' => 'sorting_foreign',
             'foreign_table_field' => 'tablenames',
-            'foreign_match_fields' => array(
+            'foreign_match_fields' => [
                 'fieldname' => $fieldName
-            ),
+            ],
             'foreign_label' => 'uid_local',
             'foreign_selector' => 'uid_local',
-            'foreign_selector_fieldTcaOverride' => array(
-                'config' => array(
-                    'appearance' => array(
+            'foreign_selector_fieldTcaOverride' => [
+                'config' => [
+                    'appearance' => [
                         'elementBrowserType' => 'file',
                         'elementBrowserAllowed' => $allowedFileExtensions
-                    )
-                )
-            ),
-            'filter' => array(
-                array(
+                    ]
+                ]
+            ],
+            'filter' => [
+                [
                     'userFunc' => \TYPO3\CMS\Core\Resource\Filter\FileExtensionFilter::class . '->filterInlineChildren',
-                    'parameters' => array(
+                    'parameters' => [
                         'allowedFileExtensions' => $allowedFileExtensions,
                         'disallowedFileExtensions' => $disallowedFileExtensions
-                    )
-                )
-            ),
-            'appearance' => array(
+                    ]
+                ]
+            ],
+            'appearance' => [
                 'useSortable' => true,
-                'headerThumbnail' => array(
+                'headerThumbnail' => [
                     'field' => 'uid_local',
                     'width' => '45',
                     'height' => '45c',
-                ),
+                ],
                 'showPossibleLocalizationRecords' => false,
                 'showRemovedLocalizationRecords' => false,
                 'showSynchronizationLink' => false,
                 'showAllLocalizationLink' => false,
 
-                'enabledControls' => array(
+                'enabledControls' => [
                     'info' => true,
                     'new' => false,
                     'dragdrop' => true,
@@ -601,13 +609,13 @@ class ExtensionManagementUtility
                     'hide' => true,
                     'delete' => true,
                     'localize' => true,
-                ),
-            ),
-            'behaviour' => array(
+                ],
+            ],
+            'behaviour' => [
                 'localizationMode' => 'select',
                 'localizeChildrenAtParentLocalization' => true,
-            ),
-        );
+            ],
+        ];
         ArrayUtility::mergeRecursiveWithOverrule($fileFieldTCAConfig, $customSettingOverride);
         return $fileFieldTCAConfig;
     }
@@ -710,13 +718,13 @@ class ExtensionManagementUtility
     protected static function removeDuplicatesForInsertion($insertionList, $list = '')
     {
         $insertionListParts = preg_split('/\\s*,\\s*/', $insertionList);
-        $listMatches = array();
+        $listMatches = [];
         if ($list !== '') {
             preg_match_all('/(?:^|,)\\s*\\b([^;,]+)\\b[^,]*/', $list, $listMatches);
             $listMatches = $listMatches[1];
         }
 
-        $cleanInsertionListParts = array();
+        $cleanInsertionListParts = [];
         foreach ($insertionListParts as $fieldName) {
             $fieldNameParts = explode(';', $fieldName, 2);
             $cleanFieldName = $fieldNameParts[0];
@@ -741,7 +749,7 @@ class ExtensionManagementUtility
      */
     protected static function explodeItemList($itemList)
     {
-        $items = array();
+        $items = [];
         $itemParts = GeneralUtility::trimExplode(',', $itemList, true);
         foreach ($itemParts as $itemPart) {
             $itemDetails = GeneralUtility::trimExplode(';', $itemPart, false, 5);
@@ -751,11 +759,11 @@ class ExtensionManagementUtility
                 $key .= count($items);
             }
             if (!isset($items[$key])) {
-                $items[$key] = array(
+                $items[$key] = [
                     'rawData' => $itemPart,
-                    'details' => array()
-                );
-                $details = array(0 => 'field', 1 => 'label', 2 => 'palette');
+                    'details' => []
+                ];
+                $details = [0 => 'field', 1 => 'label', 2 => 'palette'];
                 foreach ($details as $id => $property) {
                     $items[$key]['details'][$property] = isset($itemDetails[$id]) ? $itemDetails[$id] : '';
                 }
@@ -774,18 +782,18 @@ class ExtensionManagementUtility
      */
     protected static function generateItemList(array $items, $useRawData = false)
     {
-        $itemParts = array();
+        $itemParts = [];
         foreach ($items as $item => $itemDetails) {
             if (strpos($item, '--') !== false) {
                 // If $item is a separator (--div--) or palette (--palette--) then it may have been appended by a unique number. This must be stripped away here.
-                $item = str_replace(array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9), '', $item);
+                $item = str_replace([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], '', $item);
             }
             if ($useRawData) {
                 $itemParts[] = $itemDetails['rawData'];
             } else {
                 if (count($itemDetails['details']) > 1) {
-                    $details = array('palette', 'label', 'field');
-                    $elements = array();
+                    $details = ['palette', 'label', 'field'];
+                    $elements = [];
                     $addEmpty = false;
                     foreach ($details as $property) {
                         if ($itemDetails['details'][$property] !== '' || $addEmpty) {
@@ -826,19 +834,19 @@ class ExtensionManagementUtility
      * @param array $moduleConfiguration Icon with array keys: access, icon, labels to configure the module
      * @throws \InvalidArgumentException
      */
-    public static function addExtJSModule($extensionName, $mainModuleName, $subModuleName = '', $position = '', array $moduleConfiguration = array())
+    public static function addExtJSModule($extensionName, $mainModuleName, $subModuleName = '', $position = '', array $moduleConfiguration = [])
     {
         if (empty($extensionName)) {
             throw new \InvalidArgumentException('The extension name must not be empty', 1325938973);
         }
         $extensionKey = GeneralUtility::camelCaseToLowerCaseUnderscored($extensionName);
         $extensionName = str_replace(' ', '', ucwords(str_replace('_', ' ', $extensionName)));
-        $defaultModuleConfiguration = array(
+        $defaultModuleConfiguration = [
             'access' => 'admin',
             'icon' => self::extRelPath('backend') . 'Resources/Public/Images/Logo.png',
             'labels' => '',
             'extRelPath' => self::extRelPath($extensionKey) . 'Classes/'
-        );
+        ];
         // Add mandatory parameter to use new pagetree
         if ($mainModuleName === 'web') {
             $defaultModuleConfiguration['navigationComponentId'] = 'typo3-pagetree';
@@ -853,7 +861,7 @@ class ExtensionManagementUtility
         $moduleConfiguration['name'] = $moduleSignature;
         $moduleConfiguration['script'] = 'extjspaneldummy.html';
         $moduleConfiguration['extensionName'] = $extensionName;
-        $moduleConfiguration['configureModuleFunction'] = array(ExtensionManagementUtility::class, 'configureModule');
+        $moduleConfiguration['configureModuleFunction'] = [self::class, 'configureModule'];
         $GLOBALS['TBE_MODULES']['_configuration'][$moduleSignature] = $moduleConfiguration;
         self::addModule($mainModuleName, $subModuleName, $position);
     }
@@ -863,28 +871,31 @@ class ExtensionManagementUtility
      * and it replaces old conf.php.
      *
      * @param string $moduleSignature The module name
+     * @param string $modulePath Absolute path to module (not used by Extbase currently)
      * @return array Configuration of the module
      */
-    public static function configureModule($moduleSignature)
+    public static function configureModule($moduleSignature, $modulePath)
     {
         $moduleConfiguration = $GLOBALS['TBE_MODULES']['_configuration'][$moduleSignature];
-        if (!empty($moduleConfiguration['labels']['tabs_images']['tab'])) {
-            GeneralUtility::deprecationLog('Module registration for backend module "' . $moduleSignature . '" uses old referencing for the icon. Use the configuration option "icon" directly instead of [labels][tabs_images][tab]. The old option is removed with TYPO3 v9.');
-            $moduleConfiguration['icon'] = $moduleConfiguration['labels']['tabs_images']['tab'];
-            unset($moduleConfiguration['labels']['tabs_images']['tab']);
+        $iconPathAndFilename = $moduleConfiguration['icon'];
+        if (substr($iconPathAndFilename, 0, 4) === 'EXT:') {
+            list($extensionKey, $relativePath) = explode('/', substr($iconPathAndFilename, 4), 2);
+            $iconPathAndFilename = self::extPath($extensionKey) . $relativePath;
         }
-
-        // Register the icon and move it too "iconIdentifier"
-        if (!empty($moduleConfiguration['icon'])) {
-            $iconIdentifier = 'module-' . $moduleSignature;
-            $iconRegistry = GeneralUtility::makeInstance(IconRegistry::class);
-            $iconRegistry->registerIcon($iconIdentifier, BitmapIconProvider::class, [
-                'source' => GeneralUtility::getFileAbsFileName($moduleConfiguration['icon'])
-            ]);
-            $moduleConfiguration['iconIdentifier'] = $iconIdentifier;
-            unset($moduleConfiguration['icon']);
-        }
-
+        // @todo skin support
+        $moduleLabels = [
+            'tabs_images' => [
+                'tab' => $iconPathAndFilename
+            ],
+            'labels' => [
+                'tablabel' => $GLOBALS['LANG']->sL($moduleConfiguration['labels'] . ':mlang_labels_tablabel'),
+                'tabdescr' => $GLOBALS['LANG']->sL($moduleConfiguration['labels'] . ':mlang_labels_tabdescr')
+            ],
+            'tabs' => [
+                'tab' => $GLOBALS['LANG']->sL($moduleConfiguration['labels'] . ':mlang_tabs_tab')
+            ]
+        ];
+        $GLOBALS['LANG']->addModuleLabels($moduleLabels, $moduleSignature . '_');
         return $moduleConfiguration;
     }
 
@@ -895,11 +906,11 @@ class ExtensionManagementUtility
      * @param string $main The main module key, $sub is the submodule key. So $main would be an index in the $TBE_MODULES array and $sub could be an element in the lists there.
      * @param string $sub The submodule key. If $sub is not set a blank $main module is created.
      * @param string $position Can be used to set the position of the $sub module within the list of existing submodules for the main module. $position has this syntax: [cmd]:[submodule-key]. cmd can be "after", "before" or "top" (or blank which is default). If "after"/"before" then submodule will be inserted after/before the existing submodule with [submodule-key] if found. If not found, the bottom of list. If "top" the module is inserted in the top of the submodule list.
-     * @param string $path The absolute path to the module. Was used prior to TYPO3 v8, use $moduleConfiguration[routeTarget] now
+     * @param string $path The absolute path to the module. If this value is defined the path is added as an entry in $TBE_MODULES['_PATHS'][  main_sub  ] = $path; and thereby tells the backend where the newly added modules is found in the system. This option is deprecated as of TYPO3 CMS 7, and will have no effect in TYPO3 CMS 8 anymore.
      * @param array $moduleConfiguration additional configuration, previously put in "conf.php" of the module directory
      * @return void
      */
-    public static function addModule($main, $sub = '', $position = '', $path = null, $moduleConfiguration = array())
+    public static function addModule($main, $sub = '', $position = '', $path = '', $moduleConfiguration = [])
     {
         // If there is already a main module by this name:
         // Adding the submodule to the correct position:
@@ -932,27 +943,15 @@ class ExtensionManagementUtility
             // Create new main modules with only one submodule, $sub (or none if $sub is blank)
             $GLOBALS['TBE_MODULES'][$main] = $sub;
         }
+        $fullModuleSignature = $main . ($sub ? '_' . $sub : '');
+        // Adding path:
+        if ($path) {
+            GeneralUtility::deprecationLog('Registered "' . $fullModuleSignature . '" as a script-based module. Script-based modules are deprecated since TYPO3 CMS 7. Support will be removed with TYPO3 CMS 8, use the "routeTarget" option or dispatched modules instead.');
+            self::addModulePath($fullModuleSignature, $path);
+        }
 
         // add additional configuration
         if (is_array($moduleConfiguration) && !empty($moduleConfiguration)) {
-            $fullModuleSignature = $main . ($sub ? '_' . $sub : '');
-
-            if (!empty($moduleConfiguration['labels']['tabs_images']['tab'])) {
-                GeneralUtility::deprecationLog('Module registration for module "' . $fullModuleSignature . '" uses old referencing for the icon. Use the configuration option "icon" directly instead of [labels][tabs_images][tab]. The old option is removed with TYPO3 v9.');
-                $moduleConfiguration['icon'] = $moduleConfiguration['labels']['tabs_images']['tab'];
-                unset($moduleConfiguration['labels']['tabs_images']['tab']);
-            }
-
-            if (!empty($moduleConfiguration['icon'])) {
-                $iconIdentifier = 'module-' . $fullModuleSignature;
-                $iconRegistry = GeneralUtility::makeInstance(IconRegistry::class);
-                $iconRegistry->registerIcon($iconIdentifier, BitmapIconProvider::class, [
-                    'source' => GeneralUtility::getFileAbsFileName($moduleConfiguration['icon'])
-                ]);
-                $moduleConfiguration['iconIdentifier'] = $iconIdentifier;
-                unset($moduleConfiguration['icon']);
-            }
-
             $GLOBALS['TBE_MODULES']['_configuration'][$fullModuleSignature] = $moduleConfiguration;
         }
     }
@@ -968,11 +967,11 @@ class ExtensionManagementUtility
      */
     public static function registerExtDirectComponent($endpointName, $callbackClass, $moduleName = null, $accessLevel = null)
     {
-        $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ExtDirect'][$endpointName] = array(
+        $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['ExtDirect'][$endpointName] = [
             'callbackClass' => $callbackClass,
             'moduleName' => $moduleName,
             'accessLevel' => $accessLevel
-        );
+        ];
     }
 
     /**
@@ -981,15 +980,35 @@ class ExtensionManagementUtility
      * @param string $ajaxId Identifier of the handler, that is used in the request
      * @param string $callbackMethod TYPO3 callback method (className->methodName).
      * @param bool $csrfTokenCheck Only set this to FALSE if you are sure that the registered handler does not modify any data!
-     * @deprecated since TYPO3 v8, will be removed in TYPO3 v9
      */
     public static function registerAjaxHandler($ajaxId, $callbackMethod, $csrfTokenCheck = true)
     {
-        GeneralUtility::logDeprecatedFunction();
-        $GLOBALS['TYPO3_CONF_VARS']['BE']['AJAX'][$ajaxId] = array(
+        $GLOBALS['TYPO3_CONF_VARS']['BE']['AJAX'][$ajaxId] = [
             'callbackMethod' => $callbackMethod,
             'csrfTokenCheck' => $csrfTokenCheck
-        );
+        ];
+    }
+
+    /**
+     * Adds a module path to $GLOBALS['TBE_MODULES'] for used with the module dispatcher, index.php
+     * Used only for modules that are not placed in the main/sub menu hierarchy by the traditional mechanism of addModule()
+     * Examples for this is context menu functionality (like import/export) which runs as an independent module through index.php
+     * FOR USE IN ext_tables.php FILES
+     * Example:  \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::addModulePath('xMOD_tximpexp', \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::extPath($_EXTKEY).'app/');
+     *
+     * @param string $name The name of the module, refer to conf.php of the module.
+     * @param string $path The absolute path to the module directory inside of which "index.php" and "conf.php" is found.
+     * @return void
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8, use routeTarget or dispatched modules instead.
+     */
+    public static function addModulePath($name, $path)
+    {
+        GeneralUtility::logDeprecatedFunction();
+        if (StringUtility::beginsWith($path, 'EXT:')) {
+            list($extensionKey, $relativePath) = explode('/', substr($path, 4), 2);
+            $path = self::extPath($extensionKey) . $relativePath;
+        }
+        $GLOBALS['TBE_MODULES']['_PATHS'][$name] = $path;
     }
 
     /**
@@ -1009,11 +1028,12 @@ class ExtensionManagementUtility
      */
     public static function insertModuleFunction($modname, $className, $classPath = null, $title, $MM_key = 'function', $WS = '')
     {
-        $GLOBALS['TBE_MODULES_EXT'][$modname]['MOD_MENU'][$MM_key][$className] = array(
+        $GLOBALS['TBE_MODULES_EXT'][$modname]['MOD_MENU'][$MM_key][$className] = [
             'name' => $className,
+            'path' => null,
             'title' => $title,
             'ws' => $WS
-        );
+        ];
     }
 
     /**
@@ -1077,10 +1097,10 @@ class ExtensionManagementUtility
     {
         if ($tca_descr_key) {
             if (!is_array($GLOBALS['TCA_DESCR'][$tca_descr_key])) {
-                $GLOBALS['TCA_DESCR'][$tca_descr_key] = array();
+                $GLOBALS['TCA_DESCR'][$tca_descr_key] = [];
             }
             if (!is_array($GLOBALS['TCA_DESCR'][$tca_descr_key]['refs'])) {
-                $GLOBALS['TCA_DESCR'][$tca_descr_key]['refs'] = array();
+                $GLOBALS['TCA_DESCR'][$tca_descr_key]['refs'] = [];
             }
             $GLOBALS['TCA_DESCR'][$tca_descr_key]['refs'][] = $file_ref;
         }
@@ -1101,11 +1121,11 @@ class ExtensionManagementUtility
         if (!isset($extensionKey)) {
             throw new \RuntimeException('No extensionKey set in addNavigationComponent(). Provide it as third Parameter', 1404068039);
         }
-        $GLOBALS['TBE_MODULES']['_navigationComponents'][$module] = array(
+        $GLOBALS['TBE_MODULES']['_navigationComponents'][$module] = [
             'componentId' => $componentId,
             'extKey' => $extensionKey,
             'isCoreComponent' => false
-        );
+        ];
     }
 
     /**
@@ -1162,7 +1182,7 @@ class ExtensionManagementUtility
                 }
             }
             // Convert subtype list to array for quicker access
-            $GLOBALS['T3_SERVICES'][$serviceType][$serviceKey]['serviceSubTypes'] = array();
+            $GLOBALS['T3_SERVICES'][$serviceType][$serviceKey]['serviceSubTypes'] = [];
             $serviceSubTypes = GeneralUtility::trimExplode(',', $info['subtype']);
             foreach ($serviceSubTypes as $subtype) {
                 $GLOBALS['T3_SERVICES'][$serviceType][$serviceKey]['serviceSubTypes'][$subtype] = $subtype;
@@ -1178,7 +1198,7 @@ class ExtensionManagementUtility
      * @param mixed $excludeServiceKeys Service keys that should be excluded in the search for a service. Array or comma list.
      * @return mixed Service info array if a service was found, FALSE otherwise
      */
-    public static function findService($serviceType, $serviceSubType = '', $excludeServiceKeys = array())
+    public static function findService($serviceType, $serviceSubType = '', $excludeServiceKeys = [])
     {
         $serviceKey = false;
         $serviceInfo = false;
@@ -1385,21 +1405,24 @@ class ExtensionManagementUtility
      * FOR USE IN ext_localconf.php FILES
      *
      * @param string $key The extension key
-     * @param string $_ unused since TYPO3 CMS 8
+     * @param string $classFile The PHP-class filename relative to the extension root directory. If set to blank a default value is chosen according to convensions.
      * @param string $suffix Is used as a suffix of the class name (e.g. "_pi1")
      * @param string $type See description above
      * @param int $cached If $cached is set as USER content object (cObject) is created - otherwise a USER_INT object is created.
      *
      * @return void
      */
-    public static function addPItoST43($key, $_, $suffix = '', $type = 'list_type', $cached = 0)
+    public static function addPItoST43($key, $classFile = '', $suffix = '', $type = 'list_type', $cached = 0)
     {
+        $classFile = $classFile ? $classFile : 'pi/class.tx_' . str_replace('_', '', $key) . $suffix . '.php';
         $cN = self::getCN($key);
         // General plugin
         $pluginContent = trim('
 plugin.' . $cN . $suffix . ' = USER' . ($cached ? '' : '_INT') . '
-plugin.' . $cN . $suffix . '.userFunc = ' . $cN . $suffix . '->main
-');
+plugin.' . $cN . $suffix . ' {
+	includeLibs = ' . $GLOBALS['TYPO3_LOADED_EXT'][$key]['siteRelPath'] . $classFile . '
+	userFunc = ' . $cN . $suffix . '->main
+}');
         self::addTypoScript($key, 'setup', '
 # Setting ' . $key . ' plugin TypoScript
 ' . $pluginContent);
@@ -1439,7 +1462,7 @@ tt_content.' . $key . $suffix . ' {
 
     /**
      * Call this method to add an entry in the static template list found in sys_templates
-     * FOR USE IN ext_tables.php FILES or files in Configuration/TCA/Overrides/*.php Use the latter to benefit from TCA caching!
+     * FOR USE IN ext_tables.php FILES or in Configuration/TCA/Overrides/sys_template.php Use the latter to benefit from TCA caching!
      *
      * @param string $extKey Is of course the extension key
      * @param string $path Is the path where the template files (fixed names) include_static.txt (integer list of uids from the table "static_templates"), constants.txt, setup.txt, and include_static_file.txt is found (relative to extPath, eg. 'static/'). The file include_static_file.txt, allows you to include other static templates defined in files, from your static template, and thus corresponds to the field 'include_static_file' in the sys_template table. The syntax for this is a comma separated list of static templates to include, like:  EXT:css_styled_content/static/,EXT:da_newsletter_subscription/static/,EXT:cc_random_image/pi2/static/
@@ -1451,14 +1474,14 @@ tt_content.' . $key . $suffix . ' {
     {
         if ($extKey && $path && is_array($GLOBALS['TCA']['sys_template']['columns'])) {
             $value = str_replace(',', '', 'EXT:' . $extKey . '/' . $path);
-            $itemArray = array(trim($title . ' (' . $extKey . ')'), $value);
+            $itemArray = [trim($title . ' (' . $extKey . ')'), $value];
             $GLOBALS['TCA']['sys_template']['columns']['include_static_file']['config']['items'][] = $itemArray;
         }
     }
 
     /**
      * Call this method to add an entry in the pageTSconfig list found in pages
-     * FOR USE in files in Configuration/TCA/Overrides/*.php Use the latter to benefit from TCA caching!
+     * FOR USE in Configuration/TCA/Overrides/pages.php Use the latter to benefit from TCA caching!
      *
      * @param string $extKey The extension key
      * @param string $filePath The path where the TSconfig file is located
@@ -1477,8 +1500,8 @@ tt_content.' . $key . $suffix . ' {
             throw new \InvalidArgumentException('No TCA definition for table "pages".', 1447789492);
         }
 
-        $value = str_replace(',',  '', 'EXT:' . $extKey . '/' . $filePath);
-        $itemArray = array(trim($title . ' (' . $extKey . ')'), $value);
+        $value = str_replace(',', '', 'EXT:' . $extKey . '/' . $filePath);
+        $itemArray = [trim($title . ' (' . $extKey . ')'), $value];
         $GLOBALS['TCA']['pages']['columns']['tsconfig_includes']['config']['items'][] = $itemArray;
     }
 
@@ -1571,7 +1594,7 @@ tt_content.' . $key . $suffix . ' {
     public static function getExtensionIcon($extensionPath, $returnFullPath = false)
     {
         $icon = '';
-        $iconFileTypesToCheckFor = array('png', 'svg', 'gif');
+        $iconFileTypesToCheckFor = ['png', 'svg', 'gif'];
         foreach ($iconFileTypesToCheckFor as $fileType) {
             if (file_exists($extensionPath . 'ext_icon.' . $fileType)) {
                 $icon = 'ext_icon.' . $fileType;
@@ -1640,7 +1663,7 @@ tt_content.' . $key . $suffix . ' {
     protected static function createExtLocalconfCacheEntry()
     {
         $extensionInformation = $GLOBALS['TYPO3_LOADED_EXT'];
-        $phpCodeToCache = array();
+        $phpCodeToCache = [];
         // Set same globals as in loadSingleExtLocalconfFiles()
         $phpCodeToCache[] = '/**';
         $phpCodeToCache[] = ' * Compiled ext_localconf.php cache file';
@@ -1662,7 +1685,7 @@ tt_content.' . $key . $suffix . ' {
                 $phpCodeToCache[] = '$_EXTCONF = $GLOBALS[\'TYPO3_CONF_VARS\'][\'EXT\'][\'extConf\'][$_EXTKEY];';
                 $phpCodeToCache[] = '';
                 // Add ext_localconf.php content of extension
-                $phpCodeToCache[] = trim(file_get_contents($extensionDetails['ext_localconf.php']));
+                $phpCodeToCache[] = trim(GeneralUtility::getUrl($extensionDetails['ext_localconf.php']));
                 $phpCodeToCache[] = '';
                 $phpCodeToCache[] = '';
             }
@@ -1727,7 +1750,7 @@ tt_content.' . $key . $suffix . ' {
      */
     protected static function buildBaseTcaFromSingleFiles()
     {
-        $GLOBALS['TCA'] = array();
+        $GLOBALS['TCA'] = [];
 
         $activePackages = static::$packageManager->getActivePackages();
 
@@ -1776,13 +1799,13 @@ tt_content.' . $key . $suffix . ' {
         }
 
         // TCA migration
-        // @deprecated since TYPO3 CMS 7. Not removed in TYPO3 CMS 8 though. This call will stay for now to allow further TCA migrations in 8.
+        // @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8. This can be removed *if* no additional TCA migration is added with CMS 8, see class TcaMigration
         $tcaMigration = GeneralUtility::makeInstance(TcaMigration::class);
         $GLOBALS['TCA'] = $tcaMigration->migrate($GLOBALS['TCA']);
         $messages = $tcaMigration->getMessages();
         if (!empty($messages)) {
             $context = 'Automatic TCA migration done during bootstrap. Please adapt TCA accordingly, these migrations'
-                . ' will be removed. The backend module "Configuration -> TCA" shows the modified values.'
+                . ' will be removed with TYPO3 CMS 8. The backend module "Configuration -> TCA" shows the modified values.'
                 . ' Please adapt these areas:';
             array_unshift($messages, $context);
             GeneralUtility::deprecationLog(implode(LF, $messages));
@@ -1803,7 +1826,7 @@ tt_content.' . $key . $suffix . ' {
      */
     protected static function emitTcaIsBeingBuiltSignal(array $tca)
     {
-        list($tca) = static::getSignalSlotDispatcher()->dispatch(__CLASS__, 'tcaIsBeingBuilt', array($tca));
+        list($tca) = static::getSignalSlotDispatcher()->dispatch(__CLASS__, 'tcaIsBeingBuilt', [$tca]);
         $GLOBALS['TCA'] = $tca;
     }
 
@@ -1817,7 +1840,7 @@ tt_content.' . $key . $suffix . ' {
     {
         /** @var $codeCache \TYPO3\CMS\Core\Cache\Frontend\PhpFrontend */
         $codeCache = self::getCacheManager()->getCache('cache_core');
-        $codeCache->set(static::getBaseTcaCacheIdentifier(), serialize(array('tca' => $GLOBALS['TCA'], 'categoryRegistry' => CategoryRegistry::getInstance())));
+        $codeCache->set(static::getBaseTcaCacheIdentifier(), serialize(['tca' => $GLOBALS['TCA'], 'categoryRegistry' => CategoryRegistry::getInstance()]));
     }
 
     /**
@@ -1880,6 +1903,7 @@ tt_content.' . $key . $suffix . ' {
                 // and are explicitly set in cached file as well
                 $_EXTCONF = $GLOBALS['TYPO3_CONF_VARS']['EXT']['extConf'][$_EXTKEY];
                 require $extensionInformation['ext_tables.php'];
+                static::loadNewTcaColumnsConfigFiles();
             }
         }
     }
@@ -1892,7 +1916,7 @@ tt_content.' . $key . $suffix . ' {
     protected static function createExtTablesCacheEntry()
     {
         $extensionInformation = $GLOBALS['TYPO3_LOADED_EXT'];
-        $phpCodeToCache = array();
+        $phpCodeToCache = [];
         // Set same globals as in loadSingleExtTablesFiles()
         $phpCodeToCache[] = '/**';
         $phpCodeToCache[] = ' * Compiled ext_tables.php cache file';
@@ -1917,7 +1941,9 @@ tt_content.' . $key . $suffix . ' {
                 $phpCodeToCache[] = '$_EXTCONF = $GLOBALS[\'TYPO3_CONF_VARS\'][\'EXT\'][\'extConf\'][$_EXTKEY];';
                 $phpCodeToCache[] = '';
                 // Add ext_tables.php content of extension
-                $phpCodeToCache[] = trim(file_get_contents($extensionDetails['ext_tables.php']));
+                $phpCodeToCache[] = trim(GeneralUtility::getUrl($extensionDetails['ext_tables.php']));
+                $phpCodeToCache[] = '';
+                $phpCodeToCache[] = self::class . '::loadNewTcaColumnsConfigFiles();';
                 $phpCodeToCache[] = '';
             }
         }
@@ -1925,6 +1951,49 @@ tt_content.' . $key . $suffix . ' {
         // Remove all start and ending php tags from content
         $phpCodeToCache = preg_replace('/<\\?php|\\?>/is', '', $phpCodeToCache);
         self::getCacheManager()->getCache('cache_core')->set(self::getExtTablesCacheIdentifier(), $phpCodeToCache);
+    }
+
+    /**
+     * Loads "columns" of a $TCA table definition if extracted
+     * to a "dynamicConfigFile". This method is called after each
+     * single ext_tables.php files was included to immediately have
+     * the full $TCA ready for the next extension.
+     *
+     * $TCA[$tableName]['ctrl']['dynamicConfigFile'] must be the
+     * absolute path to a file.
+     *
+     * Be aware that 'dynamicConfigFile' is obsolete, and all TCA
+     * table definitions should be moved to Configuration/TCA/tablename.php
+     * to be fully loaded automatically.
+     *
+     * Example:
+     * dynamicConfigFile = \TYPO3\CMS\Core\Utility\ExtensionManagementUtility::extPath($_EXTKEY) . 'SysNote.php',
+     *
+     * @return void
+     * @throws \RuntimeException
+     * @internal Internal use ONLY. It is called by cache files and can not be protected. Do not call yourself!
+     * @deprecated since TYPO3 CMS 7, will be removed in TYPO3 CMS 8. Table definition should be moved to <your_extension>/Configuration/TCA/<table_name>
+     */
+    public static function loadNewTcaColumnsConfigFiles()
+    {
+        global $TCA;
+
+        foreach ($TCA as $tableName => $_) {
+            if (!isset($TCA[$tableName]['columns'])) {
+                $columnsConfigFile = $TCA[$tableName]['ctrl']['dynamicConfigFile'];
+                if ($columnsConfigFile) {
+                    GeneralUtility::logDeprecatedFunction();
+                    if (GeneralUtility::isAbsPath($columnsConfigFile)) {
+                        include($columnsConfigFile);
+                    } else {
+                        throw new \RuntimeException(
+                            'Columns configuration file not found',
+                            1341151261
+                        );
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -2015,7 +2084,7 @@ tt_content.' . $key . $suffix . ' {
      * @see addTCAcolumns
      * @see addToAllTCAtypes
      */
-    public static function makeCategorizable($extensionKey, $tableName, $fieldName = 'categories', array $options = array(), $override = false)
+    public static function makeCategorizable($extensionKey, $tableName, $fieldName = 'categories', array $options = [], $override = false)
     {
         // Update the category registry
         $result = CategoryRegistry::getInstance()->add($extensionKey, $tableName, $fieldName, $options, $override);

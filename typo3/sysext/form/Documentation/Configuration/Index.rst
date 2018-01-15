@@ -1,4 +1,4 @@
-﻿.. include:: ../Includes.txt
+﻿﻿.. include:: ../Includes.txt
 
 
 .. _configuration:
@@ -11,7 +11,7 @@ Configuration
 
     .. tip::
 
-      Whenever you see a reference to anything named an "object" in this
+      Whenever there is a reference to anything named an "object" in this
       section it is a reference to a "FORM object" and not the "cObjects"
       unless it is clearly stated.
 

@@ -29,7 +29,7 @@ class RegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     protected function setUp()
     {
-        $GLOBALS['TYPO3_DB'] = $this->getMock(\TYPO3\CMS\Core\Database\DatabaseConnection::class, array());
+        $GLOBALS['TYPO3_DB'] = $this->getMock(\TYPO3\CMS\Core\Database\DatabaseConnection::class, []);
         $GLOBALS['TYPO3_DB']->expects($this->any())->method('fullQuoteStr')->will($this->onConsecutiveCalls('\'tx_phpunit\'', '\'someKey\'', '\'tx_phpunit\'', '\'someKey\''));
         $this->registry = new \TYPO3\CMS\Core\Registry();
     }
@@ -63,9 +63,9 @@ class RegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     {
         $testKey = 'TYPO3\\CMS\\Core\\Registry_testcase.testData.getRetrievesTheCorrectEntry';
         $testValue = 'getRetrievesTheCorrectEntry';
-        $GLOBALS['TYPO3_DB']->expects($this->once())->method('exec_SELECTgetRows')->with('*', 'sys_registry', 'entry_namespace = \'tx_phpunit\'')->will($this->returnValue(array(
-            array('entry_key' => $testKey, 'entry_value' => serialize($testValue))
-        )));
+        $GLOBALS['TYPO3_DB']->expects($this->once())->method('exec_SELECTgetRows')->with('*', 'sys_registry', 'entry_namespace = \'tx_phpunit\'')->will($this->returnValue([
+            ['entry_key' => $testKey, 'entry_value' => serialize($testValue)]
+        ]));
         $this->assertEquals($this->registry->get('tx_phpunit', $testKey), $testValue, 'The actual data did not match the expected data.');
     }
 
@@ -78,10 +78,10 @@ class RegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
         $testValue1 = 'getLazyLoadsEntriesOfOneNamespace1';
         $testKey2 = 'TYPO3\\CMS\\Core\\Registry_testcase.testData.getLazyLoadsEntriesOfOneNamespace2';
         $testValue2 = 'getLazyLoadsEntriesOfOneNamespace2';
-        $GLOBALS['TYPO3_DB']->expects($this->once())->method('exec_SELECTgetRows')->with('*', 'sys_registry', 'entry_namespace = \'tx_phpunit\'')->will($this->returnValue(array(
-            array('entry_key' => $testKey1, 'entry_value' => serialize($testValue1)),
-            array('entry_key' => $testKey2, 'entry_value' => serialize($testValue2))
-        )));
+        $GLOBALS['TYPO3_DB']->expects($this->once())->method('exec_SELECTgetRows')->with('*', 'sys_registry', 'entry_namespace = \'tx_phpunit\'')->will($this->returnValue([
+            ['entry_key' => $testKey1, 'entry_value' => serialize($testValue1)],
+            ['entry_key' => $testKey2, 'entry_value' => serialize($testValue2)]
+        ]));
         $this->assertEquals($this->registry->get('tx_phpunit', $testKey1), $testValue1, 'The actual data did not match the expected data.');
         $this->assertEquals($this->registry->get('tx_phpunit', $testKey2), $testValue2, 'The actual data did not match the expected data.');
     }
@@ -92,9 +92,9 @@ class RegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function getReturnsTheDefaultValueIfTheRequestedKeyWasNotFound()
     {
         $defaultValue = 'getReturnsTheDefaultValueIfTheRequestedKeyWasNotFound';
-        $GLOBALS['TYPO3_DB']->expects($this->once())->method('exec_SELECTgetRows')->with('*', 'sys_registry', 'entry_namespace = \'tx_phpunit\'')->will($this->returnValue(array(
-            array('entry_key' => 'foo', 'entry_value' => 'bar')
-        )));
+        $GLOBALS['TYPO3_DB']->expects($this->once())->method('exec_SELECTgetRows')->with('*', 'sys_registry', 'entry_namespace = \'tx_phpunit\'')->will($this->returnValue([
+            ['entry_key' => 'foo', 'entry_value' => 'bar']
+        ]));
         $this->assertEquals($defaultValue, $this->registry->get('tx_phpunit', 'someNonExistingKey', $defaultValue), 'A value other than the default value was returned.');
     }
 
@@ -125,7 +125,7 @@ class RegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function setAllowsValidNamespaces()
     {
-        $registry = $this->getMock(\TYPO3\CMS\Core\Registry::class, array('loadEntriesByNamespace'));
+        $registry = $this->getMock(\TYPO3\CMS\Core\Registry::class, ['loadEntriesByNamespace']);
         $registry->set('tx_thisIsValid', 'someKey', 'someValue');
         $registry->set('thisIsValid', 'someKey', 'someValue');
         $registry->set('user_soIsThis', 'someKey', 'someValue');
@@ -137,12 +137,12 @@ class RegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function setReallySavesTheGivenValueToTheDatabase()
     {
-        $GLOBALS['TYPO3_DB']->expects($this->once())->method('exec_INSERTquery')->with('sys_registry', array(
+        $GLOBALS['TYPO3_DB']->expects($this->once())->method('exec_INSERTquery')->with('sys_registry', [
             'entry_namespace' => 'tx_phpunit',
             'entry_key' => 'someKey',
             'entry_value' => serialize('someValue')
-        ));
-        $registry = $this->getMock(\TYPO3\CMS\Core\Registry::class, array('loadEntriesByNamespace'));
+        ]);
+        $registry = $this->getMock(\TYPO3\CMS\Core\Registry::class, ['loadEntriesByNamespace']);
         $registry->set('tx_phpunit', 'someKey', 'someValue');
     }
 
@@ -153,11 +153,11 @@ class RegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     {
         $GLOBALS['TYPO3_DB']->expects($this->once())->method('exec_SELECTquery')->with('uid', 'sys_registry', 'entry_namespace = \'tx_phpunit\' AND entry_key = \'someKey\'')->will($this->returnValue('DBResource'));
         $GLOBALS['TYPO3_DB']->expects($this->once())->method('sql_num_rows')->with('DBResource')->will($this->returnValue(1));
-        $GLOBALS['TYPO3_DB']->expects($this->once())->method('exec_UPDATEquery')->with('sys_registry', 'entry_namespace = \'tx_phpunit\' AND entry_key = \'someKey\'', array(
+        $GLOBALS['TYPO3_DB']->expects($this->once())->method('exec_UPDATEquery')->with('sys_registry', 'entry_namespace = \'tx_phpunit\' AND entry_key = \'someKey\'', [
             'entry_value' => serialize('someValue')
-        ));
+        ]);
         $GLOBALS['TYPO3_DB']->expects($this->never())->method('exec_INSERTquery');
-        $registry = $this->getMock(\TYPO3\CMS\Core\Registry::class, array('loadEntriesByNamespace'));
+        $registry = $this->getMock(\TYPO3\CMS\Core\Registry::class, ['loadEntriesByNamespace']);
         $registry->set('tx_phpunit', 'someKey', 'someValue');
     }
 
@@ -186,7 +186,7 @@ class RegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function removeUnsetsValueFromTheInternalEntriesCache()
     {
-        $registry = $this->getMock(\TYPO3\CMS\Core\Registry::class, array('loadEntriesByNamespace'));
+        $registry = $this->getMock(\TYPO3\CMS\Core\Registry::class, ['loadEntriesByNamespace']);
         $registry->set('tx_phpunit', 'someKey', 'someValue');
         $registry->set('tx_phpunit', 'someOtherKey', 'someOtherValue');
         $registry->set('tx_otherNamespace', 'someKey', 'someValueInOtherNamespace');
@@ -221,7 +221,7 @@ class RegistryTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     public function removeAllByNamespaceUnsetsValuesOfTheSpecifiedNamespaceFromTheInternalEntriesCache()
     {
-        $registry = $this->getMock(\TYPO3\CMS\Core\Registry::class, array('loadEntriesByNamespace'));
+        $registry = $this->getMock(\TYPO3\CMS\Core\Registry::class, ['loadEntriesByNamespace']);
         $registry->set('tx_phpunit', 'someKey', 'someValue');
         $registry->set('tx_phpunit', 'someOtherKey', 'someOtherValue');
         $registry->set('tx_otherNamespace', 'someKey', 'someValueInOtherNamespace');

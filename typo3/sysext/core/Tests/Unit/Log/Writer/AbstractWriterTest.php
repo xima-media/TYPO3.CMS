@@ -13,25 +13,21 @@ namespace TYPO3\CMS\Core\Tests\Unit\Log\Writer;
  *
  * The TYPO3 project - inspiring people to share!
  */
-use TYPO3\CMS\Core\Log\Exception\InvalidLogWriterConfigurationException;
-use TYPO3\CMS\Core\Tests\UnitTestCase;
 
 /**
  * Test case
  */
-class AbstractWriterTest extends UnitTestCase
+class AbstractWriterTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
 {
     /**
      * @test
+     * @expectedException \TYPO3\CMS\Core\Log\Exception\InvalidLogWriterConfigurationException
      */
     public function constructThrowsExceptionWithInvalidConfigurationOption()
     {
-        $this->expectException(InvalidLogWriterConfigurationException::class);
-        $this->expectExceptionCode(1321696152);
-
-        $invalidConfiguration = array(
+        $invalidConfiguration = [
             'foo' => 'bar'
-        );
-        $this->getMockForAbstractClass(\TYPO3\CMS\Core\Log\Writer\AbstractWriter::class, array($invalidConfiguration));
+        ];
+        $this->getMockForAbstractClass(\TYPO3\CMS\Core\Log\Writer\AbstractWriter::class, [$invalidConfiguration]);
     }
 }

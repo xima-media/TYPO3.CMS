@@ -1,5 +1,5 @@
 <?php
-$EM_CONF[$_EXTKEY] = array(
+$EM_CONF[$_EXTKEY] = [
     'title' => 'TYPO3 skin',
     'description' => '',
     'category' => 'be',
@@ -10,12 +10,12 @@ $EM_CONF[$_EXTKEY] = array(
     'author' => 'TYPO3 Skin Team',
     'author_email' => 'typo3-team-t3skin@lists.typo3.org',
     'author_company' => '',
-    'version' => '8.2.0',
-    'constraints' => array(
-        'depends' => array(
-            'typo3' => '8.2.0-8.2.99',
-        ),
-        'conflicts' => array(),
-        'suggests' => array(),
-    ),
-);
+    'version' => '7.6.24',
+    'constraints' => [
+        'depends' => [
+            'typo3' => '7.6.0-7.6.24',
+        ],
+        'conflicts' => [],
+        'suggests' => [],
+    ],
+];

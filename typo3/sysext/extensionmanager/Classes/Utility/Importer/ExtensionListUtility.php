@@ -13,11 +13,13 @@ namespace TYPO3\CMS\Extensionmanager\Utility\Importer;
  *
  * The TYPO3 project - inspiring people to share!
  */
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
+ * Module: Extension manager - Extension list importer
+ */
+/**
  * Importer object for extension list
+ * @since 2010-02-10
  */
 class ExtensionListUtility implements \SplObserver
 {
@@ -40,14 +42,14 @@ class ExtensionListUtility implements \SplObserver
      *
      * @var array
      */
-    protected $arrRows = array();
+    protected $arrRows = [];
 
     /**
      * Keeps fieldnames of tx_extensionmanager_domain_model_extension table.
      *
      * @var array
      */
-    protected static $fieldNames = array(
+    protected static $fieldNames = [
         'extension_key',
         'version',
         'integer_version',
@@ -68,14 +70,14 @@ class ExtensionListUtility implements \SplObserver
         'description',
         'serialized_dependencies',
         'update_comment'
-    );
+    ];
 
     /**
      * Keeps indexes of fields that should not be quoted.
      *
      * @var array
      */
-    protected static $fieldIndicesNoQuote = array(2, 3, 5, 11, 13, 14, 15, 16);
+    protected static $fieldIndicesNoQuote = [2, 3, 5, 11, 13, 14, 15, 16];
 
     /**
      * Keeps repository UID.
@@ -138,16 +140,10 @@ class ExtensionListUtility implements \SplObserver
         }
         $zlibStream = 'compress.zlib://';
         $this->sumRecords = 0;
-        $this->parser->parseXml($zlibStream . $localExtensionListFile);
+        $this->parser->parseXML($zlibStream . $localExtensionListFile);
         // flush last rows to database if existing
         if (!empty($this->arrRows)) {
-            GeneralUtility::makeInstance(ConnectionPool::class)
-                ->getConnectionForTable('tx_extensionmanager_domain_model_extension')
-                ->bulkInsert(
-                    'tx_extensionmanager_domain_model_extension',
-                    $this->arrRows,
-                    self::$fieldNames
-                );
+            $GLOBALS['TYPO3_DB']->exec_INSERTmultipleRows('tx_extensionmanager_domain_model_extension', self::$fieldNames, $this->arrRows, self::$fieldIndicesNoQuote);
         }
         $extensions = $this->extensionRepository->insertLastVersion($this->repositoryUid);
         $this->repositoryRepository->updateRepositoryCount($extensions, $this->repositoryUid);
@@ -164,18 +160,12 @@ class ExtensionListUtility implements \SplObserver
     {
         // flush every 50 rows to database
         if ($this->sumRecords !== 0 && $this->sumRecords % 50 === 0) {
-            GeneralUtility::makeInstance(ConnectionPool::class)
-                ->getConnectionForTable('tx_extensionmanager_domain_model_extension')
-                ->bulkInsert(
-                    'tx_extensionmanager_domain_model_extension',
-                    $this->arrRows,
-                    self::$fieldNames
-                );
-            $this->arrRows = array();
+            $GLOBALS['TYPO3_DB']->exec_INSERTmultipleRows('tx_extensionmanager_domain_model_extension', self::$fieldNames, $this->arrRows, self::$fieldIndicesNoQuote);
+            $this->arrRows = [];
         }
         $versionRepresentations = \TYPO3\CMS\Core\Utility\VersionNumberUtility::convertVersionStringToArray($subject->getVersion());
         // order must match that of self::$fieldNames!
-        $this->arrRows[] = array(
+        $this->arrRows[] = [
             $subject->getExtkey(),
             $subject->getVersion(),
             $versionRepresentations['version_int'],
@@ -197,7 +187,7 @@ class ExtensionListUtility implements \SplObserver
             $subject->getDescription() ?: '',
             $subject->getDependencies() ?: '',
             $subject->getUploadcomment() ?: ''
-        );
+        ];
         ++$this->sumRecords;
     }
 

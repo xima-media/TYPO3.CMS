@@ -63,11 +63,11 @@ class NumberViewHelper extends AbstractViewHelper
     public function render($decimals = 2, $decimalSeparator = '.', $thousandsSeparator = ',')
     {
         return static::renderStatic(
-            array(
+            [
                 'decimals' => $decimals,
                 'decimalSeparator' => $decimalSeparator,
                 'thousandsSeparator' => $thousandsSeparator,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

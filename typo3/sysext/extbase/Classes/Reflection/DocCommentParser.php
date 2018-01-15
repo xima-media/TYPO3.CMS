@@ -27,7 +27,7 @@ class DocCommentParser
     /**
      * @var array An array of tag names and their values (multiple values are possible)
      */
-    protected $tags = array();
+    protected $tags = [];
 
     /**
      * Parses the given doc comment and saves the result (description and
@@ -40,13 +40,13 @@ class DocCommentParser
     public function parseDocComment($docComment)
     {
         $this->description = '';
-        $this->tags = array();
+        $this->tags = [];
         $lines = explode(LF, $docComment);
         foreach ($lines as $line) {
             if ($line !== '' && strpos($line, '@') !== false) {
                 $this->parseTag(substr($line, strpos($line, '@')));
             } elseif (empty($this->tags)) {
-                $this->description .= preg_replace('/\\s*\\/?[\\\\*]*(.*)$/', '$1', $line) . LF;
+                $this->description .= preg_replace('#\\s*/?[*/]*(.*)$#', '$1', $line) . LF;
             }
         }
         $this->description = trim($this->description);
@@ -114,7 +114,7 @@ class DocCommentParser
         if (count($tagAndValue) > 1) {
             $this->tags[$tag][] = trim($tagAndValue[1]);
         } else {
-            $this->tags[$tag] = array();
+            $this->tags[$tag] = [];
         }
     }
 }

@@ -42,11 +42,11 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     /**
      * @var array
      */
-    protected $coreExtensionsToLoad = array(
+    protected $coreExtensionsToLoad = [
         'fluid',
         'version',
         'workspaces',
-    );
+    ];
 
     protected function setUp()
     {
@@ -55,7 +55,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
         $this->importScenarioDataSet('LiveDefaultElements');
         $this->importScenarioDataSet('ReferenceIndex');
 
-        $this->setUpFrontendRootPage(1, array('typo3/sysext/core/Tests/Functional/Fixtures/Frontend/JsonRenderer.ts'));
+        $this->setUpFrontendRootPage(1, ['typo3/sysext/core/Tests/Functional/Fixtures/Frontend/JsonRenderer.ts']);
         $this->backendUser->workspace = self::VALUE_WorkspaceId;
     }
 
@@ -65,73 +65,73 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
 
     /**
      * @test
-     * @see DataSet/Assertion/addCategoryRelation.csv
+     * @see DataSet/addCategoryRelation.csv
      */
     public function addCategoryRelation()
     {
         $this->actionService->modifyReferences(
-            self::TABLE_Content, self::VALUE_ContentIdFirst, 'categories', array(self::VALUE_CategoryIdFirst, self::VALUE_CategoryIdSecond, self::VALUE_CategoryIdLast)
+            self::TABLE_Content, self::VALUE_ContentIdFirst, 'categories', [self::VALUE_CategoryIdFirst, self::VALUE_CategoryIdSecond, self::VALUE_CategoryIdLast]
         );
     }
 
     /**
      * @test
-     * @see DataSet/Assertion/deleteCategoryRelation.csv
+     * @see DataSet/deleteCategoryRelation.csv
      */
     public function deleteCategoryRelation()
     {
         $this->actionService->modifyReferences(
-            self::TABLE_Content, self::VALUE_ContentIdFirst, 'categories', array(self::VALUE_CategoryIdFirst)
+            self::TABLE_Content, self::VALUE_ContentIdFirst, 'categories', [self::VALUE_CategoryIdFirst]
         );
     }
 
     /**
      * @test
-     * @see DataSet/Assertion/changeCategoryRelationSorting.csv
+     * @see DataSet/changeCategoryRelationSorting.csv
      */
     public function changeCategoryRelationSorting()
     {
         $this->actionService->modifyReferences(
-            self::TABLE_Content, self::VALUE_ContentIdFirst, 'categories', array(self::VALUE_CategoryIdSecond, self::VALUE_CategoryIdFirst)
+            self::TABLE_Content, self::VALUE_ContentIdFirst, 'categories', [self::VALUE_CategoryIdSecond, self::VALUE_CategoryIdFirst]
         );
     }
 
     /**
      * @test
-     * @see DataSet/Assertion/createContentRecordAndAddCategoryRelation.csv
+     * @see DataSet/createContentRecordAndAddCategoryRelation.csv
      */
     public function createContentAndAddRelation()
     {
         $newTableIds = $this->actionService->createNewRecord(
-            self::TABLE_Content, self::VALUE_PageId, array('header' => 'Testing #1', 'categories' => self::VALUE_CategoryIdSecond)
+            self::TABLE_Content, self::VALUE_PageId, ['header' => 'Testing #1', 'categories' => self::VALUE_CategoryIdSecond]
         );
         $this->recordIds['newContentId'] = $newTableIds[self::TABLE_Content][0];
     }
 
     /**
      * @test
-     * @see DataSet/Assertion/createCategoryRecordAndAddCategoryRelation.csv
+     * @see DataSet/createCategoryRecordAndAddCategoryRelation.csv
      */
     public function createCategoryAndAddRelation()
     {
         $newTableIds = $this->actionService->createNewRecord(
-            self::TABLE_Category, 0, array('title' => 'Testing #1', 'items' => 'tt_content_' . self::VALUE_ContentIdFirst)
+            self::TABLE_Category, 0, ['title' => 'Testing #1', 'items' => 'tt_content_' . self::VALUE_ContentIdFirst]
         );
         $this->recordIds['newCategoryId'] = $newTableIds[self::TABLE_Category][0];
     }
 
     /**
      * @test
-     * @see DataSet/Assertion/createContentRecordAndCreateCategoryRelation.csv
+     * @see DataSet/createContentRecordAndCreateCategoryRelation.csv
      */
     public function createContentAndCreateRelation()
     {
         $newTableIds = $this->actionService->createNewRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Category => array('pid' => 0, 'title' => 'Testing #1'),
-                self::TABLE_Content => array('header' => 'Testing #1', 'categories' => '__previousUid'),
-            )
+            [
+                self::TABLE_Category => ['pid' => 0, 'title' => 'Testing #1'],
+                self::TABLE_Content => ['header' => 'Testing #1', 'categories' => '__previousUid'],
+            ]
         );
         $this->recordIds['newCategoryId'] = $newTableIds[self::TABLE_Category][0];
         $this->recordIds['newContentId'] = $newTableIds[self::TABLE_Content][0];
@@ -139,48 +139,82 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
 
     /**
      * @test
-     * @see DataSet/Assertion/createCategoryRecordAndCreateCategoryRelation.csv
+     * @see DataSet/createCategoryRecordAndCreateCategoryRelation.csv
      */
     public function createCategoryAndCreateRelation()
     {
         $newTableIds = $this->actionService->createNewRecords(
             self::VALUE_PageId,
-            array(
-                self::TABLE_Content => array('header' => 'Testing #1'),
-                self::TABLE_Category => array('pid' => 0, 'title' => 'Testing #1', 'items' => 'tt_content___previousUid'),
-            )
+            [
+                self::TABLE_Content => ['header' => 'Testing #1'],
+                self::TABLE_Category => ['pid' => 0, 'title' => 'Testing #1', 'items' => 'tt_content___previousUid'],
+            ]
         );
         $this->recordIds['newContentId'] = $newTableIds[self::TABLE_Content][0];
         $this->recordIds['newCategoryId'] = $newTableIds[self::TABLE_Category][0];
     }
 
+    public function createContentWithCategoryAndAddRelation()
+    {
+        $newTableIds = $this->actionService->createNewRecords(
+            self::VALUE_PageId,
+            [
+                self::TABLE_Category => ['pid' => 0, 'title' => 'Testing #1'],
+                self::TABLE_Content => ['header' => 'Testing #1'],
+            ]
+        );
+        $this->recordIds['newCategoryId'] = $newTableIds[self::TABLE_Category][0];
+        $this->recordIds['newContentId'] = $newTableIds[self::TABLE_Content][0];
+
+        $this->actionService->modifyRecord(
+            self::TABLE_Content, $this->recordIds['newContentId'], ['categories' => $this->recordIds['newCategoryId']]
+        );
+    }
+
+    public function createCategoryWithContentAndAddRelation()
+    {
+        $newTableIds = $this->actionService->createNewRecords(
+            self::VALUE_PageId,
+            [
+                self::TABLE_Content => ['header' => 'Testing #1'],
+                self::TABLE_Category => ['pid' => 0, 'title' => 'Testing #1', 'items' => 'tt_content___previousUid'],
+            ]
+        );
+        $this->recordIds['newContentId'] = $newTableIds[self::TABLE_Content][0];
+        $this->recordIds['newCategoryId'] = $newTableIds[self::TABLE_Category][0];
+
+        $this->actionService->modifyRecord(
+            self::TABLE_Category, $this->recordIds['newCategoryId'], ['items' => 'tt_content_' . $this->recordIds['newContentId']]
+        );
+    }
+
     /**
-     * @see DataSet/Assertion/modifyCategoryRecordOfCategoryRelation.csv
+     * @see DataSet/modifyCategoryRecordOfCategoryRelation.csv
      */
     public function modifyCategoryOfRelation()
     {
-        $this->actionService->modifyRecord(self::TABLE_Category, self::VALUE_CategoryIdFirst, array('title' => 'Testing #1'));
+        $this->actionService->modifyRecord(self::TABLE_Category, self::VALUE_CategoryIdFirst, ['title' => 'Testing #1']);
     }
 
     /**
-     * @see DataSet/Assertion/modifyContentRecordOfCategoryRelation.csv
+     * @see DataSet/modifyContentRecordOfCategoryRelation.csv
      */
     public function modifyContentOfRelation()
     {
-        $this->actionService->modifyRecord(self::TABLE_Content, self::VALUE_ContentIdFirst, array('header' => 'Testing #1'));
+        $this->actionService->modifyRecord(self::TABLE_Content, self::VALUE_ContentIdFirst, ['header' => 'Testing #1']);
     }
 
     /**
-     * @see DataSet/Assertion/modifyBothRecordsOfCategoryRelation.csv
+     * @see DataSet/modifyBothRecordsOfCategoryRelation.csv
      */
     public function modifyBothsOfRelation()
     {
-        $this->actionService->modifyRecord(self::TABLE_Category, self::VALUE_CategoryIdFirst, array('title' => 'Testing #1'));
-        $this->actionService->modifyRecord(self::TABLE_Content, self::VALUE_ContentIdFirst, array('header' => 'Testing #1'));
+        $this->actionService->modifyRecord(self::TABLE_Category, self::VALUE_CategoryIdFirst, ['title' => 'Testing #1']);
+        $this->actionService->modifyRecord(self::TABLE_Content, self::VALUE_ContentIdFirst, ['header' => 'Testing #1']);
     }
 
     /**
-     * @see DataSet/Assertion/deleteContentRecordOfCategoryRelation.csv
+     * @see DataSet/deleteContentRecordOfCategoryRelation.csv
      */
     public function deleteContentOfRelation()
     {
@@ -188,7 +222,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/deleteCategoryRecordOfCategoryRelation.csv
+     * @see DataSet/deleteCategoryRecordOfCategoryRelation.csv
      */
     public function deleteCategoryOfRelation()
     {
@@ -196,7 +230,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/copyContentRecordOfCategoryRelation.csv
+     * @see DataSet/copyContentRecordOfCategoryRelation.csv
      */
     public function copyContentOfRelation()
     {
@@ -205,7 +239,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/copyCategoryRecordOfCategoryRelation.csv
+     * @see DataSet/copyCategoryRecordOfCategoryRelation.csv
      */
     public function copyCategoryOfRelation()
     {
@@ -214,7 +248,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/localizeContentRecordOfCategoryRelation.csv
+     * @see DataSet/localizeContentRecordOfCategoryRelation.csv
      */
     public function localizeContentOfRelation()
     {
@@ -223,7 +257,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/localizeCategoryRecordOfCategoryRelation.csv
+     * @see DataSet/localizeCategoryRecordOfCategoryRelation.csv
      */
     public function localizeCategoryOfRelation()
     {
@@ -232,7 +266,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/moveContentRecordOfCategoryRelationToDifferentPage.csv
+     * @see DataSet/moveContentRecordOfCategoryRelationToDifferentPage.csv
      */
     public function moveContentOfRelationToDifferentPage()
     {
@@ -240,7 +274,7 @@ abstract class AbstractActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\D
     }
 
     /**
-     * @see DataSet/Assertion/copyPage.csv
+     * @see DataSet/copyPage.csv
      */
     public function copyPage()
     {

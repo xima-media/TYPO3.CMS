@@ -46,7 +46,7 @@ class SelectCheckBoxElement extends AbstractFormElement
             $itemArray = array_flip($parameterArray['itemFormElValue']);
 
             // Traverse the Array of selector box items:
-            $groups = array();
+            $groups = [];
             $currentGroup = 0;
             $c = 0;
             $sOnChange = '';
@@ -61,10 +61,10 @@ class SelectCheckBoxElement extends AbstractFormElement
                             $selIcon = FormEngineUtility::getIconHtml($p[2]);
                         }
                         $currentGroup++;
-                        $groups[$currentGroup]['header'] = array(
+                        $groups[$currentGroup]['header'] = [
                             'icon' => $selIcon,
-                            'title' => htmlspecialchars($p[0])
-                        );
+                            'title' => $p[0]
+                        ];
                     } else {
                         // Check if some help text is available
                         // Since TYPO3 4.5 help text is expected to be an associative array
@@ -74,7 +74,7 @@ class SelectCheckBoxElement extends AbstractFormElement
                         // are modified with an itemProcFunc)
                         $hasHelp = false;
                         $help = '';
-                        $helpArray = array();
+                        $helpArray = [];
                         if (!empty($p[3])) {
                             $hasHelp = true;
                             if (is_array($p[3])) {
@@ -95,17 +95,17 @@ class SelectCheckBoxElement extends AbstractFormElement
                         }
 
                         // Build item array
-                        $groups[$currentGroup]['items'][] = array(
+                        $groups[$currentGroup]['items'][] = [
                             'id' => StringUtility::getUniqueId('select_checkbox_row_'),
                             'name' => $parameterArray['itemFormElName'] . '[' . $c . ']',
                             'value' => $p[1],
                             'checked' => $checked,
                             'disabled' => false,
                             'class' => '',
-                            'icon' => FormEngineUtility::getIconHtml(!empty($p[2]) ? $p[2] : 'empty-empty'),
-                            'title' => htmlspecialchars($p[0], ENT_COMPAT, 'UTF-8', false),
+                            'icon' => (!empty($p[2]) ? FormEngineUtility::getIconHtml($p[2]) : $this->iconFactory->getIcon('empty-empty', Icon::SIZE_SMALL)->render()),
+                            'title' => $p[0],
                             'help' => $help
-                        );
+                        ];
                         $c++;
                     }
                 }
@@ -121,13 +121,13 @@ class SelectCheckBoxElement extends AbstractFormElement
                     $html[] = '<div class="panel-heading">';
                     $html[] = '<a data-toggle="collapse" href="#' . $groupId . '" aria-expanded="false" aria-controls="' . $groupId . '">';
                     $html[] = $group['header']['icon'];
-                    $html[] = $group['header']['title'];
+                    $html[] = htmlspecialchars($group['header']['title']);
                     $html[] = '</a>';
                     $html[] = '</div>';
                 }
                 if (is_array($group['items']) && !empty($group['items'])) {
                     $tableRows = [];
-                    $resetGroup = array();
+                    $resetGroup = [];
 
                     // Render rows
                     foreach ($group['items'] as $item) {
@@ -139,15 +139,16 @@ class SelectCheckBoxElement extends AbstractFormElement
                                             . 'value="' . htmlspecialchars($item['value']) . '" '
                                             . 'onclick="' . htmlspecialchars($sOnChange) . '" '
                                             . ($item['checked'] ? 'checked=checked ' : '')
-                                            . ($item['disabled'] ? 'disabled=disabled ' : '') . '>';
+                                            . ($item['disabled'] ? 'disabled=disabled ' : '')
+                                            . $parameterArray['onFocus'] . '>';
                         $tableRows[] =    '</td>';
                         $tableRows[] =    '<td class="col-icon">';
                         $tableRows[] =        '<label class="label-block" for="' . $item['id'] . '">' . $item['icon'] . '</label>';
                         $tableRows[] =    '</td>';
                         $tableRows[] =    '<td class="col-title">';
-                        $tableRows[] =        '<label class="label-block" for="' . $item['id'] . '">' . $item['title'] . '</label>';
+                        $tableRows[] =        '<label class="label-block" for="' . $item['id'] . '">' . htmlspecialchars($item['title'], ENT_COMPAT, 'UTF-8', false) . '</label>';
                         $tableRows[] =    '</td>';
-                        $tableRows[] =    '<td class="text-right">' . $item['help'] . '</td>';
+                        $tableRows[] =    '<td>' . $item['help'] . '</td>';
                         $tableRows[] = '</tr>';
                         $resetGroup[] = 'document.editform[' . GeneralUtility::quoteJSvalue($item['name']) . '].checked=' . $item['checked'] . ';';
                     }
@@ -156,7 +157,7 @@ class SelectCheckBoxElement extends AbstractFormElement
                     $resetGroupBtn = '';
                     if (!empty($resetGroup)) {
                         $resetGroup[] = 'TYPO3.FormEngine.updateCheckboxState(this);';
-                        $title = htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.revertSelection'));
+                        $title = $this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.revertSelection', true);
                         $resetGroupBtn = '<a href="#" '
                             . 'class="btn btn-default btn-sm" '
                             . 'onclick="' . implode('', $resetGroup) . ' return false;" '
@@ -168,17 +169,16 @@ class SelectCheckBoxElement extends AbstractFormElement
                     if (is_array($group['header'])) {
                         $html[] = '<div id="' . $groupId . '" class="panel-collapse collapse" role="tabpanel">';
                     }
-                    $checkboxId = uniqid($groupId);
-                    $title = htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.toggleall'));
+                    $title = $this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:labels.toggleall');
                     $html[] =    '<div class="table-responsive">';
                     $html[] =        '<table class="table table-transparent table-hover">';
                     $html[] =            '<thead>';
                     $html[] =                '<tr>';
                     $html[] =                    '<th class="col-checkbox">';
-                    $html[] =                       '<input type="checkbox" id="' . $checkboxId . '" class="t3js-toggle-checkboxes" data-trigger="hover" data-placement="right" data-title="' . $title . '" data-toggle="tooltip" />';
+                    $html[] =                       '<input type="checkbox" class="t3js-toggle-checkboxes" data-trigger="hover" data-placement="right" data-title="' . htmlspecialchars($title) . '" data-toggle="tooltip" />';
                     $html[] =                    '</th>';
-                    $html[] =                    '<th class="col-title" colspan="2"><label for="' . $checkboxId . '">' . $title . '</label></th>';
-                    $html[] =                    '<th class="text-right">' . $resetGroupBtn . '</th>';
+                    $html[] =                    '<th class="col-icon"></th>';
+                    $html[] =                    '<th class="text-right" colspan="2">' . $resetGroupBtn . '</th>';
                     $html[] =                '</tr>';
                     $html[] =            '</thead>';
                     $html[] =            '<tbody>' . implode(LF, $tableRows) . '</tbody>';
@@ -194,7 +194,7 @@ class SelectCheckBoxElement extends AbstractFormElement
 
         if (!$disabled) {
             $html = $this->renderWizards(
-                array(implode(LF, $html)),
+                [implode(LF, $html)],
                 $config['wizards'],
                 $this->data['tableName'],
                 $this->data['databaseRow'],

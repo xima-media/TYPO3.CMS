@@ -13,7 +13,6 @@ namespace TYPO3\CMS\Frontend\Tests\Unit\View;
  *
  * The TYPO3 project - inspiring people to share!
  */
-use TYPO3\CMS\Core\Utility\GeneralUtility;
 
 /**
  * Test case
@@ -25,7 +24,7 @@ class AdminPanelViewTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
      */
     protected function setUp()
     {
-        $GLOBALS['LANG'] = $this->getMock(\TYPO3\CMS\Lang\LanguageService::class, array(), array(), '', false);
+        $GLOBALS['LANG'] = $this->getMock(\TYPO3\CMS\Lang\LanguageService::class, [], [], '', false);
     }
 
     /**
@@ -42,7 +41,7 @@ class AdminPanelViewTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
         unset($backendUser->extAdminConfig['override.']['preview']);
         $GLOBALS['BE_USER'] = $backendUser;
 
-        $adminPanelMock = $this->getMock(\TYPO3\CMS\Frontend\View\AdminPanelView::class, array('isAdminModuleEnabled', 'isAdminModuleOpen'), array(), '', false);
+        $adminPanelMock = $this->getMock(\TYPO3\CMS\Frontend\View\AdminPanelView::class, ['isAdminModuleEnabled', 'isAdminModuleOpen'], [], '', false);
         $adminPanelMock->expects($this->any())->method('isAdminModuleEnabled')->will($this->returnValue(true));
         $adminPanelMock->expects($this->any())->method('isAdminModuleOpen')->will($this->returnValue(true));
 
@@ -56,14 +55,13 @@ class AdminPanelViewTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
 
     /**
      * @test
+     * @expectedException \UnexpectedValueException
      */
     public function extendAdminPanelHookThrowsExceptionIfHookClassDoesNotImplementInterface()
     {
-        $this->expectException(\UnexpectedValueException::class);
-        $this->expectExceptionCode(1311942539);
         $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['tslib/class.tslib_adminpanel.php']['extendAdminPanel'][] = \TYPO3\CMS\Frontend\Tests\Unit\Fixtures\AdminPanelHookWithoutInterfaceFixture::class;
         /** @var $adminPanelMock \PHPUnit_Framework_MockObject_MockObject|\TYPO3\CMS\Frontend\View\AdminPanelView */
-        $adminPanelMock = $this->getMock(\TYPO3\CMS\Frontend\View\AdminPanelView::class, array('dummy'), array(), '', false);
+        $adminPanelMock = $this->getMock(\TYPO3\CMS\Frontend\View\AdminPanelView::class, ['dummy'], [], '', false);
         $adminPanelMock->display();
     }
 
@@ -73,11 +71,11 @@ class AdminPanelViewTest extends \TYPO3\CMS\Core\Tests\UnitTestCase
     public function extendAdminPanelHookCallsExtendAdminPanelMethodOfHook()
     {
         $hookClass = $this->getUniqueId('tx_coretest');
-        $hookMock = $this->getMock(\TYPO3\CMS\Frontend\View\AdminPanelViewHookInterface::class, array(), array(), $hookClass);
-        GeneralUtility::addInstance($hookClass, $hookMock);
+        $hookMock = $this->getMock(\TYPO3\CMS\Frontend\View\AdminPanelViewHookInterface::class, [], [], $hookClass);
+        $GLOBALS['T3_VAR']['getUserObj'][$hookClass] = $hookMock;
         $GLOBALS['TYPO3_CONF_VARS']['SC_OPTIONS']['tslib/class.tslib_adminpanel.php']['extendAdminPanel'][] = $hookClass;
         /** @var $adminPanelMock \PHPUnit_Framework_MockObject_MockObject|\TYPO3\CMS\Frontend\View\AdminPanelView */
-        $adminPanelMock = $this->getMock(\TYPO3\CMS\Frontend\View\AdminPanelView::class, array('extGetLL'), array(), '', false);
+        $adminPanelMock = $this->getMock(\TYPO3\CMS\Frontend\View\AdminPanelView::class, ['extGetLL'], [], '', false);
         $hookMock->expects($this->once())->method('extendAdminPanel')->with($this->isType('string'), $this->isInstanceOf(\TYPO3\CMS\Frontend\View\AdminPanelView::class));
         $adminPanelMock->display();
     }

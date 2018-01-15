@@ -37,7 +37,7 @@ class LocalizationUtility
      *
      * @var array
      */
-    protected static $LOCAL_LANG = array();
+    protected static $LOCAL_LANG = [];
 
     /**
      * Contains those LL keys, which have been set to (empty) in TypoScript.
@@ -47,7 +47,7 @@ class LocalizationUtility
      *
      * @var array
      */
-    protected static $LOCAL_LANG_UNSET = array();
+    protected static $LOCAL_LANG_UNSET = [];
 
     /**
      * Key of the language to use
@@ -61,7 +61,7 @@ class LocalizationUtility
      *
      * @var array
      */
-    protected static $alternativeLanguageKeys = array();
+    protected static $alternativeLanguageKeys = [];
 
     /**
      * @var \TYPO3\CMS\Extbase\Configuration\ConfigurationManagerInterface
@@ -153,13 +153,14 @@ class LocalizationUtility
         }
         $locallangPathAndFilename = 'EXT:' . GeneralUtility::camelCaseToLowerCaseUnderscored($extensionName) . '/' . self::$locallangPath . 'locallang.xlf';
         self::setLanguageKeys();
+        $renderCharset = TYPO3_MODE === 'FE' ? self::getTypoScriptFrontendController()->renderCharset : self::getLanguageService()->charSet;
 
         /** @var $languageFactory LocalizationFactory */
         $languageFactory = GeneralUtility::makeInstance(LocalizationFactory::class);
 
-        self::$LOCAL_LANG[$extensionName] = $languageFactory->getParsedData($locallangPathAndFilename, self::$languageKey, 'utf-8');
+        self::$LOCAL_LANG[$extensionName] = $languageFactory->getParsedData($locallangPathAndFilename, self::$languageKey, $renderCharset);
         foreach (self::$alternativeLanguageKeys as $language) {
-            $tempLL = $languageFactory->getParsedData($locallangPathAndFilename, $language, 'utf-8');
+            $tempLL = $languageFactory->getParsedData($locallangPathAndFilename, $language, $renderCharset);
             if (self::$languageKey !== 'default' && isset($tempLL[$language])) {
                 self::$LOCAL_LANG[$extensionName][$language] = $tempLL[$language];
             }
@@ -176,7 +177,7 @@ class LocalizationUtility
     protected static function setLanguageKeys()
     {
         self::$languageKey = 'default';
-        self::$alternativeLanguageKeys = array();
+        self::$alternativeLanguageKeys = [];
         if (TYPO3_MODE === 'FE') {
             if (isset(self::getTypoScriptFrontendController()->config['config']['language'])) {
                 self::$languageKey = self::getTypoScriptFrontendController()->config['config']['language'];
@@ -214,7 +215,7 @@ class LocalizationUtility
         if (!is_array($frameworkConfiguration['_LOCAL_LANG'])) {
             return;
         }
-        self::$LOCAL_LANG_UNSET[$extensionName] = array();
+        self::$LOCAL_LANG_UNSET[$extensionName] = [];
         foreach ($frameworkConfiguration['_LOCAL_LANG'] as $languageKey => $labels) {
             if (!(is_array($labels) && isset(self::$LOCAL_LANG[$extensionName][$languageKey]))) {
                 continue;
@@ -251,7 +252,7 @@ class LocalizationUtility
      */
     protected static function flattenTypoScriptLabelArray(array $labelValues, $parentKey = '')
     {
-        $result = array();
+        $result = [];
         foreach ($labelValues as $key => $labelValue) {
             if (!empty($parentKey)) {
                 $key = $parentKey . '.' . $key;

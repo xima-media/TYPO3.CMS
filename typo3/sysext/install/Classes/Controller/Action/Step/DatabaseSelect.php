@@ -14,8 +14,6 @@ namespace TYPO3\CMS\Install\Controller\Action\Step;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Utility\GeneralUtility;
-
 /**
  * Database select step.
  * This step is only rendered if database is mysql. With dbal,
@@ -35,22 +33,21 @@ class DatabaseSelect extends AbstractStepAction
      */
     public function execute()
     {
-        $result = array();
+        $result = [];
         $this->initializeDatabaseConnection();
         $postValues = $this->postValues['values'];
-        $localConfigurationPathValuePairs = array();
+        $localConfigurationPathValuePairs = [];
         /** @var $configurationManager \TYPO3\CMS\Core\Configuration\ConfigurationManager */
-        $configurationManager = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
-        $canProceed = true;
+        $configurationManager = $this->objectManager->get(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
         if ($postValues['type'] === 'new') {
             $newDatabaseName = $postValues['new'];
             if ($this->isValidDatabaseName($newDatabaseName)) {
                 $createDatabaseResult = $this->databaseConnection->admin_query('CREATE DATABASE ' . $newDatabaseName . ' CHARACTER SET utf8');
                 if ($createDatabaseResult) {
-                    $localConfigurationPathValuePairs['DB/Connections/Default/dbname'] = $newDatabaseName;
+                    $localConfigurationPathValuePairs['DB/database'] = $newDatabaseName;
                 } else {
                     /** @var $errorStatus \TYPO3\CMS\Install\Status\ErrorStatus */
-                    $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
+                    $errorStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\ErrorStatus::class);
                     $errorStatus->setTitle('Unable to create database');
                     $errorStatus->setMessage(
                         'Database with name ' . $newDatabaseName . ' could not be created.' .
@@ -62,7 +59,7 @@ class DatabaseSelect extends AbstractStepAction
                 }
             } else {
                 /** @var $errorStatus \TYPO3\CMS\Install\Status\ErrorStatus */
-                $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
+                $errorStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\ErrorStatus::class);
                 $errorStatus->setTitle('Database name not valid');
                 $errorStatus->setMessage(
                     'Given database name must be shorter than fifty characters' .
@@ -78,7 +75,7 @@ class DatabaseSelect extends AbstractStepAction
                 $this->databaseConnection->sql_select_db();
                 $existingTables = $this->databaseConnection->admin_get_tables();
                 if (!empty($existingTables)) {
-                    $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
+                    $errorStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\ErrorStatus::class);
                     $errorStatus->setTitle('Selected database is not empty!');
                     $errorStatus->setMessage(
                         sprintf('Cannot use database "%s"', $postValues['existing'])
@@ -87,7 +84,7 @@ class DatabaseSelect extends AbstractStepAction
                     $result[] = $errorStatus;
                 }
             } catch (\RuntimeException $e) {
-                $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
+                $errorStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\ErrorStatus::class);
                 $errorStatus->setTitle('Could not connect to selected database!');
                 $errorStatus->setMessage(
                     sprintf('Could not connect to database "%s"', $postValues['existing'])
@@ -97,30 +94,17 @@ class DatabaseSelect extends AbstractStepAction
             }
             $isInitialInstallation = $configurationManager->getConfigurationValueByPath('SYS/isInitialInstallationInProgress');
             if (!$isInitialInstallation || empty($result)) {
-                $localConfigurationPathValuePairs['DB/Connections/Default/dbname'] = $postValues['existing'];
-            }
-            // check if database charset is utf-8
-            $defaultDatabaseCharset = $this->getDefaultDatabaseCharset();
-            // also allow utf8mb4
-            if (substr($defaultDatabaseCharset, 0, 4) !== 'utf8') {
-                $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
-                $errorStatus->setTitle('Invalid Charset');
-                $errorStatus->setMessage(
-                    'Your database uses character set "' . $defaultDatabaseCharset . '", ' .
-                    'but only "utf8" is supported with TYPO3. You probably want to change this before proceeding.'
-                );
-                $result[] = $errorStatus;
-                $canProceed = false;
+                $localConfigurationPathValuePairs['DB/database'] = $postValues['existing'];
             }
         } else {
             /** @var $errorStatus \TYPO3\CMS\Install\Status\ErrorStatus */
-            $errorStatus = GeneralUtility::makeInstance(\TYPO3\CMS\Install\Status\ErrorStatus::class);
+            $errorStatus = $this->objectManager->get(\TYPO3\CMS\Install\Status\ErrorStatus::class);
             $errorStatus->setTitle('No Database selected');
             $errorStatus->setMessage('You must select a database.');
             $result[] = $errorStatus;
         }
 
-        if ($canProceed && !empty($localConfigurationPathValuePairs)) {
+        if (!empty($localConfigurationPathValuePairs)) {
             $configurationManager->setLocalConfigurationValuesByPathValuePairs($localConfigurationPathValuePairs);
         }
 
@@ -137,8 +121,8 @@ class DatabaseSelect extends AbstractStepAction
     {
         $this->initializeDatabaseConnection();
         $result = true;
-        if ((string)$GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['dbname'] !== '') {
-            $this->databaseConnection->setDatabaseName($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['dbname']);
+        if ((string)$GLOBALS['TYPO3_CONF_VARS']['DB']['database'] !== '') {
+            $this->databaseConnection->setDatabaseName($GLOBALS['TYPO3_CONF_VARS']['DB']['database']);
             try {
                 $selectResult = $this->databaseConnection->sql_select_db();
                 if ($selectResult === true) {
@@ -158,7 +142,7 @@ class DatabaseSelect extends AbstractStepAction
     protected function executeAction()
     {
         /** @var $configurationManager \TYPO3\CMS\Core\Configuration\ConfigurationManager */
-        $configurationManager = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
+        $configurationManager = $this->objectManager->get(\TYPO3\CMS\Core\Configuration\ConfigurationManager::class);
         $isInitialInstallationInProgress = $configurationManager->getConfigurationValueByPath('SYS/isInitialInstallationInProgress');
         $this->view->assign('databaseList', $this->getDatabaseList($isInitialInstallationInProgress));
         $this->view->assign('isInitialInstallationInProgress', $isInitialInstallationInProgress);
@@ -177,7 +161,7 @@ class DatabaseSelect extends AbstractStepAction
         $this->initializeDatabaseConnection();
         $databaseArray = $this->databaseConnection->admin_get_dbs();
         // Remove mysql organizational tables from database list
-        $reservedDatabaseNames = array('mysql', 'information_schema', 'performance_schema');
+        $reservedDatabaseNames = ['mysql', 'information_schema', 'performance_schema'];
         $allPossibleDatabases = array_diff($databaseArray, $reservedDatabaseNames);
 
         // If we are upgrading we show *all* databases the user has access to
@@ -185,15 +169,15 @@ class DatabaseSelect extends AbstractStepAction
             return $allPossibleDatabases;
         } else {
             // In first installation we show all databases but disable not empty ones (with tables)
-            $databases = array();
+            $databases = [];
             foreach ($allPossibleDatabases as $database) {
                 $this->databaseConnection->setDatabaseName($database);
                 $this->databaseConnection->sql_select_db();
                 $existingTables = $this->databaseConnection->admin_get_tables();
-                $databases[] = array(
+                $databases[] = [
                     'name' => $database,
                     'tables' => count($existingTables),
-                );
+                ];
             }
             return $databases;
         }
@@ -206,12 +190,12 @@ class DatabaseSelect extends AbstractStepAction
      */
     protected function initializeDatabaseConnection()
     {
-        $this->databaseConnection = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Database\DatabaseConnection::class);
-        $this->databaseConnection->setDatabaseUsername($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['user']);
-        $this->databaseConnection->setDatabasePassword($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['password']);
-        $this->databaseConnection->setDatabaseHost($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['host']);
-        $this->databaseConnection->setDatabasePort($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['port']);
-        $this->databaseConnection->setDatabaseSocket($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['unix_socket']);
+        $this->databaseConnection = $this->objectManager->get(\TYPO3\CMS\Core\Database\DatabaseConnection::class);
+        $this->databaseConnection->setDatabaseUsername($GLOBALS['TYPO3_CONF_VARS']['DB']['username']);
+        $this->databaseConnection->setDatabasePassword($GLOBALS['TYPO3_CONF_VARS']['DB']['password']);
+        $this->databaseConnection->setDatabaseHost($GLOBALS['TYPO3_CONF_VARS']['DB']['host']);
+        $this->databaseConnection->setDatabasePort($GLOBALS['TYPO3_CONF_VARS']['DB']['port']);
+        $this->databaseConnection->setDatabaseSocket($GLOBALS['TYPO3_CONF_VARS']['DB']['socket']);
         $this->databaseConnection->sql_pconnect();
     }
 
@@ -224,26 +208,5 @@ class DatabaseSelect extends AbstractStepAction
     protected function isValidDatabaseName($databaseName)
     {
         return strlen($databaseName) <= 50 && preg_match('/^[a-zA-Z0-9\$_]*$/', $databaseName);
-    }
-
-    /**
-     * Retrieves the default character set of the database.
-     *
-     * @return string
-     */
-    protected function getDefaultDatabaseCharset()
-    {
-        $result = $this->databaseConnection->admin_query('SHOW VARIABLES LIKE "character_set_database"');
-        $row = $this->databaseConnection->sql_fetch_assoc($result);
-
-        $key = $row['Variable_name'];
-        $value = $row['Value'];
-        $databaseCharset = '';
-
-        if ($key == 'character_set_database') {
-            $databaseCharset = $value;
-        }
-
-        return $databaseCharset;
     }
 }

@@ -30,12 +30,12 @@ class ClearCacheToolbarItem implements ToolbarItemInterface
     /**
      * @var array
      */
-    protected $cacheActions = array();
+    protected $cacheActions = [];
 
     /**
      * @var array
      */
-    protected $optionValues = array();
+    protected $optionValues = [];
 
     /**
      * @var IconFactory
@@ -57,28 +57,45 @@ class ClearCacheToolbarItem implements ToolbarItemInterface
 
         // Clear all page-related caches
         if ($backendUser->isAdmin() || $backendUser->getTSConfigVal('options.clearCache.pages')) {
-            $this->cacheActions[] = array(
+            $this->cacheActions[] = [
                 'id' => 'pages',
-                'title' => htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:flushPageCachesTitle')),
-                'description' => htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:flushPageCachesDescription')),
-                'href' => BackendUtility::getModuleUrl('tce_db', ['vC' => $backendUser->veriCode(), 'cacheCmd' => 'pages']),
+                'title' => $languageService->sL('LLL:EXT:lang/locallang_core.xlf:flushPageCachesTitle', true),
+                'description' => $languageService->sL('LLL:EXT:lang/locallang_core.xlf:flushPageCachesDescription', true),
+                'href' => BackendUtility::getModuleUrl('tce_db', ['vC' => $backendUser->veriCode(), 'cacheCmd' => 'pages', 'ajaxCall' => 1]),
                 'icon' => $this->iconFactory->getIcon('actions-system-cache-clear-impact-low', Icon::SIZE_SMALL)->render()
-            );
+            ];
             $this->optionValues[] = 'pages';
         }
 
-        // Clearing of all caches is only shown if explicitly enabled via TSConfig
-        // or if BE-User is admin and the TSconfig explicitly disables the possibility for admins.
-        // This is useful for big production systems where admins accidentally could slow down the system.
-        if ($backendUser->getTSConfigVal('options.clearCache.all') || ($backendUser->isAdmin() && $backendUser->getTSConfigVal('options.clearCache.all') !== '0')) {
-            $this->cacheActions[] = array(
+        // Clear cache for ALL tables!
+        if ($backendUser->isAdmin() || $backendUser->getTSConfigVal('options.clearCache.all')) {
+            $this->cacheActions[] = [
                 'id' => 'all',
-                'title' => htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:flushAllCachesTitle2')),
-                'description' => htmlspecialchars($languageService->sL('LLL:EXT:lang/locallang_core.xlf:flushAllCachesDescription2')),
-                'href' => BackendUtility::getModuleUrl('tce_db', ['vC' => $backendUser->veriCode(), 'cacheCmd' => 'all']),
-                'icon' => $this->iconFactory->getIcon('actions-system-cache-clear-impact-high', Icon::SIZE_SMALL)->render()
-            );
+                'title' => $languageService->sL('LLL:EXT:lang/locallang_core.xlf:flushGeneralCachesTitle', true),
+                'description' => $languageService->sL('LLL:EXT:lang/locallang_core.xlf:flushGeneralCachesDescription', true),
+                'href' => BackendUtility::getModuleUrl('tce_db', ['vC' => $backendUser->veriCode(), 'cacheCmd' => 'all', 'ajaxCall' => 1]),
+                'icon' => $this->iconFactory->getIcon('actions-system-cache-clear-impact-medium', Icon::SIZE_SMALL)->render()
+            ];
             $this->optionValues[] = 'all';
+        }
+
+        // Clearing of system cache (core cache, class cache etc)
+        // is only shown explicitly if activated for a BE-user (not activated for admins by default)
+        // or if the system runs in development mode (only for admins)
+        // or if $GLOBALS['TYPO3_CONF_VARS']['SYS']['clearCacheSystem'] is set (only for admins)
+        if (
+            $backendUser->getTSConfigVal('options.clearCache.system')
+            || (GeneralUtility::getApplicationContext()->isDevelopment() && $backendUser->isAdmin())
+            || ((bool)$GLOBALS['TYPO3_CONF_VARS']['SYS']['clearCacheSystem'] === true && $backendUser->isAdmin())
+        ) {
+            $this->cacheActions[] = [
+                'id' => 'system',
+                'title' => $languageService->sL('LLL:EXT:lang/locallang_core.xlf:flushSystemCachesTitle', true),
+                'description' => $languageService->sL('LLL:EXT:lang/locallang_core.xlf:flushSystemCachesDescription', true),
+                'href' => BackendUtility::getModuleUrl('tce_db', ['vC' => $backendUser->veriCode(), 'cacheCmd' => 'system', 'ajaxCall' => 1]),
+                'icon' => $this->iconFactory->getIcon('actions-system-cache-clear-impact-high', Icon::SIZE_SMALL)->render()
+            ];
+            $this->optionValues[] = 'system';
         }
 
         // Hook for manipulating cacheActions
@@ -121,7 +138,7 @@ class ClearCacheToolbarItem implements ToolbarItemInterface
      */
     public function getItem()
     {
-        $title = htmlspecialchars($this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:rm.clearCache_clearCache'));
+        $title = $this->getLanguageService()->sL('LLL:EXT:lang/locallang_core.xlf:rm.clearCache_clearCache', true);
         return '<span title="' . $title . '">'
             . $this->iconFactory->getIcon('apps-toolbar-menu-cache', Icon::SIZE_SMALL)->render('inline')
             . '</span>';
@@ -134,14 +151,13 @@ class ClearCacheToolbarItem implements ToolbarItemInterface
      */
     public function getDropDown()
     {
-        $result = array();
+        $result = [];
         $result[] = '<ul class="dropdown-list">';
         foreach ($this->cacheActions as $cacheAction) {
             $title = $cacheAction['description'] ?: $cacheAction['title'];
             $result[] = '<li>';
-            $result[] = '<a class="dropdown-list-link" href="' . htmlspecialchars($cacheAction['href']) . '">';
+            $result[] = '<a class="dropdown-list-link" href="' . htmlspecialchars($cacheAction['href']) . '" title="' . htmlspecialchars($title) . '">';
             $result[] = $cacheAction['icon'] . ' ' . htmlspecialchars($cacheAction['title']);
-            $result[] = '<br/><small>' . htmlspecialchars($title) . '</small>';
             $result[] = '</a>';
             $result[] = '</li>';
         }
@@ -156,7 +172,7 @@ class ClearCacheToolbarItem implements ToolbarItemInterface
      */
     public function getAdditionalAttributes()
     {
-        return array();
+        return [];
     }
 
     /**

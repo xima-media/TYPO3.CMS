@@ -7,12 +7,16 @@ if (TYPO3_MODE === 'BE') {
         'func',
         '',
         '',
-        array(
+        [
             'routeTarget' => \TYPO3\CMS\Func\Controller\PageFunctionsController::class . '::mainAction',
             'access' => 'user,group',
             'name' => 'web_func',
-            'icon' => 'EXT:func/Resources/Public/Icons/module-func.svg',
-            'labels' => 'LLL:EXT:lang/locallang_mod_web_func.xlf'
-        )
+            'labels' => [
+                'tabs_images' => [
+                    'tab' => 'EXT:func/Resources/Public/Icons/module-func.svg',
+                ],
+                'll_ref' => 'LLL:EXT:lang/locallang_mod_web_func.xlf',
+            ],
+        ]
     );
 }

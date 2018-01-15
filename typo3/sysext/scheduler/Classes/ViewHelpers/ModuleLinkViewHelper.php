@@ -32,14 +32,14 @@ class ModuleLinkViewHelper extends AbstractViewHelper
      * @param array $arguments Arguments for the action
      * @return string
      */
-    public function render($controller, $action, array $arguments = array())
+    public function render($controller, $action, array $arguments = [])
     {
         return static::renderStatic(
-            array(
+            [
                 'controller' => $controller,
                 'action' => $action,
                 'arguments' => $arguments,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
@@ -54,7 +54,7 @@ class ModuleLinkViewHelper extends AbstractViewHelper
      */
     public static function renderStatic(array $arguments, \Closure $renderChildrenClosure, RenderingContextInterface $renderingContext)
     {
-        $moduleArguments = array();
+        $moduleArguments = [];
         $moduleArguments['SET']['function'] = $arguments['controller'];
         $moduleArguments['CMD'] = $arguments['action'];
         if (!empty($arguments['arguments'])) {

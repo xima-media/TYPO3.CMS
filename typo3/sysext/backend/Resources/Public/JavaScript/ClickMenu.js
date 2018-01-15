@@ -98,16 +98,19 @@ define(['jquery'], function($) {
 			url += ((url.indexOf('?') == -1) ? '?' : '&') + parameters;
 		}
 		$.ajax(url).done(function(response) {
-			// No response content, usually because a copy/paste action was triggered and just the frame needs
-			// to be reloaded.
-			if (typeof response.items === "undefined") {
+			if (!response.getElementsByTagName('data')[0]) {
 				var res = parameters.match(/&reloadListFrame=(0|1|2)(&|$)/);
-				if (parseInt(res[1], 0)) {
-					top.content.list_frame.location.reload(true);
+				var reloadListFrame = res !== null && parseInt(res[1], 0);
+				if (reloadListFrame) {
+					var doc = reloadListFrame != 2 ? top.content.list_frame : top.content;
+					doc.location.reload(true);
 				}
-			} else {
-				ClickMenu.populateData(response.items, response.level);
+				return;
 			}
+			var menu = response.getElementsByTagName('data')[0].getElementsByTagName('clickmenu')[0];
+			var data = menu.getElementsByTagName('htmltable')[0].firstChild.data;
+			var level = menu.getElementsByTagName('cmlevel')[0].firstChild.data;
+			ClickMenu.populateData(data, level);
 		});
 	};
 
@@ -115,17 +118,17 @@ define(['jquery'], function($) {
 	 * fills the clickmenu with content and displays it correctly
 	 * depending on the mouse position
 	 *
-	 * @param {array} items The data that will be put in the menu
+	 * @param {String} data The data that will be put in the menu
 	 * @param {Number} level The depth of the clickmenu
 	 */
-	ClickMenu.populateData = function(items, level) {
+	ClickMenu.populateData = function(data, level) {
 		this.initializeClickMenuContainer();
 
 		level = parseInt(level, 10) || 0;
 		var $obj = $('#contentMenu' + level);
 
 		if ($obj.length && (level === 0 || $('#contentMenu' + (level-1)).is(':visible'))) {
-			$obj.html('<div class="list-group">' + items.join('') + '</div>');
+			$obj.html(data);
 			var x = this.mousePos.X;
 			var y = this.mousePos.Y;
 			var dimsWindow = {
@@ -241,7 +244,7 @@ define(['jquery'], function($) {
 	 */
 	ClickMenu.initializeClickMenuContainer = function() {
 		if ($('#contentMenu0').length === 0) {
-			var code = '<div id="contentMenu0" class="context-menu"></div><div id="contentMenu1" class="context-menu" style="display: block;"></div>';
+			var code = '<div id="contentMenu0" style="display: block;"></div><div id="contentMenu1" style="display: block;"></div>';
 			$('body').append(code);
 		}
 	};
@@ -252,3 +255,38 @@ define(['jquery'], function($) {
 	TYPO3.ClickMenu = ClickMenu;
 	return ClickMenu;
 });
+
+
+/**
+ * available calls to the old API
+ */
+Clickmenu = {
+	show: function(table, uid, listFr, enDisItems, addParams) {
+		if (console !== undefined) {
+			console.log('Clickmenu.show is deprecated and will be removed with CMS 8, please use TYPO3.ClickMenu.');
+		}
+		TYPO3.ClickMenu.show(table, uid, listFr, enDisItems, addParams);
+	},
+	populateData: function(data, level) {
+		if (console !== undefined) {
+			console.log('Clickmenu.popuplateData is deprecated and will be removed with CMS 8, please use TYPO3.ClickMenu.');
+		}
+		TYPO3.ClickMenu.populateData(data, level);
+	}
+};
+
+/**
+ * @param url
+ * @deprecated since 4.2, Used in Core: \TYPO3\CMS\Backend\ClickMenu\ClickMenu::linkItem()
+ */
+function showClickmenu_raw(url) {
+	if (console !== undefined) {
+		console.log('showClickmenu_raw is deprecated and will be removed with CMS 8, please use TYPO3.ClickMenu.');
+	}
+	var parts = url.split('?');
+	if (parts.length === 2) {
+		TYPO3.ClickMenu.fetch(parts[1]);
+	} else {
+		TYPO3.ClickMenu.fetch(url);
+	}
+}

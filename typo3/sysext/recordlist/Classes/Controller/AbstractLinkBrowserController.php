@@ -234,6 +234,11 @@ abstract class AbstractLinkBrowserController
         $lang = $this->getLanguageService();
         foreach ($linkHandlers as $identifier => $configuration) {
             $identifier = rtrim($identifier, '.');
+
+            if (empty($configuration['handler'])) {
+                throw new \UnexpectedValueException(sprintf('Missing handler for link handler "%1$s", check page TSconfig TCEMAIN.linkHandler.%1$s.handler', $identifier), 1494579849);
+            }
+
             /** @var LinkHandlerInterface $handler */
             $handler = GeneralUtility::makeInstance($configuration['handler']);
             $handler->initialize(
@@ -242,6 +247,8 @@ abstract class AbstractLinkBrowserController
                 isset($configuration['configuration.']) ? $configuration['configuration.'] : []
             );
 
+            $label = !empty($configuration['label']) ? $lang->sL($configuration['label']) : '';
+            $label = $label ?: $lang->sL('LLL:EXT:recordlist/Resources/Private/Language/locallang.xlf:error.linkHandlerTitleMissing');
             $this->linkHandlers[$identifier] = [
                 'handlerInstance' => $handler,
                 'label' => htmlspecialchars($lang->sL($configuration['label'])),
@@ -360,7 +367,7 @@ abstract class AbstractLinkBrowserController
         }
 
         $allowedHandlers = array_flip($allowedItems);
-        $menuDef = array();
+        $menuDef = [];
         foreach ($this->linkHandlers as $identifier => $configuration) {
             if (!isset($allowedHandlers[$identifier])) {
                 continue;

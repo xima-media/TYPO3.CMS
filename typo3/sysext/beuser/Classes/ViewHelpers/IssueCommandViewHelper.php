@@ -38,10 +38,10 @@ class IssueCommandViewHelper extends AbstractViewHelper
     public function render($parameters, $redirectUrl = '')
     {
         return static::renderStatic(
-            array(
+            [
                 'parameters' => $parameters,
                 'redirectUrl' => $redirectUrl
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );

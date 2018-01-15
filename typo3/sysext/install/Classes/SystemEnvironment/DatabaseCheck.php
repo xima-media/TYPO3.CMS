@@ -33,9 +33,9 @@ class DatabaseCheck
      *
      * @var array
      */
-    protected $incompatibleSqlModes = array(
+    protected $incompatibleSqlModes = [
         'NO_BACKSLASH_ESCAPES'
-    );
+    ];
 
     /**
      * Get all status information as array with status objects
@@ -44,13 +44,12 @@ class DatabaseCheck
      */
     public function getStatus()
     {
-        $statusArray = array();
+        $statusArray = [];
         if ($this->isDbalEnabled() || !$this->getDatabaseConnection()) {
             return $statusArray;
         }
         $statusArray[] = $this->checkMysqlVersion();
         $statusArray[] = $this->checkInvalidSqlModes();
-        $statusArray[] = $this->checkMysqlDatabaseUtf8Status();
         return $statusArray;
     }
 
@@ -96,51 +95,44 @@ class DatabaseCheck
                 $currentMysqlVersion = $result[1];
             }
         }
-        if (version_compare($currentMysqlVersion, $minimumMysqlVersion) < 0) {
-            $status = new Status\ErrorStatus();
-            $status->setTitle('MySQL version too low');
-            $status->setMessage(
-                'Your MySQL version ' . $currentMysqlVersion . ' is too old. TYPO3 CMS does not run' .
-                ' with this version. Update to at least MySQL ' . $minimumMysqlVersion
-            );
+        if (strpos($currentMysqlVersion, 'MariaDB') !== false) {
+            $notSupportedVersion = '10.2.0';
+            if (version_compare($currentMysqlVersion, $minimumMysqlVersion) < 0) {
+                $status = new Status\ErrorStatus();
+                $status->setTitle('MariaDB version too low');
+                $status->setMessage(
+                    'Your MariaDB version ' . $currentMysqlVersion . ' is too old. TYPO3 CMS does not run' .
+                    ' with this version. Update to at least MariaDB ' . $minimumMysqlVersion
+                );
+            } elseif (version_compare($currentMysqlVersion, $notSupportedVersion) >= 0) {
+                $status = new Status\ErrorStatus();
+                $status->setTitle('MariaDB version too high');
+                $status->setMessage(
+                    'Your MariaDB version ' . $currentMysqlVersion . ' is too new. TYPO3 CMS does not run with this version.'
+                );
+            } else {
+                $status = new Status\OkStatus();
+                $status->setTitle('MariaDB version is fine');
+            }
         } else {
-            $status = new Status\OkStatus();
-            $status->setTitle('MySQL version is fine');
-        }
-
-        return $status;
-    }
-
-    /**
-     * Checks the character set of the database and reports an error if it is not utf-8.
-     *
-     * @return Status\StatusInterface
-     */
-    protected function checkMysqlDatabaseUtf8Status()
-    {
-        $result = $this->getDatabaseConnection()->admin_query('SHOW VARIABLES LIKE "character_set_database"');
-        $row = $this->getDatabaseConnection()->sql_fetch_assoc($result);
-
-        $key = $row['Variable_name'];
-        $value = $row['Value'];
-
-        if ($key !== 'character_set_database') {
-            $status = new Status\ErrorStatus();
-            $status->setTitle('MySQL database character set check failed');
-            $status->setMessage(
-                'Checking database character set failed, got key "' . $key . '" instead of "character_set_database"'
-            );
-        }
-        // also allow utf8mb4
-        if (substr($value, 0, 4) !== 'utf8') {
-            $status = new Status\ErrorStatus();
-            $status->setTitle('MySQL database character set wrong');
-            $status->setMessage(
-                'Your database uses character set "' . $value . '", but only "utf8" is supported with TYPO3.'
-            );
-        } else {
-            $status = new Status\OkStatus();
-            $status->setTitle('Your database uses utf-8. All good.');
+            $notSupportedVersion = '8.0.0';
+            if (version_compare($currentMysqlVersion, $minimumMysqlVersion) < 0) {
+                $status = new Status\ErrorStatus();
+                $status->setTitle('MySQL version too low');
+                $status->setMessage(
+                    'Your MySQL version ' . $currentMysqlVersion . ' is too old. TYPO3 CMS does not run' .
+                    ' with this version. Update to at least MySQL ' . $minimumMysqlVersion
+                );
+            } elseif (version_compare($currentMysqlVersion, $notSupportedVersion) >= 0) {
+                $status = new Status\ErrorStatus();
+                $status->setTitle('MySQL version too high');
+                $status->setMessage(
+                    'Your MySQL version ' . $currentMysqlVersion . ' is too new. TYPO3 CMS does not run with this version.'
+                );
+            } else {
+                $status = new Status\OkStatus();
+                $status->setTitle('MySQL version is fine');
+            }
         }
 
         return $status;
@@ -153,7 +145,7 @@ class DatabaseCheck
      */
     protected function getIncompatibleSqlModes()
     {
-        $sqlModes = array();
+        $sqlModes = [];
         $resource = $this->getDatabaseConnection()->sql_query('SELECT @@SESSION.sql_mode;');
         if ($resource !== false) {
             $result = $this->getDatabaseConnection()->sql_fetch_row($resource);
@@ -176,12 +168,12 @@ class DatabaseCheck
         if (!is_object($database)) {
             /** @var \TYPO3\CMS\Core\Database\DatabaseConnection $database */
             $database = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Database\DatabaseConnection::class);
-            $database->setDatabaseUsername($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['user']);
-            $database->setDatabasePassword($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['password']);
-            $database->setDatabaseHost($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['host']);
-            $database->setDatabasePort($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['port']);
-            $database->setDatabaseSocket($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['unix_socket']);
-            $database->setDatabaseName($GLOBALS['TYPO3_CONF_VARS']['DB']['Connections']['Default']['dbname']);
+            $database->setDatabaseUsername($GLOBALS['TYPO3_CONF_VARS']['DB']['username']);
+            $database->setDatabasePassword($GLOBALS['TYPO3_CONF_VARS']['DB']['password']);
+            $database->setDatabaseHost($GLOBALS['TYPO3_CONF_VARS']['DB']['host']);
+            $database->setDatabasePort($GLOBALS['TYPO3_CONF_VARS']['DB']['port']);
+            $database->setDatabaseSocket($GLOBALS['TYPO3_CONF_VARS']['DB']['socket']);
+            $database->setDatabaseName($GLOBALS['TYPO3_CONF_VARS']['DB']['database']);
             $database->initialize();
             $database->connectDB();
         }

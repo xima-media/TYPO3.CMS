@@ -45,9 +45,6 @@ class NoneElement extends AbstractFormElement
         $rows = (int)$config['rows'];
         // Render as textarea
         if ($rows > 1 || $config['type'] === 'text') {
-            if (!$config['pass_content']) {
-                $itemValue = nl2br($itemValue);
-            }
             $cols = MathUtility::forceIntegerInRange($config['cols'] ?: $this->defaultInputWidth, 5, $this->maxInputWidth);
             $width = $this->formMaxWidth($cols);
             $html = '
@@ -127,7 +124,7 @@ class NoneElement extends AbstractFormElement
                 }
                 break;
             case 'int':
-                $baseArr = array('dec' => 'd', 'hex' => 'x', 'HEX' => 'X', 'oct' => 'o', 'bin' => 'b');
+                $baseArr = ['dec' => 'd', 'hex' => 'x', 'HEX' => 'X', 'oct' => 'o', 'bin' => 'b'];
                 $base = isset($config['format.']['base']) ? trim($config['format.']['base']) : '';
                 $format = isset($baseArr[$base]) ? $baseArr[$base] : 'd';
                 $itemValue = sprintf('%' . $format, $itemValue);

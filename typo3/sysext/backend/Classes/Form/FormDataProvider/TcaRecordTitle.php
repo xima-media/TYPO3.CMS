@@ -69,10 +69,7 @@ class TcaRecordTitle implements FormDataProviderInterface
             $fieldName = $result['isOnSymmetricSide']
                 ? $result['inlineParentConfig']['symmetric_label']
                 : $result['inlineParentConfig']['foreign_label'];
-            // @todo: this is a mixup here. problem is the prep method cuts the string, but also hsc's the thing.
-            // @todo: this is uncool for the userfuncs, so it is applied only here. however, the OuterWrapContainer
-            // @todo: also prep()'s the title created by the else patch below ... find a better separation and clean this up!
-            $result['recordTitle'] = BackendUtility::getRecordTitlePrep($this->getRecordTitleForField($fieldName, $result));
+            $result['recordTitle'] = $this->getRecordTitleForField($fieldName, $result);
         } elseif (isset($result['processedTca']['ctrl']['label_userFunc'])) {
             // userFunc takes precedence over everything else
             $parameters = [
@@ -162,7 +159,8 @@ class TcaRecordTitle implements FormDataProviderInterface
                 $recordTitle = $this->getRecordTitleForRadioType($rawValue, $fieldConfig);
                 break;
             case 'inline':
-                // intentional fall-through
+                $recordTitle = $this->getRecordTitleForInlineType($rawValue, $result['processedTca']['columns'][$fieldName]['children']);
+                break;
             case 'select':
                 $recordTitle = $this->getRecordTitleForSelectType($rawValue, $fieldConfig);
                 break;
@@ -204,6 +202,23 @@ class TcaRecordTitle implements FormDataProviderInterface
                 return $itemLabel;
             }
         }
+        return '';
+    }
+
+    /**
+     * @param int $value
+     * @param array $children
+     *
+     * @return string
+     */
+    protected function getRecordTitleForInlineType($value, array $children)
+    {
+        foreach ($children as $child) {
+            if ((int)$value === $child['vanillaUid']) {
+                return $child['recordTitle'];
+            }
+        }
+
         return '';
     }
 

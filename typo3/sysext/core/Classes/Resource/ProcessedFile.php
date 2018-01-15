@@ -14,7 +14,6 @@ namespace TYPO3\CMS\Core\Resource;
  * The TYPO3 project - inspiring people to share!
  */
 
-use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Utility\MathUtility;
 
 /**
@@ -122,7 +121,7 @@ class ProcessedFile extends AbstractFile
         if (is_array($databaseRow)) {
             $this->reconstituteFromDatabaseRecord($databaseRow);
         }
-        $this->taskTypeRegistry = GeneralUtility::makeInstance(Processing\TaskTypeRegistry::class);
+        $this->taskTypeRegistry = \TYPO3\CMS\Core\Utility\GeneralUtility::makeInstance(\TYPO3\CMS\Core\Resource\Processing\TaskTypeRegistry::class);
     }
 
     /**
@@ -190,9 +189,7 @@ class ProcessedFile extends AbstractFile
         // Update some related properties
         $this->identifier = $addedFile->getIdentifier();
         $this->originalFileSha1 = $this->originalFile->getSha1();
-        if ($addedFile instanceof AbstractFile) {
-            $this->updateProperties($addedFile->getProperties());
-        }
+        $this->updateProperties($addedFile->getProperties());
         $this->deleted = false;
         $this->updated = true;
     }
@@ -326,10 +323,10 @@ class ProcessedFile extends AbstractFile
     public function updateProperties(array $properties)
     {
         if (!is_array($this->properties)) {
-            $this->properties = array();
+            $this->properties = [];
         }
 
-        if (array_key_exists('uid', $properties) && MathUtility::canBeInterpretedAsInteger($properties['uid'])) {
+        if (array_key_exists('uid', $properties) && \TYPO3\CMS\Core\Utility\MathUtility::canBeInterpretedAsInteger($properties['uid'])) {
             $this->properties['uid'] = $properties['uid'];
         }
 
@@ -367,14 +364,14 @@ class ProcessedFile extends AbstractFile
 
         $properties['configuration'] = serialize($this->processingConfiguration);
 
-        return array_merge($properties, array(
+        return array_merge($properties, [
             'storage' => $this->getStorage()->getUid(),
             'checksum' => $this->calculateChecksum(),
             'task_type' => $this->taskType,
             'configurationsha1' => sha1($properties['configuration']),
             'original' => $this->originalFile->getUid(),
             'originalfilesha1' => $this->originalFileSha1
-        ));
+        ]);
     }
 
     /**

@@ -15,6 +15,7 @@ namespace TYPO3\CMS\Impexp;
  */
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
+use TYPO3\CMS\Core\Authentication\BackendUserAuthentication;
 use TYPO3\CMS\Core\Imaging\Icon;
 use TYPO3\CMS\Core\Imaging\IconFactory;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
@@ -50,16 +51,16 @@ class Clickmenu
      */
     public function main(&$backRef, $menuItems, $table, $uid)
     {
-        $localItems = array();
+        $localItems = [];
         // Show import/export on second level menu OR root level.
         if ($backRef->cmLevel && GeneralUtility::_GP('subname') == 'moreoptions' || $table === 'pages' && $uid == 0) {
             $LL = $this->includeLL();
-            $urlParameters = array(
-                'tx_impexp' => array(
+            $urlParameters = [
+                'tx_impexp' => [
                     'action' => 'export'
-                ),
+                ],
                 'id' => ($table == 'pages' ? $uid : $backRef->rec['pid'])
-            );
+            ];
             if ($table == 'pages') {
                 $urlParameters['tx_impexp']['pagetree']['id'] = $uid;
                 $urlParameters['tx_impexp']['pagetree']['levels'] = 0;
@@ -70,26 +71,30 @@ class Clickmenu
             }
             $url = BackendUtility::getModuleUrl('xMOD_tximpexp', $urlParameters);
             $localItems[] = $backRef->linkItem(
-                htmlspecialchars($this->getLanguageService()->getLLL('export', $LL)),
-                $this->iconFactory->getIcon('actions-document-export-t3d', Icon::SIZE_SMALL),
+                $this->getLanguageService()->makeEntities($this->getLanguageService()->getLLL('export', $LL)),
+                $backRef->excludeIcon($this->iconFactory->getIcon('actions-document-export-t3d', Icon::SIZE_SMALL)),
                 $backRef->urlRefForCM($url),
                 1
             );
             if ($table === 'pages') {
-                $urlParameters = array(
-                    'id' => $uid,
-                    'table' => $table,
-                    'tx_impexp' => array(
-                        'action' => 'import'
-                    ),
-                );
-                $url = BackendUtility::getModuleUrl('xMOD_tximpexp', $urlParameters);
-                $localItems[] = $backRef->linkItem(
-                    htmlspecialchars($this->getLanguageService()->getLLL('import', $LL)),
-                    $this->iconFactory->getIcon('actions-document-import-t3d', Icon::SIZE_SMALL),
-                    $backRef->urlRefForCM($url),
-                    1
-                );
+                $backendUser = $this->getBackendUser();
+                $isEnabledForNonAdmin = $backendUser->getTSConfig('options.impexp.enableImportForNonAdminUser');
+                if ($backendUser->isAdmin() || !empty($isEnabledForNonAdmin['value'])) {
+                    $urlParameters = [
+                        'id' => $uid,
+                        'table' => $table,
+                        'tx_impexp' => [
+                            'action' => 'import'
+                        ],
+                    ];
+                    $url = BackendUtility::getModuleUrl('xMOD_tximpexp', $urlParameters);
+                    $localItems[] = $backRef->linkItem(
+                        $this->getLanguageService()->makeEntities($this->getLanguageService()->getLLL('import', $LL)),
+                        $backRef->excludeIcon($this->iconFactory->getIcon('actions-document-import-t3d', Icon::SIZE_SMALL)),
+                        $backRef->urlRefForCM($url),
+                        1
+                    );
+                }
             }
         }
         return array_merge($menuItems, $localItems);
@@ -111,5 +116,13 @@ class Clickmenu
     protected function getLanguageService()
     {
         return $GLOBALS['LANG'];
+    }
+
+    /**
+     * @return BackendUserAuthentication
+     */
+    protected function getBackendUser()
+    {
+        return $GLOBALS['BE_USER'];
     }
 }

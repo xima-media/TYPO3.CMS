@@ -1,4 +1,4 @@
-﻿.. include:: Includes.txt
+﻿﻿.. include:: Includes.txt
 
 
 .. _start:
@@ -11,7 +11,7 @@ Form
     form
 
 :Version:
-    8
+    7
 
 :Language:
     en
@@ -23,7 +23,7 @@ Form
     form
 
 :Copyright:
-    2000-2016
+    2000-2018
 
 :Author:
     TYPO3 CMS Core Development Team

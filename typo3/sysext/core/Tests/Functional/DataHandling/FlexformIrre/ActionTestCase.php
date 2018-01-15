@@ -16,12 +16,13 @@ namespace TYPO3\CMS\Core\Tests\Functional\DataHandling\FlexformIrre;
 
 class ActionTestCase extends \TYPO3\CMS\Core\Tests\Functional\DataHandling\AbstractDataHandlerActionTestCase
 {
+
     /**
      * @var array
      */
-    protected $pathsToLinkInTestInstance = array(
+    protected $pathsToLinkInTestInstance = [
         'typo3/sysext/core/Tests/Functional/DataHandling/FlexformIrre/Fixtures/fileadmin' => 'fileadmin/fixture',
-    );
+    ];
 
     /**
      * @var string

@@ -15,15 +15,12 @@ namespace TYPO3\CMS\Version\Hook;
  */
 
 use TYPO3\CMS\Backend\Utility\BackendUtility;
-use TYPO3\CMS\Core\Database\ConnectionPool;
-use TYPO3\CMS\Core\Database\Query\Restriction\DeletedRestriction;
 use TYPO3\CMS\Core\Database\ReferenceIndex;
 use TYPO3\CMS\Core\DataHandling\DataHandler;
 use TYPO3\CMS\Core\Service\MarkerBasedTemplateService;
 use TYPO3\CMS\Core\Utility\ArrayUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Core\Versioning\VersionState;
-use TYPO3\CMS\Lang\LanguageService;
 
 /**
  * Contains some parts for staging, versioning and workspaces
@@ -38,14 +35,14 @@ class DataHandlerHook
      *
      * @var array
      */
-    protected $notificationEmailInfo = array();
+    protected $notificationEmailInfo = [];
 
     /**
      * Contains remapped IDs.
      *
      * @var array
      */
-    protected $remappedIds = array();
+    protected $remappedIds = [];
 
     /****************************
      *****  Cmdmap  Hooks  ******
@@ -59,7 +56,7 @@ class DataHandlerHook
     public function processCmdmap_beforeStart(DataHandler $tcemainObj)
     {
         // Reset notification array
-        $this->notificationEmailInfo = array();
+        $this->notificationEmailInfo = [];
         // Resolve dependencies of version/workspaces actions:
         $tcemainObj->cmdmap = $this->getCommandMap($tcemainObj)->process()->get();
     }
@@ -82,7 +79,7 @@ class DataHandlerHook
             $commandIsProcessed = true;
             $action = (string)$value['action'];
             $comment = !empty($value['comment']) ? $value['comment'] : '';
-            $notificationAlternativeRecipients = (isset($value['notificationAlternativeRecipients'])) && is_array($value['notificationAlternativeRecipients']) ? $value['notificationAlternativeRecipients'] : array();
+            $notificationAlternativeRecipients = (isset($value['notificationAlternativeRecipients'])) && is_array($value['notificationAlternativeRecipients']) ? $value['notificationAlternativeRecipients'] : [];
             switch ($action) {
                 case 'new':
                     // check if page / branch versioning is needed,
@@ -142,9 +139,9 @@ class DataHandlerHook
             $this->notifyStageChange($notifItem['shared'][0], $notifItem['shared'][1], implode(', ', $notifItem['elements']), 0, $notifItem['shared'][2], $tcemainObj, $notifItem['alternativeRecipients']);
         }
         // Reset notification array
-        $this->notificationEmailInfo = array();
+        $this->notificationEmailInfo = [];
         // Reset remapped IDs
-        $this->remappedIds = array();
+        $this->remappedIds = [];
     }
 
     /**
@@ -195,17 +192,11 @@ class DataHandlerHook
                     if ($record['t3ver_wsid'] > 0 && $recordVersionState->equals(VersionState::DEFAULT_STATE)) {
                         // Change normal versioned record to delete placeholder
                         // Happens when an edited record is deleted
-                        GeneralUtility::makeInstance(ConnectionPool::class)
-                            ->getConnectionForTable($table)
-                            ->update(
-                                $table,
-                                [
-                                    't3ver_label' => 'DELETED!',
-                                    't3ver_state' => 2,
-                                ],
-                                ['uid' => $id]
-                            );
-
+                        $updateFields = [
+                            't3ver_label' => 'DELETED!',
+                            't3ver_state' => 2,
+                        ];
+                        $GLOBALS['TYPO3_DB']->exec_UPDATEquery($table, 'uid=' . $id, $updateFields);
                         // Delete localization overlays:
                         $tcemainObj->deleteL10nOverlayRecords($table, $id);
                     } elseif ($record['t3ver_wsid'] == 0 || !$liveRecordVersionState->indicatesPlaceholder()) {
@@ -242,16 +233,10 @@ class DataHandlerHook
             if ($wsRec = BackendUtility::getWorkspaceVersionOfRecord($record['t3ver_wsid'], $table, $record['t3ver_move_id'], 'uid')) {
                 // Clear the state flag of the workspace version of the record
                 // Setting placeholder state value for version (so it can know it is currently a new version...)
-
-                GeneralUtility::makeInstance(ConnectionPool::class)
-                    ->getConnectionForTable($table)
-                    ->update(
-                        $table,
-                        [
-                            't3ver_state' => (string)new VersionState(VersionState::DEFAULT_STATE)
-                        ],
-                        ['uid' => (int)$wsRec['uid']]
-                    );
+                $updateFields = [
+                    't3ver_state' => (string)new VersionState(VersionState::DEFAULT_STATE)
+                ];
+                $GLOBALS['TYPO3_DB']->exec_UPDATEquery($table, 'uid=' . (int)$wsRec['uid'], $updateFields);
             }
             $tcemainObj->deleteEl($table, $id);
         } else {
@@ -317,7 +302,7 @@ class DataHandlerHook
             }
         }
         // Check workspace permissions:
-        $workspaceAccessBlocked = array();
+        $workspaceAccessBlocked = [];
         // Element was in "New/Deleted/Moved" so it can be moved...
         $recIsNewVersion = $moveRecVersionState->indicatesPlaceholder();
         $destRes = $tcemainObj->BE_USER->workspaceAllowLiveRecordsInPID($resolvedPid, $table);
@@ -442,7 +427,7 @@ class DataHandlerHook
      * @param array $notificationAlternativeRecipients List of recipients to notify instead of be_users selected by sys_workspace, list is generated by workspace extension module
      * @return void
      */
-    protected function notifyStageChange(array $stat, $stageId, $table, $id, $comment, DataHandler $tcemainObj, array $notificationAlternativeRecipients = array())
+    protected function notifyStageChange(array $stat, $stageId, $table, $id, $comment, DataHandler $tcemainObj, array $notificationAlternativeRecipients = [])
     {
         $workspaceRec = BackendUtility::getRecord('sys_workspace', $stat['uid']);
         // So, if $id is not set, then $table is taken to be the complete element name!
@@ -494,29 +479,11 @@ class DataHandlerHook
                             // Traverse them, and find the history of each
                             foreach ($allElements as $elRef) {
                                 list($eTable, $eUid) = explode(':', $elRef);
-
-                                $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-                                    ->getQueryBuilderForTable('sys_log');
-
-                                $queryBuilder->getRestrictions()->removeAll();
-
-                                $result = $queryBuilder
-                                    ->select('log_data', 'tstamp', 'userid')
-                                    ->from('sys_log')
-                                    ->where(
-                                        $queryBuilder->expr()->eq('action', 6),
-                                        $queryBuilder->expr()->eq('details_nr', 30),
-                                        $queryBuilder->expr()->eq(
-                                            'tablename',
-                                            $queryBuilder->createNamedParameter($eTable)
-                                        ),
-                                        $queryBuilder->expr()->eq('recuid', (int)$eUid)
-                                    )
-                                    ->orderBy('uid', 'DESC')
-                                    ->execute();
-
+                                $rows = $GLOBALS['TYPO3_DB']->exec_SELECTgetRows('log_data,tstamp,userid', 'sys_log', 'action=6 and details_nr=30
+												AND tablename=' . $GLOBALS['TYPO3_DB']->fullQuoteStr($eTable, 'sys_log') . '
+												AND recuid=' . (int)$eUid, '', 'uid DESC');
                                 // Find all implicated since the last stage-raise from editing to review:
-                                while ($dat = $result->fetch()) {
+                                foreach ($rows as $dat) {
                                     $data = unserialize($dat['log_data']);
                                     $emails = $this->getEmailsForStageChangeNotification($dat['userid'], true) + $emails;
                                     if ($data['stage'] == 1) {
@@ -564,7 +531,7 @@ class DataHandlerHook
             // userTSconfig: page.tx_version.workspaces.stageNotificationEmail.subject
             $pageTsConfig = BackendUtility::getPagesTSconfig($pageUid);
             $emailConfig = $pageTsConfig['tx_version.']['workspaces.']['stageNotificationEmail.'];
-            $markers = array(
+            $markers = [
                 '###RECORD_TITLE###' => $recordTitle,
                 '###RECORD_PATH###' => BackendUtility::getRecordPath($elementUid, '', 20),
                 '###SITE_NAME###' => $GLOBALS['TYPO3_CONF_VARS']['SYS']['sitename'],
@@ -578,13 +545,13 @@ class DataHandlerHook
                 '###USER_REALNAME###' => $tcemainObj->BE_USER->user['realName'],
                 '###USER_FULLNAME###' => $tcemainObj->BE_USER->user['realName'],
                 '###USER_USERNAME###' => $tcemainObj->BE_USER->user['username']
-            );
+            ];
             // add marker for preview links if workspace extension is loaded
             if (\TYPO3\CMS\Core\Utility\ExtensionManagementUtility::isLoaded('workspaces')) {
                 $this->workspaceService = GeneralUtility::makeInstance(\TYPO3\CMS\Workspaces\Service\WorkspaceService::class);
                 // only generate the link if the marker is in the template - prevents database from getting to much entries
                 if (GeneralUtility::isFirstPartOfStr($emailConfig['message'], 'LLL:')) {
-                    $tempEmailMessage = $this->getLanguageService()->sL($emailConfig['message']);
+                    $tempEmailMessage = $GLOBALS['LANG']->sL($emailConfig['message']);
                 } else {
                     $tempEmailMessage = $emailConfig['message'];
                 }
@@ -603,12 +570,12 @@ class DataHandlerHook
             }
             // send an email to each individual user, to ensure the
             // multilanguage version of the email
-            $emailRecipients = array();
+            $emailRecipients = [];
             // an array of language objects that are needed
             // for emails with different languages
-            $languageObjects = array(
-                $this->getLanguageService()->lang => $this->getLanguageService()
-            );
+            $languageObjects = [
+                $GLOBALS['LANG']->lang => $GLOBALS['LANG']
+            ];
             // loop through each recipient and send the email
             foreach ($emails as $recipientData) {
                 // don't send an email twice
@@ -646,7 +613,7 @@ class DataHandlerHook
                 /** @var $mail \TYPO3\CMS\Core\Mail\MailMessage */
                 $mail = GeneralUtility::makeInstance(\TYPO3\CMS\Core\Mail\MailMessage::class);
                 if (!empty($recipientData['realName'])) {
-                    $recipient = array($recipientData['email'] => $recipientData['realName']);
+                    $recipient = [$recipientData['email'] => $recipientData['realName']];
                 } else {
                     $recipient = $recipientData['email'];
                 }
@@ -672,7 +639,7 @@ class DataHandlerHook
     protected function getEmailsForStageChangeNotification($listOfUsers, $noTablePrefix = false)
     {
         $users = GeneralUtility::trimExplode(',', $listOfUsers, true);
-        $emails = array();
+        $emails = [];
         foreach ($users as $userIdent) {
             if ($noTablePrefix) {
                 $id = (int)$userIdent;
@@ -705,7 +672,7 @@ class DataHandlerHook
      * @param array $notificationAlternativeRecipients comma separated list of recipients to notify instead of normal be_users
      * @return void
      */
-    protected function version_setStage($table, $id, $stageId, $comment = '', $notificationEmailInfo = false, DataHandler $tcemainObj, array $notificationAlternativeRecipients = array())
+    protected function version_setStage($table, $id, $stageId, $comment = '', $notificationEmailInfo = false, DataHandler $tcemainObj, array $notificationAlternativeRecipients = [])
     {
         if ($errorCode = $tcemainObj->BE_USER->workspaceCannotEditOfflineVersion($table, $id)) {
             $tcemainObj->newlog('Attempt to set stage for record failed: ' . $errorCode, 1);
@@ -715,21 +682,16 @@ class DataHandlerHook
             // check if the usere is allowed to the current stage, so it's also allowed to send to next stage
             if ($GLOBALS['BE_USER']->workspaceCheckStageForCurrent($record['t3ver_stage'])) {
                 // Set stage of record:
-                GeneralUtility::makeInstance(ConnectionPool::class)
-                    ->getConnectionForTable($table)
-                    ->update(
-                        $table,
-                        [
-                            't3ver_stage' => $stageId,
-                        ],
-                        ['uid' => (int)$id]
-                    );
+                $updateData = [
+                    't3ver_stage' => $stageId
+                ];
+                $GLOBALS['TYPO3_DB']->exec_UPDATEquery($table, 'uid=' . (int)$id, $updateData);
                 $tcemainObj->newlog2('Stage for record was changed to ' . $stageId . '. Comment was: "' . substr($comment, 0, 100) . '"', $table, $id);
                 // TEMPORARY, except 6-30 as action/detail number which is observed elsewhere!
-                $tcemainObj->log($table, $id, 6, 0, 0, 'Stage raised...', 30, array('comment' => $comment, 'stage' => $stageId));
+                $tcemainObj->log($table, $id, 6, 0, 0, 'Stage raised...', 30, ['comment' => $comment, 'stage' => $stageId]);
                 if ((int)$stat['stagechg_notification'] > 0) {
                     if ($notificationEmailInfo) {
-                        $this->notificationEmailInfo[$stat['uid'] . ':' . $stageId . ':' . $comment]['shared'] = array($stat, $stageId, $comment);
+                        $this->notificationEmailInfo[$stat['uid'] . ':' . $stageId . ':' . $comment]['shared'] = [$stat, $stageId, $comment];
                         $this->notificationEmailInfo[$stat['uid'] . ':' . $stageId . ':' . $comment]['elements'][] = $table . ':' . $id;
                         $this->notificationEmailInfo[$stat['uid'] . ':' . $stageId . ':' . $comment]['alternativeRecipients'] = $notificationAlternativeRecipients;
                     } else {
@@ -768,7 +730,7 @@ class DataHandlerHook
             return;
         }
         // Make list of tables that should come along with a new version of the page:
-        $verTablesArray = array();
+        $verTablesArray = [];
         $allTables = array_keys($GLOBALS['TCA']);
         foreach ($allTables as $tableName) {
             if ($tableName != 'pages' && ($versionizeTree > 0 || $GLOBALS['TCA'][$tableName]['ctrl']['versioning_followPages'])) {
@@ -792,7 +754,7 @@ class DataHandlerHook
         // If we're going to copy recursively...:
         if ($versionizeTree > 0) {
             // Get ALL subpages to copy (read permissions respected - they should NOT be...):
-            $CPtable = $tcemainObj->int_pageTreeInfo(array(), $uid, (int)$versionizeTree, $theNewRootID);
+            $CPtable = $tcemainObj->int_pageTreeInfo([], $uid, (int)$versionizeTree, $theNewRootID);
             // Now copying the subpages
             foreach ($CPtable as $thePageUid => $thePagePid) {
                 $newPid = $tcemainObj->copyMappingArray['pages'][$thePagePid];
@@ -821,10 +783,15 @@ class DataHandlerHook
      * @param array $notificationAlternativeRecipients comma separated list of recipients to notificate instead of normal be_users
      * @return void
      */
-    protected function version_swap($table, $id, $swapWith, $swapIntoWS = 0, DataHandler $tcemainObj, $comment = '', $notificationEmailInfo = false, $notificationAlternativeRecipients = array())
+    protected function version_swap($table, $id, $swapWith, $swapIntoWS = 0, DataHandler $tcemainObj, $comment = '', $notificationEmailInfo = false, $notificationAlternativeRecipients = [])
     {
 
         // Check prerequisites before start swapping
+
+        // Skip records that have been deleted during the current execution
+        if ($tcemainObj->hasDeletedRecord($table, $id)) {
+            return;
+        }
 
         // First, check if we may actually edit the online record
         if (!$tcemainObj->checkRecordUpdateAccess($table, $id)) {
@@ -834,7 +801,7 @@ class DataHandlerHook
         // Select the two versions:
         $curVersion = BackendUtility::getRecord($table, $id, '*');
         $swapVersion = BackendUtility::getRecord($table, $swapWith, '*');
-        $movePlh = array();
+        $movePlh = [];
         $movePlhID = 0;
         if (!(is_array($curVersion) && is_array($swapVersion))) {
             $tcemainObj->newlog('Error: Either online or swap version could not be selected!', 2);
@@ -863,7 +830,7 @@ class DataHandlerHook
             return;
         }
         // Lock file name:
-        $lockFileName = PATH_site . 'typo3temp/var/swap_locking/' . $table . ':' . $id . '.ser';
+        $lockFileName = PATH_site . 'typo3temp/swap_locking/' . $table . '_' . $id . '.ser';
         if (@is_file($lockFileName)) {
             $tcemainObj->newlog('A swapping lock file was present. Either another swap process is already running or a previous swap process failed. Ask your administrator to handle the situation.', 2);
             return;
@@ -872,12 +839,12 @@ class DataHandlerHook
         // Now start to swap records by first creating the lock file
 
         // Write lock-file:
-        GeneralUtility::writeFileToTypo3tempDir($lockFileName, serialize(array(
+        GeneralUtility::writeFileToTypo3tempDir($lockFileName, serialize([
             'tstamp' => $GLOBALS['EXEC_TIME'],
             'user' => $tcemainObj->BE_USER->user['username'],
             'curVersion' => $curVersion,
             'swapVersion' => $swapVersion
-        )));
+        ]));
         // Find fields to keep
         $keepFields = $this->getUniqueFields($table);
         if ($GLOBALS['TCA'][$table]['ctrl']['sortby']) {
@@ -895,7 +862,7 @@ class DataHandlerHook
             $curVersion[$fN] = $tmp;
         }
         // Preserve states:
-        $t3ver_state = array();
+        $t3ver_state = [];
         $t3ver_state['swapVersion'] = $swapVersion['t3ver_state'];
         $t3ver_state['curVersion'] = $curVersion['t3ver_state'];
         // Modify offline version to become online:
@@ -942,7 +909,9 @@ class DataHandlerHook
         // Take care of relations in each field (e.g. IRRE):
         if (is_array($GLOBALS['TCA'][$table]['columns'])) {
             foreach ($GLOBALS['TCA'][$table]['columns'] as $field => $fieldConf) {
-                $this->version_swap_processFields($table, $field, $fieldConf['config'], $curVersion, $swapVersion, $tcemainObj);
+                if (isset($fieldConf['config']) && is_array($fieldConf['config'])) {
+                    $this->version_swap_processFields($table, $field, $fieldConf['config'], $curVersion, $swapVersion, $tcemainObj);
+                }
             }
         }
         unset($swapVersion['uid']);
@@ -964,27 +933,15 @@ class DataHandlerHook
         // Generating proper history data to prepare logging
         $tcemainObj->compareFieldArrayWithCurrentAndUnset($table, $id, $swapVersion);
         $tcemainObj->compareFieldArrayWithCurrentAndUnset($table, $swapWith, $curVersion);
-
         // Execute swapping:
         $sqlErrors = [];
-        $connection = GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable($table);
-        $connection->update(
-            $table,
-            $swapVersion,
-            ['uid' => (int)$id]
-        );
-
-        if ($connection->errorCode()) {
-            $sqlErrors[] = $connection->errorInfo();
+        $GLOBALS['TYPO3_DB']->exec_UPDATEquery($table, 'uid=' . (int)$id, $swapVersion);
+        if ($GLOBALS['TYPO3_DB']->sql_error()) {
+            $sqlErrors[] = $GLOBALS['TYPO3_DB']->sql_error();
         } else {
-            $connection->update(
-                $table,
-                $curVersion,
-                ['uid' => (int)$swapWith]
-            );
-
-            if ($connection->errorCode()) {
-                $sqlErrors[] = $connection->errorInfo();
+            $GLOBALS['TYPO3_DB']->exec_UPDATEquery($table, 'uid=' . (int)$swapWith, $curVersion);
+            if ($GLOBALS['TYPO3_DB']->sql_error()) {
+                $sqlErrors[] = $GLOBALS['TYPO3_DB']->sql_error();
             } else {
                 unlink($lockFileName);
             }
@@ -1003,13 +960,7 @@ class DataHandlerHook
                     $tcemainObj->deleteEl($table, $movePlhID, true, true);
                 } else {
                     // Otherwise update the movePlaceholder:
-                    GeneralUtility::makeInstance(ConnectionPool::class)
-                        ->getConnectionForTable($table)
-                        ->update(
-                            $table,
-                            $movePlh,
-                            ['uid' => (int)$movePlhID]
-                        );
+                    $GLOBALS['TYPO3_DB']->exec_UPDATEquery($table, 'uid=' . (int)$movePlhID, $movePlh);
                     $tcemainObj->addRemapStackRefIndex($table, $movePlhID);
                 }
             }
@@ -1025,28 +976,28 @@ class DataHandlerHook
             // Set log entry for live record:
             $propArr = $tcemainObj->getRecordPropertiesFromRow($table, $swapVersion);
             if ($propArr['_ORIG_pid'] == -1) {
-                $label = $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tcemain.xlf:version_swap.offline_record_updated');
+                $label = $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_tcemain.xlf:version_swap.offline_record_updated');
             } else {
-                $label = $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tcemain.xlf:version_swap.online_record_updated');
+                $label = $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_tcemain.xlf:version_swap.online_record_updated');
             }
-            $theLogId = $tcemainObj->log($table, $id, 2, $propArr['pid'], 0, $label, 10, array($propArr['header'], $table . ':' . $id), $propArr['event_pid']);
+            $theLogId = $tcemainObj->log($table, $id, 2, $propArr['pid'], 0, $label, 10, [$propArr['header'], $table . ':' . $id], $propArr['event_pid']);
             $tcemainObj->setHistory($table, $id, $theLogId);
             // Update reference index of the offline record:
             $tcemainObj->addRemapStackRefIndex($table, $swapWith);
             // Set log entry for offline record:
             $propArr = $tcemainObj->getRecordPropertiesFromRow($table, $curVersion);
             if ($propArr['_ORIG_pid'] == -1) {
-                $label = $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tcemain.xlf:version_swap.offline_record_updated');
+                $label = $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_tcemain.xlf:version_swap.offline_record_updated');
             } else {
-                $label = $this->getLanguageService()->sL('LLL:EXT:lang/locallang_tcemain.xlf:version_swap.online_record_updated');
+                $label = $GLOBALS['LANG']->sL('LLL:EXT:lang/locallang_tcemain.xlf:version_swap.online_record_updated');
             }
-            $theLogId = $tcemainObj->log($table, $swapWith, 2, $propArr['pid'], 0, $label, 10, array($propArr['header'], $table . ':' . $swapWith), $propArr['event_pid']);
+            $theLogId = $tcemainObj->log($table, $swapWith, 2, $propArr['pid'], 0, $label, 10, [$propArr['header'], $table . ':' . $swapWith], $propArr['event_pid']);
             $tcemainObj->setHistory($table, $swapWith, $theLogId);
 
             $stageId = -20; // \TYPO3\CMS\Workspaces\Service\StagesService::STAGE_PUBLISH_EXECUTE_ID;
             if ($notificationEmailInfo) {
                 $notificationEmailInfoKey = $wsAccess['uid'] . ':' . $stageId . ':' . $comment;
-                $this->notificationEmailInfo[$notificationEmailInfoKey]['shared'] = array($wsAccess, $stageId, $comment);
+                $this->notificationEmailInfo[$notificationEmailInfoKey]['shared'] = [$wsAccess, $stageId, $comment];
                 $this->notificationEmailInfo[$notificationEmailInfoKey]['elements'][] = $table . ':' . $id;
                 $this->notificationEmailInfo[$notificationEmailInfoKey]['alternativeRecipients'] = $notificationAlternativeRecipients;
             } else {
@@ -1054,7 +1005,7 @@ class DataHandlerHook
             }
                 // Write to log with stageId -20
             $tcemainObj->newlog2('Stage for record was changed to ' . $stageId . '. Comment was: "' . substr($comment, 0, 100) . '"', $table, $id);
-            $tcemainObj->log($table, $id, 6, 0, 0, 'Published', 30, array('comment' => $comment, 'stage' => $stageId));
+            $tcemainObj->log($table, $id, 6, 0, 0, 'Published', 30, ['comment' => $comment, 'stage' => $stageId]);
 
             // Clear cache:
             $tcemainObj->registerRecordIdForPageCacheClearing($table, $id);
@@ -1122,15 +1073,15 @@ class DataHandlerHook
         if (count($liveRelations->itemArray)) {
             $dataHandler->addRemapAction(
                     $tableName, $liveData['uid'],
-                    array($this, 'updateInlineForeignFieldSorting'),
-                    array($tableName, $liveData['uid'], $foreignTable, $liveRelations->tableArray[$foreignTable], $configuration, $dataHandler->BE_USER->workspace)
+                    [$this, 'updateInlineForeignFieldSorting'],
+                    [$tableName, $liveData['uid'], $foreignTable, $liveRelations->tableArray[$foreignTable], $configuration, $dataHandler->BE_USER->workspace]
             );
         }
         if (count($versionRelations->itemArray)) {
             $dataHandler->addRemapAction(
                     $tableName, $liveData['uid'],
-                    array($this, 'updateInlineForeignFieldSorting'),
-                    array($tableName, $liveData['uid'], $foreignTable, $versionRelations->tableArray[$foreignTable], $configuration, 0)
+                    [$this, 'updateInlineForeignFieldSorting'],
+                    [$tableName, $liveData['uid'], $foreignTable, $versionRelations->tableArray[$foreignTable], $configuration, 0]
             );
         }
     }
@@ -1155,7 +1106,7 @@ class DataHandlerHook
      */
     public function updateInlineForeignFieldSorting($parentTableName, $parentId, $foreignTableName, $foreignIds, array $configuration, $targetWorkspaceId)
     {
-        $remappedIds = array();
+        $remappedIds = [];
         // Use remapped ids (live id <-> version id)
         foreach ($foreignIds as $foreignId) {
             if (!empty($this->remappedIds[$foreignTableName][$foreignId])) {
@@ -1197,28 +1148,17 @@ class DataHandlerHook
             return;
         }
         // Clear workspace ID:
-        $updateData = array(
+        $updateData = [
             't3ver_wsid' => 0,
             't3ver_tstamp' => $GLOBALS['EXEC_TIME']
-        );
-        $connection = GeneralUtility::makeInstance(ConnectionPool::class)->getConnectionForTable($table);
-        $connection->update(
-            $table,
-            $updateData,
-            ['uid' => (int)$id]
-        );
-
+        ];
+        $GLOBALS['TYPO3_DB']->exec_UPDATEquery($table, 'uid=' . (int)$id, $updateData);
         // Clear workspace ID for live version AND DELETE IT as well because it is a new record!
         if (
             VersionState::cast($liveRec['t3ver_state'])->equals(VersionState::NEW_PLACEHOLDER)
             || VersionState::cast($liveRec['t3ver_state'])->equals(VersionState::DELETE_PLACEHOLDER)
         ) {
-            $connection->update(
-                $table,
-                $updateData,
-                ['uid' => (int)$liveRec['uid']]
-            );
-
+            $GLOBALS['TYPO3_DB']->exec_UPDATEquery($table, 'uid=' . (int)$liveRec['uid'], $updateData);
             // THIS assumes that the record was placeholder ONLY for ONE record (namely $id)
             $tcemainObj->deleteEl($table, $liveRec['uid'], true);
         }
@@ -1264,25 +1204,15 @@ class DataHandlerHook
         foreach ($copyTablesArray as $table) {
             // all records under the page is copied.
             if ($table && is_array($GLOBALS['TCA'][$table]) && $table !== 'pages') {
-                $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-                    ->getQueryBuilderForTable($table);
-                $queryBuilder->getRestrictions()
-                    ->removeAll()
-                    ->add(GeneralUtility::makeInstance(DeletedRestriction::class));
-
-                $statement = $queryBuilder
-                    ->select('uid')
-                    ->from($table)
-                    ->where($queryBuilder->expr()->eq('pid', (int)$oldPageId))
-                    ->execute();
-
-                while ($row = $statement->fetch()) {
+                $mres = $GLOBALS['TYPO3_DB']->exec_SELECTquery('uid', $table, 'pid=' . (int)$oldPageId . $tcemainObj->deleteClause($table));
+                while ($row = $GLOBALS['TYPO3_DB']->sql_fetch_assoc($mres)) {
                     // Check, if this record has already been copied by a parent record as relation:
                     if (!$tcemainObj->copyMappingArray[$table][$row['uid']]) {
                         // Copying each of the underlying records (method RAW)
                         $tcemainObj->copyRecord_raw($table, $row['uid'], $newPageId);
                     }
                 }
+                $GLOBALS['TYPO3_DB']->sql_free_result($mres);
             }
         }
     }
@@ -1299,7 +1229,7 @@ class DataHandlerHook
     {
         $rec = BackendUtility::getRecord($table, $offlineId, 't3ver_wsid');
         $workspaceId = (int)$rec['t3ver_wsid'];
-        $elementData = array();
+        $elementData = [];
         if ($workspaceId === 0) {
             return $elementData;
         }
@@ -1317,34 +1247,16 @@ class DataHandlerHook
         // Traversing all tables supporting versioning:
         foreach ($GLOBALS['TCA'] as $table => $cfg) {
             if ($GLOBALS['TCA'][$table]['ctrl']['versioningWS'] && $table !== 'pages') {
-                $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-                    ->getQueryBuilderForTable($table);
-
-                $queryBuilder->getRestrictions()
-                    ->removeAll()
-                    ->add(GeneralUtility::makeInstance(DeletedRestriction::class));
-
-                $statement = $queryBuilder
-                    ->select('A.uid AS offlineUid', 'B.uid AS uid')
-                    ->from($table, 'A')
-                    ->from($table, 'B')
-                    ->where(
-                        $queryBuilder->expr()->eq('A.pid', -1),
-                        $queryBuilder->expr()->eq('B.pid', (int)$pageId),
-                        $queryBuilder->expr()->eq('A.t3ver_wsid', (int)$workspaceId),
-                        $queryBuilder->expr()->eq('A.t3ver_oid', $queryBuilder->quoteIdentifier('B.uid'))
-                    )
-                    ->execute();
-
-                while ($row = $statement->fetch()) {
-                    $elementData[$table][] = [$row['uid'], $row['offlineUid']];
+                $res = $GLOBALS['TYPO3_DB']->exec_SELECTquery('A.uid AS offlineUid, B.uid AS uid', $table . ' A,' . $table . ' B', 'A.pid=-1 AND B.pid=' . $pageId . ' AND A.t3ver_wsid=' . $workspaceId . ' AND B.uid=A.t3ver_oid' . BackendUtility::deleteClause($table, 'A') . BackendUtility::deleteClause($table, 'B'));
+                while (false != ($row = $GLOBALS['TYPO3_DB']->sql_fetch_row($res))) {
+                    $elementData[$table][] = [$row[1], $row[0]];
                 }
+                $GLOBALS['TYPO3_DB']->sql_free_result($res);
             }
         }
         if ($offlinePageId && $offlinePageId != $pageId) {
             $elementData['pages'][] = [$pageId, $offlinePageId];
         }
-
         return $elementData;
     }
 
@@ -1364,29 +1276,11 @@ class DataHandlerHook
         // Traversing all tables supporting versioning:
         foreach ($GLOBALS['TCA'] as $table => $cfg) {
             if ($GLOBALS['TCA'][$table]['ctrl']['versioningWS'] && $table !== 'pages') {
-                $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-                    ->getQueryBuilderForTable($table);
-
-                $queryBuilder->getRestrictions()
-                    ->removeAll()
-                    ->add(GeneralUtility::makeInstance(DeletedRestriction::class));
-
-                $statement = $queryBuilder
-                    ->select('A.uid')
-                    ->from($table, 'A')
-                    ->from($table, 'B')
-                    ->where(
-                        $queryBuilder->expr()->eq('A.pid', -1),
-                        $queryBuilder->expr()->in('B.pid', array_map('intval', $pageIdList)),
-                        $queryBuilder->expr()->eq('A.t3ver_wsid', (int)$workspaceId),
-                        $queryBuilder->expr()->eq('A.t3ver_oid', $queryBuilder->quoteIdentifier('B.uid'))
-                    )
-                    ->groupBy('A.uid')
-                    ->execute();
-
-                while ($row = $statement->fetch()) {
-                    $elementList[$table][] = $row['uid'];
+                $res = $GLOBALS['TYPO3_DB']->exec_SELECTquery('DISTINCT A.uid', $table . ' A,' . $table . ' B', 'A.pid=-1' . ' AND A.t3ver_wsid=' . $workspaceId . ' AND B.pid IN (' . implode(',', $pageIdList) . ') AND A.t3ver_oid=B.uid' . BackendUtility::deleteClause($table, 'A') . BackendUtility::deleteClause($table, 'B'));
+                while (false !== ($row = $GLOBALS['TYPO3_DB']->sql_fetch_row($res))) {
+                    $elementList[$table][] = $row[0];
                 }
+                $GLOBALS['TYPO3_DB']->sql_free_result($res);
                 if (is_array($elementList[$table])) {
                     // Yes, it is possible to get non-unique array even with DISTINCT above!
                     // It happens because several UIDs are passed in the array already.
@@ -1411,28 +1305,9 @@ class DataHandlerHook
         if ($workspaceId == 0) {
             return;
         }
-
-        $queryBuilder = GeneralUtility::makeInstance(ConnectionPool::class)
-            ->getQueryBuilderForTable($table);
-        $queryBuilder->getRestrictions()
-            ->removeAll()
-            ->add(GeneralUtility::makeInstance(DeletedRestriction::class));
-
-        $statement = $queryBuilder
-            ->select('B.pid')
-            ->from($table, 'A')
-            ->from($table, 'B')
-            ->where(
-                $queryBuilder->expr()->eq('A.pid', -1),
-                $queryBuilder->expr()->eq('A.t3ver_wsid', (int)$workspaceId),
-                $queryBuilder->expr()->in('A.uid', array_map('intval', $idList)),
-                $queryBuilder->expr()->eq('A.t3ver_oid', $queryBuilder->quoteIdentifier('B.uid'))
-            )
-            ->groupBy('B.pid')
-            ->execute();
-
-        while ($row = $statement->fetch()) {
-            $pageIdList[] = $row['pid'];
+        $res = $GLOBALS['TYPO3_DB']->exec_SELECTquery('DISTINCT B.pid', $table . ' A,' . $table . ' B', 'A.pid=-1' . ' AND A.t3ver_wsid=' . $workspaceId . ' AND A.uid IN (' . implode(',', $idList) . ') AND A.t3ver_oid=B.uid' . BackendUtility::deleteClause($table, 'A') . BackendUtility::deleteClause($table, 'B'));
+        while (false !== ($row = $GLOBALS['TYPO3_DB']->sql_fetch_row($res))) {
+            $pageIdList[] = $row[0];
             // Find ws version
             // Note: cannot use BackendUtility::getRecordWSOL()
             // here because it does not accept workspace id!
@@ -1442,6 +1317,7 @@ class DataHandlerHook
                 $elementList['pages'][$row[0]] = $rec['_ORIG_uid'];
             }
         }
+        $GLOBALS['TYPO3_DB']->sql_free_result($res);
         // The line below is necessary even with DISTINCT
         // because several elements can be passed by caller
         $pageIdList = array_unique($pageIdList);
@@ -1494,7 +1370,7 @@ class DataHandlerHook
         } else {
             // First, we create a placeholder record in the Live workspace that
             // represents the position to where the record is eventually moved to.
-            $newVersion_placeholderFieldArray = array();
+            $newVersion_placeholderFieldArray = [];
 
             // Use property for move placeholders if set (since TYPO3 CMS 6.2)
             if (isset($GLOBALS['TCA'][$table]['ctrl']['shadowColumnsForMovePlaceholders'])) {
@@ -1560,17 +1436,10 @@ class DataHandlerHook
             $tcemainObj->moveRecord_raw($table, $tcemainObj->substNEWwithIDs[$id], $destPid);
             // Move the workspace-version of the original to be the version of the move-to-placeholder:
             // Setting placeholder state value for version (so it can know it is currently a new version...)
-            $updateFields = array(
+            $updateFields = [
                 't3ver_state' => (string)new VersionState(VersionState::MOVE_POINTER)
-            );
-
-            GeneralUtility::makeInstance(ConnectionPool::class)
-                ->getConnectionForTable($table)
-                ->update(
-                    $table,
-                    $updateFields,
-                    ['uid' => (int)$wsUid]
-                );
+            ];
+            $GLOBALS['TYPO3_DB']->exec_UPDATEquery($table, 'uid=' . (int)$wsUid, $updateFields);
         }
         // Check for the localizations of that element and move them as well
         $tcemainObj->moveL10nOverlayRecords($table, $uid, $destPid, $originalRecordDestinationPid);
@@ -1583,7 +1452,7 @@ class DataHandlerHook
      * @param array $possibleInlineChildren Collected possible inline children
      * @return array
      */
-    protected function getPossibleInlineChildTablesOfParentTable($parentTable, array $possibleInlineChildren = array())
+    protected function getPossibleInlineChildTablesOfParentTable($parentTable, array $possibleInlineChildren = [])
     {
         foreach ($GLOBALS['TCA'][$parentTable]['columns'] as $parentField => $parentFieldDefinition) {
             if (isset($parentFieldDefinition['config']['type'])) {
@@ -1623,7 +1492,7 @@ class DataHandlerHook
      */
     protected function getUniqueFields($table)
     {
-        $listArr = array();
+        $listArr = [];
         if (empty($GLOBALS['TCA'][$table]['columns'])) {
             return $listArr;
         }
@@ -1644,13 +1513,5 @@ class DataHandlerHook
     protected function createRelationHandlerInstance()
     {
         return GeneralUtility::makeInstance(\TYPO3\CMS\Core\Database\RelationHandler::class);
-    }
-
-    /**
-     * @return LanguageService
-     */
-    protected function getLanguageService()
-    {
-        return $GLOBALS['LANG'];
     }
 }

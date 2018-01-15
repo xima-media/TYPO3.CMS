@@ -54,13 +54,13 @@ class PageBrowsingViewHelper extends AbstractViewHelper
     public function render($maximumNumberOfResultPages, $numberOfResults, $resultsPerPage, $currentPage = 0, $freeIndexUid = null)
     {
         return static::renderStatic(
-            array(
+            [
                 'maximumNumberOfResultPages' => $maximumNumberOfResultPages,
                 'numberOfResults' => $numberOfResults,
                 'resultsPerPage' => $resultsPerPage,
                 'currentPage' => $currentPage,
                 'freeIndexUid' => $freeIndexUid,
-            ),
+            ],
             $this->buildRenderChildrenClosure(),
             $this->renderingContext
         );
